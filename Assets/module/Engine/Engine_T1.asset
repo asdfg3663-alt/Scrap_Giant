@@ -13,11 +13,11 @@ MonoBehaviour:
   m_Name: Engine_T1
   m_EditorClassIdentifier: Assembly-CSharp::ModuleData
   displayName: Engine_T1
-  type: 0
+  type: 1
   tier: 1
   maxHP: 10
-  powerGenPerSec: 1
-  powerUsePerSec: 0
+  powerGenPerSec: 0
+  powerUsePerSec: 3
   maxEnergy: 10
   thrust: 10
   mass: 5
