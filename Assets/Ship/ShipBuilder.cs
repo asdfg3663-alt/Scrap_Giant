@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -19,11 +20,19 @@ public class ShipBuilder : MonoBehaviour
     [Header("Input")]
     public KeyCode rotateKey = KeyCode.R;
 
-    private ModuleInstance draggingModule;
-    private Transform draggingTf;
+    [Header("Drag Rules")]
+    public float longPress = 0.25f;         // ★ 꾹 누르기 시간
+    public float dragStartDistance = 0.15f; // ★ 이만큼 움직여야 드래그 시작(클릭 오동작 방지)
+
+    private ModuleInstance candidateModule;  // 마우스 다운 시 후보
+    private Transform draggingTf;            // 실제 드래그 대상
     private Vector3 dragOffset;
     private int dragRot90;
     private bool pickedFromShip;
+
+    private float pressT;
+    private Vector2 pressWorld;
+    private bool dragStarted;
 
     void Awake()
     {
@@ -34,8 +43,15 @@ public class ShipBuilder : MonoBehaviour
 
     void Update()
     {
+        // UI 위에서는 빌더 입력 무시 (UI 얽힘 방지)
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
+
         if (PressedThisFrame())
-            TryPick();
+            BeginPress();
+
+        if (candidateModule != null && Holding())
+            HoldToStartDrag();
 
         if (draggingTf != null)
         {
@@ -48,34 +64,62 @@ public class ShipBuilder : MonoBehaviour
             }
 
             if (ReleasedThisFrame())
-                DropAttach();
+                EndDragDrop();
+        }
+
+        // 클릭만 하고 뗀 경우: 아무 일도 안 함(Attach 금지)
+        if (candidateModule != null && ReleasedThisFrame() && !dragStarted)
+        {
+            candidateModule = null;
         }
     }
 
-    void TryPick()
+    void BeginPress()
     {
-        var world = MouseWorld();
+        pressT = 0f;
+        dragStarted = false;
 
-        var col = Physics2D.OverlapPoint(world, pickMask);
+        pressWorld = MouseWorld();
+
+        var col = Physics2D.OverlapPoint(pressWorld, pickMask);
         if (!col)
         {
-            Debug.Log($"[ShipBuilder] Pick miss. world={world} mask={pickMask.value}");
+            candidateModule = null;
             return;
         }
 
         var mi = col.GetComponentInParent<ModuleInstance>();
         if (!mi)
         {
-            Debug.Log($"[ShipBuilder] Collider hit but no ModuleInstance. collider={col.name}");
+            candidateModule = null;
             return;
         }
 
-        // 이미 붙어있던 모듈도 다시 이동 가능하게
+        candidateModule = mi;
+    }
+
+    void HoldToStartDrag()
+    {
+        pressT += Time.deltaTime;
+
+        Vector2 now = MouseWorld();
+        bool movedEnough = Vector2.Distance(now, pressWorld) >= dragStartDistance;
+
+        // ★ 롱프레스 + 이동이 만족될 때만 드래그 시작
+        if (!dragStarted && pressT >= longPress && movedEnough)
+        {
+            StartDragging(candidateModule, now);
+            candidateModule = null;
+            dragStarted = true;
+        }
+    }
+
+    void StartDragging(ModuleInstance mi, Vector2 worldNow)
+    {
         pickedFromShip = mi.transform.IsChildOf(shipRoot);
 
-        draggingModule = mi;
         draggingTf = mi.transform;
-        dragOffset = draggingTf.position - world;
+        dragOffset = draggingTf.position - (Vector3)worldNow;
 
         var att = draggingTf.GetComponent<ModuleAttachment>();
         dragRot90 = att ? att.rot90 : 0;
@@ -84,14 +128,12 @@ public class ShipBuilder : MonoBehaviour
         SetModulePhysics(draggingTf, attachedToShip: false);
         SetDragCollider(draggingTf, true);
 
-        // 붙어있던 모듈이면, 부모를 잠깐 풀어서 자유롭게 이동하게
+        // ★ 드래그가 시작된 경우에만 "분리"
         if (pickedFromShip)
         {
             draggingTf.SetParent(null, true);
-            if (shipStats) shipStats.Rebuild(); // 떼면 스탯 감소(원하면 제거 가능)
+            if (shipStats) shipStats.Rebuild();
         }
-
-        Debug.Log($"[ShipBuilder] Pick OK: {draggingTf.name} (fromShip={pickedFromShip})");
     }
 
     void DragMove()
@@ -103,6 +145,18 @@ public class ShipBuilder : MonoBehaviour
 
         if (Vector3.Distance(snapped, draggingTf.position) <= snapRadius)
             draggingTf.position = snapped;
+    }
+
+    void EndDragDrop()
+    {
+        // 드래그 시작이 안 된 상태면 여기로 올 수 없음(방어)
+        if (draggingTf == null) return;
+
+        DropAttach();
+
+        draggingTf = null;
+        pickedFromShip = false;
+        dragStarted = false;
     }
 
     void DropAttach()
@@ -120,17 +174,11 @@ public class ShipBuilder : MonoBehaviour
         att.gridPos = grid;
         att.rot90 = dragRot90;
 
-        // ★ 핵심: 붙는 순간 모듈 Rigidbody2D 시뮬레이션을 끈다 (떨어지는 현상 방지)
+        // 붙는 순간 Rigidbody2D 시뮬레이션을 끈다 (떨어지는 현상 방지)
         SetDragCollider(draggingTf, false);
         SetModulePhysics(draggingTf, attachedToShip: true);
 
         if (shipStats) shipStats.Rebuild();
-
-        Debug.Log($"[ShipBuilder] Attached: {draggingTf.name} grid={grid} totalThrust={shipStats?.totalThrust}");
-
-        draggingModule = null;
-        draggingTf = null;
-        pickedFromShip = false;
     }
 
     void SetModulePhysics(Transform moduleTf, bool attachedToShip)
@@ -138,20 +186,16 @@ public class ShipBuilder : MonoBehaviour
         var rb = moduleTf.GetComponent<Rigidbody2D>();
         if (!rb) return;
 
-        // 속도/회전 속도 초기화 (안 하면 '미끄러져 나감'이 남음)
         rb.linearVelocity = Vector2.zero;
         rb.angularVelocity = 0f;
 
         if (attachedToShip)
         {
-            // 배에 붙으면 개별 물리 시뮬레이션을 꺼서 "배의 일부"가 되게 함
             rb.bodyType = RigidbodyType2D.Kinematic;
             rb.simulated = false;
         }
         else
         {
-            // 우주에 떠있을 때는 필요에 따라 켜도 됨
-            // 드래그 중엔 안정적으로 움직이도록 Kinematic + simulated true 권장
             rb.bodyType = RigidbodyType2D.Kinematic;
             rb.simulated = true;
         }
@@ -188,6 +232,15 @@ public class ShipBuilder : MonoBehaviour
         return Mouse.current != null && Mouse.current.leftButton.wasReleasedThisFrame;
 #else
         return Input.GetMouseButtonUp(0);
+#endif
+    }
+
+    bool Holding()
+    {
+#if ENABLE_INPUT_SYSTEM
+        return Mouse.current != null && Mouse.current.leftButton.isPressed;
+#else
+        return Input.GetMouseButton(0);
 #endif
     }
 

@@ -196,7 +196,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Module
   isCore: 0
-  attachableLocalSides: 00000000010000000200000003000000
+  attachableLocalSides: 00000000000000000000000000000000
   apUp: {fileID: 7714039928539405447}
   apDown: {fileID: 0}
   apLeft: {fileID: 0}
