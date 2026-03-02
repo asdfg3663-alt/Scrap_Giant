@@ -209,42 +209,51 @@ public class ShipBuilder : MonoBehaviour
     }
 
     void DetachModule(Transform moduleTf)
-    {
-        moduleTf.SetParent(null, true);
-        SetModulePhysics(moduleTf, attachedToShip: false);
+{
+    moduleTf.SetParent(null, true);
 
-        // 점유 제거
-        var mod = moduleTf.GetComponent<Module>();
-        if (mod != null)
-        {
-            var remove = new List<Vector2Int>();
-            foreach (var kv in occupied)
-                if (kv.Value == mod) remove.Add(kv.Key);
-            foreach (var k in remove) occupied.Remove(k);
-        }
+    SetModulePhysics(moduleTf, attachedToShip: false);
 
-        // metadata는 유지해도 되고, 제거해도 됨(일단 유지)
-    }
+    var mod = moduleTf.GetComponent<Module>();
+    if (mod == null) return;
+
+    var removeKeys = new List<Vector2Int>();
+    foreach (var kv in occupied)
+        if (kv.Value == mod) removeKeys.Add(kv.Key);
+
+    for (int i = 0; i < removeKeys.Count; i++)
+        occupied.Remove(removeKeys[i]);
+
+    // 🔥 이 줄 추가
+    if (shipStats) shipStats.Rebuild();
+}
 
     void SetModulePhysics(Transform moduleTf, bool attachedToShip)
+{
+    var rb = moduleTf.GetComponent<Rigidbody2D>();
+    if (!rb) return;
+
+    rb.linearVelocity = Vector2.zero;
+    rb.angularVelocity = 0f;
+
+    if (attachedToShip)
     {
-        var rb = moduleTf.GetComponent<Rigidbody2D>();
-        if (!rb) return;
+        // 붙어있어도 "픽(OverlapPoint)"이 되도록 simulated는 TRUE 유지
+        rb.bodyType = RigidbodyType2D.Kinematic;
+        rb.simulated = true;
 
-        rb.linearVelocity = Vector2.zero;
-        rb.angularVelocity = 0f;
-
-        if (attachedToShip)
-        {
-            rb.bodyType = RigidbodyType2D.Kinematic;
-            rb.simulated = false;
-        }
-        else
-        {
-            rb.bodyType = RigidbodyType2D.Kinematic;
-            rb.simulated = true;
-        }
+        // 물리로 흔들리거나 밀리지 않게 고정
+        rb.constraints = RigidbodyConstraints2D.FreezeAll;
     }
+    else
+    {
+        rb.bodyType = RigidbodyType2D.Kinematic;
+        rb.simulated = true;
+
+        // 우주에 떠다니는 상태에서는 회전은 허용할지/금지할지 취향
+        rb.constraints = RigidbodyConstraints2D.None;
+    }
+}
 
     // =========================
     // Snap logic (Captain Forever style)
