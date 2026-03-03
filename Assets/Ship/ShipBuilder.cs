@@ -165,7 +165,8 @@ public class ShipBuilder : MonoBehaviour
         if (cand.valid)
         {
             draggingTf.position = GridToWorld(cand.grid);
-            draggingTf.rotation = Quaternion.Euler(0, 0, cand.rot90 * 90f);
+            var frame = GridFrame();
+            draggingTf.rotation = (frame ? frame.rotation : Quaternion.identity) * Quaternion.Euler(0, 0, cand.rot90 * 90f);
         }
     }
 
@@ -193,7 +194,8 @@ public class ShipBuilder : MonoBehaviour
 
         moduleTf.SetParent(shipRoot, true);
         moduleTf.position = GridToWorld(grid);
-        moduleTf.rotation = Quaternion.Euler(0, 0, rot90 * 90f);
+        var frame = GridFrame();
+        moduleTf.rotation = (frame ? frame.rotation : Quaternion.identity) * Quaternion.Euler(0, 0, rot90 * 90f);
 
         SetModulePhysics(moduleTf, attachedToShip: true);
 
@@ -203,6 +205,25 @@ public class ShipBuilder : MonoBehaviour
         att.shipRoot = shipRoot;
         att.gridPos = grid;
         att.rot90 = rot90;
+
+var shipRb = shipRoot ? shipRoot.GetComponent<Rigidbody2D>() : null;
+if (shipRb)
+{
+    shipRb.linearVelocity = Vector2.zero;
+    shipRb.angularVelocity = 0f;
+}
+
+// 부착 직후 코어/함선의 남은 관성 제거
+var coreRb = coreModule ? coreModule.GetComponent<Rigidbody2D>() : null;
+if (coreRb)
+{
+    coreRb.linearVelocity = Vector2.zero;
+    coreRb.angularVelocity = 0f;
+    coreRb.Sleep(); // 남은 힘/적분을 잠재움
+}
+
+
+
 
         var mod = moduleTf.GetComponent<Module>();
         if (mod) occupied[grid] = mod;
@@ -300,8 +321,12 @@ public class ShipBuilder : MonoBehaviour
             // anchorSide의 월드 방향(90도 회전 고려)
             Vector2 normalWorld = (Vector2)anchor.transform.TransformDirection(Module.SideToDir(anchorSide));
 
-            // 그리드 델타로 강제(대각선 방지)
-            Vector2Int delta = WorldDirToGridDelta(normalWorld);
+            // 코어(그리드 프레임) 로컬로 변환해서 4방향 델타 결정
+            var frame = GridFrame();
+            Vector2 normalLocal = frame ? (Vector2)frame.InverseTransformDirection(normalWorld) : normalWorld;
+
+            // 그리드 델타로 강제(대각선 방지) - 로컬 기준
+            Vector2Int delta = LocalDirToGridDelta(normalLocal);
             Vector2Int targetGrid = aGrid + delta;
 
             Vector3 targetWorld = GridToWorld(targetGrid);
@@ -309,8 +334,9 @@ public class ShipBuilder : MonoBehaviour
             float d = Vector2.Distance(pointerWorld, targetWorld);
             if (d > snapDistance) return;
 
-            // 드래그 모듈이 "-normalWorld" 방향을 향하도록 회전(즉 붙는 면이 상대쪽을 보게)
-            if (!TryComputeRotation90(mod, -normalWorld, out int rot90))
+            // 드래그 모듈이 "그리드 로컬 기준 -delta" 방향을 향하도록 회전(붙는 면이 상대쪽을 보게)
+            Vector2 desiredLocalDir = new Vector2(-delta.x, -delta.y);
+            if (!TryComputeRotation90(mod, desiredLocalDir, out int rot90))
                 return;
 
             if (IsOccupied(targetGrid)) return;
@@ -325,7 +351,7 @@ public class ShipBuilder : MonoBehaviour
     }
 
     // 원하는 월드 방향을 향하도록 90도 회전값(0~3) 계산
-    bool TryComputeRotation90(Module mod, Vector2 desiredWorldDir, out int rot90)
+    bool TryComputeRotation90(Module mod, Vector2 desiredLocalDir, out int rot90)
     {
         rot90 = 0;
 
@@ -347,7 +373,7 @@ public class ShipBuilder : MonoBehaviour
             {
                 Vector2 localDir = Module.SideToDir(mod.attachableLocalSides[i]);
                 Vector2 rotated = Rotate90(localDir, r);
-                float dot = Vector2.Dot(rotated.normalized, desiredWorldDir.normalized);
+                float dot = Vector2.Dot(rotated.normalized, desiredLocalDir.normalized);
                 if (dot > score) score = dot;
             }
 
@@ -375,16 +401,15 @@ public class ShipBuilder : MonoBehaviour
         };
     }
 
-    Vector2Int WorldDirToGridDelta(Vector2 worldDir)
+    Vector2Int LocalDirToGridDelta(Vector2 localDir)
     {
-        // 가장 큰 축으로 4방향 결정
-        if (Mathf.Abs(worldDir.x) >= Mathf.Abs(worldDir.y))
-            return new Vector2Int(worldDir.x >= 0 ? 1 : -1, 0);
+        // 코어(그리드 프레임) 로컬 기준으로 4방향 결정
+        if (Mathf.Abs(localDir.x) >= Mathf.Abs(localDir.y))
+            return new Vector2Int(localDir.x >= 0 ? 1 : -1, 0);
         else
-            return new Vector2Int(0, worldDir.y >= 0 ? 1 : -1);
+            return new Vector2Int(0, localDir.y >= 0 ? 1 : -1);
     }
-
-    // =========================
+// =========================
     // Picking / Overlap
     // =========================
 
@@ -407,7 +432,7 @@ public class ShipBuilder : MonoBehaviour
         Vector2 size = Vector2.one * cellSize * overlapScale;
 
         // OverlapBoxAll로 받고, 자기 자신/자식 콜라이더 제외
-        var hits = Physics2D.OverlapBoxAll(center, size, rot90 * 90f, blockMask);
+        var hits = Physics2D.OverlapBoxAll(center, size, ((GridFrame() ? GridFrame().eulerAngles.z : 0f) + rot90 * 90f), blockMask);
         if (hits == null || hits.Length == 0) return false;
 
         for (int i = 0; i < hits.Length; i++)
@@ -441,32 +466,44 @@ public class ShipBuilder : MonoBehaviour
         return false;
     }
 
-    Vector3 GridOrigin()
+    Transform GridFrame()
     {
-        // 코어 기준으로 좌표계 고정(함선 커져도 라운딩 흔들림 방지)
-        if (coreModule) return coreModule.transform.position;
-        if (shipRoot) return shipRoot.position;
-        return Vector3.zero;
+        // 코어 모듈이 "본체"이므로 그 회전을 그리드 축으로 사용
+        // (코어가 없으면 shipRoot를 fallback)
+        if (coreModule) return coreModule.transform;
+        if (shipRoot) return shipRoot;
+        return null;
     }
 
     Vector2Int WorldToGrid(Vector3 world)
     {
-        Vector3 o = GridOrigin();
-        float x = (world.x - o.x) / cellSize;
-        float y = (world.y - o.y) / cellSize;
+        var frame = GridFrame();
+        if (!frame)
+        {
+            int gx0 = Mathf.RoundToInt(world.x / cellSize);
+            int gy0 = Mathf.RoundToInt(world.y / cellSize);
+            return new Vector2Int(gx0, gy0);
+        }
 
-        int gx = Mathf.RoundToInt(x);
-        int gy = Mathf.RoundToInt(y);
+        // 코어(또는 shipRoot) 로컬 좌표로 변환 후 그리드 스냅
+        Vector3 local = frame.InverseTransformPoint(world);
+        int gx = Mathf.RoundToInt(local.x / cellSize);
+        int gy = Mathf.RoundToInt(local.y / cellSize);
         return new Vector2Int(gx, gy);
     }
 
     Vector3 GridToWorld(Vector2Int grid)
     {
-        Vector3 o = GridOrigin();
-        return new Vector3(o.x + grid.x * cellSize, o.y + grid.y * cellSize, 0f);
-    }
+        var frame = GridFrame();
+        Vector3 local = new Vector3(grid.x * cellSize, grid.y * cellSize, 0f);
 
-    bool IsOccupied(Vector2Int grid) => occupied.ContainsKey(grid);
+        if (!frame)
+            return local;
+
+        // 로컬 그리드를 다시 월드로 변환 (코어 회전 반영)
+        return frame.TransformPoint(local);
+    }
+bool IsOccupied(Vector2Int grid) => occupied.ContainsKey(grid);
 
     void RebuildOccupiedMap()
     {
