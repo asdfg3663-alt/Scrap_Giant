@@ -233,12 +233,19 @@ MonoBehaviour:
   shipRoot: {fileID: 10065787}
   shipStats: {fileID: 10065788}
   cam: {fileID: 519420031}
+  coreModule: {fileID: 0}
   cellSize: 1
-  snapRadius: 0.6
+  snapDistance: 1.2
+  overlapScale: 0.95
   pickMask:
     serializedVersion: 2
     m_Bits: 2048
-  rotateKey: 114
+  blockMask:
+    serializedVersion: 2
+    m_Bits: 0
+  longPressTime: 0.25
+  dragStartDistance: 0.15
+  drawDebug: 0
 --- !u!1 &29519077
 GameObject:
   m_ObjectHideFlags: 0
@@ -502,6 +509,37 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 164302047}
   m_CullTransparentMesh: 1
+--- !u!1 &224217387
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 224217388}
+  m_Layer: 0
+  m_Name: Module
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &224217388
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 224217387}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.35384, y: 0.24248, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &274840262
 GameObject:
   m_ObjectHideFlags: 0
@@ -594,7 +632,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TutorialSpawner
   shipRoot: {fileID: 10065787}
-  enginePrefab: {fileID: 4092199381930161431, guid: 5711c8f2c1b01934482d4d809f6cfd05, type: 3}
+  enginePrefab: {fileID: 5628837094240442396, guid: 283a4e87cc406cf46a05e4211c207c47, type: 3}
   laserPrefab: {fileID: 0}
   engineOffset: {x: 3, y: 0}
   laserOffset: {x: 3, y: 2}
@@ -5776,7 +5814,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 94aa66c13ffa44a4597fe94a6d4173f0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Module
-  isCore: 0
+  isCore: 1
   attachableLocalSides: 00000000010000000200000003000000
   apUp: {fileID: 1309533336}
   apDown: {fileID: 323394552}
@@ -6633,6 +6671,66 @@ Transform:
   m_Children: []
   m_Father: {fileID: 485038381}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1485773381
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1485773383}
+  - component: {fileID: 1485773382}
+  m_Layer: 0
+  m_Name: SnapSystem
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1485773382
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1485773381}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6399a7d1173031649897bd309ed1ce82, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShipSnapper
+  shipRoot: {fileID: 10065787}
+  shipStats: {fileID: 10065788}
+  cam: {fileID: 519420031}
+  coreModule: {fileID: 485038386}
+  cellSize: 1
+  snapDistance: 1.2
+  overlapScale: 0.95
+  pickMask:
+    serializedVersion: 2
+    m_Bits: 2048
+  blockMask:
+    serializedVersion: 2
+    m_Bits: 0
+  longPressTime: 0.25
+  dragStartDistance: 0.15
+  drawDebug: 0
+--- !u!4 &1485773383
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1485773381}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.35384, y: 0.24248, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1587359858
 GameObject:
   m_ObjectHideFlags: 0
@@ -6781,3 +6879,5 @@ SceneRoots:
   - {fileID: 1040517149}
   - {fileID: 517838429}
   - {fileID: 342639404}
+  - {fileID: 1485773383}
+  - {fileID: 224217388}

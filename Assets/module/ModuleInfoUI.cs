@@ -9,6 +9,7 @@ public class ModuleInfoUI : MonoBehaviour
     public TMP_Text hpText;
     public TMP_Text powerText;
     public TMP_Text batteryText;   // 있으면 표시, 없으면 무시
+    public TMP_Text extraText;     // (선택) 무기 DPS 같은 추가정보
 
     [Header("Follow")]
     public Vector2 screenOffset = new Vector2(0f, 40f);
@@ -21,21 +22,18 @@ public class ModuleInfoUI : MonoBehaviour
     void Awake()
     {
         rt = GetComponent<RectTransform>();
+        if (rt == null)
+        {
+            enabled = false;
+            return;
+        }
+
         cam = Camera.main;
 
         cg = GetComponent<CanvasGroup>();
         if (!cg) cg = gameObject.AddComponent<CanvasGroup>();
 
         Hide();
-
-    rt = GetComponent<RectTransform>();
-    if (rt == null)
-    {
-        // UI가 아닌 곳에 붙었으니 이 인스턴스는 작동 중지
-        enabled = false;
-        return;
-    }
-
     }
 
     void LateUpdate()
@@ -63,9 +61,24 @@ public class ModuleInfoUI : MonoBehaviour
                 : "Battery: -";
         }
 
+        if (extraText != null)
+        {
+            if (m.data.type == ModuleType.Weapon || m.data.weaponType != WeaponType.None || m.data.dps > 0f)
+            {
+                float dps = m.data.dps > 0f ? m.data.dps : (m.data.weaponDamage * m.data.weaponFireRate);
+                extraText.text = $"DPS: {dps:0.##}  ({m.data.weaponType})";
+                extraText.gameObject.SetActive(true);
+            }
+            else
+            {
+                extraText.text = "";
+                extraText.gameObject.SetActive(false);
+            }
+        }
+
         if (!cam) cam = Camera.main;
 
-        // ✅ 핵심: 모듈 월드 위치 -> 스크린 좌표 -> UI 패널 위치
+        // 모듈 월드 위치 -> 스크린 좌표 -> UI 패널 위치
         Vector3 screenPos = cam.WorldToScreenPoint(m.transform.position);
         Vector2 pos = (Vector2)screenPos + screenOffset;
 
@@ -77,7 +90,6 @@ public class ModuleInfoUI : MonoBehaviour
             pos.y = Mathf.Clamp(pos.y, pad + size.y * 0.5f, Screen.height - pad - size.y * 0.5f);
         }
 
-        // Screen Space - Overlay에서 가장 안정적인 방식
         rt.position = pos;
     }
 
@@ -95,4 +107,3 @@ public class ModuleInfoUI : MonoBehaviour
         cg.blocksRaycasts = false;
     }
 }
-
