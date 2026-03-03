@@ -95,4 +95,19 @@ public class ShipStats : MonoBehaviour
         // energyMax가 바뀌었으니 현재 에너지도 범위 안으로
         energyCurrent = Mathf.Clamp(energyCurrent, 0f, energyMax);
     }
+
+public bool TryConsumeBattery(float amount)
+{
+    if (amount <= 0f) return true;
+
+    if (energyCurrent < amount)
+        return false;
+
+    energyCurrent -= amount;
+    // 혹시 모를 음수 방지
+    if (energyCurrent < 0f) energyCurrent = 0f;
+
+    return true;
+}
+
 }

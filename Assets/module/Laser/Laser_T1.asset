@@ -12,13 +12,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2255391bc9a2bd45aa50b7bdfc7b669, type: 3}
   m_Name: Laser_T1
   m_EditorClassIdentifier: Assembly-CSharp::ModuleData
-  displayName: Engine_T1
-  type: 1
+  displayName: Laser_T1
+  type: 4
   tier: 1
   maxHP: 10
   powerGenPerSec: 0
   powerUsePerSec: 3
-  maxEnergy: 10
-  thrust: 10
+  maxEnergy: 0
+  thrust: 0
   mass: 5
+  weaponType: 0
+  weaponDamage: 3
+  weaponFireRate: 2
+  weaponPowerPerShot: 0
+  weaponHeatPerShot: 0
+  weaponAmmoPerShot: 0
   dps: 0
