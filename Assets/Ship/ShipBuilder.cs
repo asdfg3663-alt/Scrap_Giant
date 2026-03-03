@@ -199,6 +199,9 @@ public class ShipBuilder : MonoBehaviour
 
         SetModulePhysics(moduleTf, attachedToShip: true);
 
+        // 내부 모듈끼리 충돌로 인한 '계속 밀림' 방지
+        IgnoreCollisionsWithShip(moduleTf, true);
+
         // attachment metadata
         var att = moduleTf.GetComponent<ModuleAttachment>();
         if (!att) att = moduleTf.gameObject.AddComponent<ModuleAttachment>();
@@ -231,6 +234,9 @@ if (coreRb)
 
     void DetachModule(Transform moduleTf)
 {
+    // ship에 붙어있던 동안 무시했던 내부 충돌 복구
+    IgnoreCollisionsWithShip(moduleTf, false);
+
     moduleTf.SetParent(null, true);
 
     SetModulePhysics(moduleTf, attachedToShip: false);
@@ -573,4 +579,43 @@ bool IsOccupied(Vector2Int grid) => occupied.ContainsKey(grid);
         if (coreModule.apLeft) Gizmos.DrawWireSphere(coreModule.apLeft.position, 0.12f);
         if (coreModule.apRight) Gizmos.DrawWireSphere(coreModule.apRight.position, 0.12f);
     }
+
+
+void IgnoreCollisionsWithShip(Transform moduleTf, bool ignore)
+{
+    if (!moduleTf) return;
+
+    // shipRoot가 없으면 core를 기준으로라도 잡음
+    Transform root = shipRoot ? shipRoot : (coreModule ? coreModule.transform : null);
+    if (!root) return;
+
+    var myCols = moduleTf.GetComponentsInChildren<Collider2D>(true);
+    if (myCols == null || myCols.Length == 0) return;
+
+    var shipCols = root.GetComponentsInChildren<Collider2D>(true);
+    if (shipCols == null || shipCols.Length == 0) return;
+
+    // 자기 자신 콜라이더는 제외하고 shipRoot 아래 기존 콜라이더들과 충돌 무시/복구
+    for (int i = 0; i < myCols.Length; i++)
+    {
+        var a = myCols[i];
+        if (!a) continue;
+
+        for (int j = 0; j < shipCols.Length; j++)
+        {
+            var b = shipCols[j];
+            if (!b) continue;
+
+            // 같은 콜라이더면 스킵
+            if (a == b) continue;
+
+            // 같은 모듈 내부끼리면 스킵(자기 자신/자식)
+            if (b.transform.IsChildOf(moduleTf)) continue;
+
+            Physics2D.IgnoreCollision(a, b, ignore);
+        }
+    }
+}
+
+
 }
