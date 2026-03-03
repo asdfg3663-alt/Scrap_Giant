@@ -38,6 +38,7 @@ public class ShipStats : MonoBehaviour
 
     void Update()
     {
+
         // 초당 전력 흐름만큼 배터리 충/방전
         energyCurrent += netPowerPerSec * Time.deltaTime;
 
@@ -109,5 +110,6 @@ public bool TryConsumeBattery(float amount)
 
     return true;
 }
+
 
 }
