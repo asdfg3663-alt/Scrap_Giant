@@ -1,54 +1,47 @@
 using UnityEngine;
 
 /// <summary>
-/// 2D 우주선 이동(우주 물리)
-/// - W: 엔진 추력방향으로 가속 (최대속도까지)
-/// - S: 약한 역추력(브레이크) (기본추력보다 훨씬 약하게)
-/// - A/D: 회전
-///
-/// 핵심:
-/// - 엔진이 없으면 코어(루트) 방향(transform.up)
-/// - 엔진이 있으면 "엔진들의 방향/추력"을 합쳐서 나온 결과 방향으로 가속
-/// - W를 떼어도 자동 감속하지 않음(관성)
-///
-/// 중요:
-/// - stats.totalMass 값이 커져도 Rigidbody2D.mass를 바꾸지 않으면,
-///   AddForce의 가속이 질량에 따라 달라지지 않습니다.
-///   => rb.mass 를 stats.totalMass로 동기화해야 "무거울수록 둔해짐"이 제대로 됩니다.
+/// ShipMovement (2D)
+/// - 전진: 엔진 추력 방향으로 AddForce
+/// - 회전: 토크 기반(AddTorque) => 질량/모양/추력의 영향 반영
+/// - 모양 영향: 모듈 질량 분포로 관성(inertia) 근사 계산
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(ShipStats))]
 public class ShipMovement : MonoBehaviour
 {
-    [Header("Rotation")]
-    public float rotationSpeed = 180f;
-
-    [Header("Space Movement")]
-    [Tooltip("최대 속도(클램프). 우주라 무한가속이지만 게임성 때문에 상한을 둡니다.")]
+    [Header("Linear Movement")]
     public float baseMaxSpeed = 8f;
-
-    [Tooltip("thrust/mass(가속도) 기반으로 maxSpeed를 가산하는 계수 (원하면 0으로)")]
     public float maxSpeedFromAccelMultiplier = 6f;
-
-    [Tooltip("가속(추력) 적용 계수 (thrust/mass에 곱해짐)")]
     public float accelMultiplier = 1f;
 
     [Header("Physics Sync")]
-    [Tooltip("ShipStats.totalMass를 Rigidbody2D.mass에 동기화 (질량이 실제 물리에 반영되도록)")]
     public bool syncRigidbodyMassWithShipStats = true;
-
-    [Tooltip("rb.mass에 적용할 최소 질량 (0이면 물리가 깨질 수 있어 방지용)")]
     public float minRigidbodyMass = 0.01f;
 
     [Header("Brake / Reverse")]
-    [Tooltip("S키 브레이크(역추력) 힘. 0 이하이면 totalThrust*reverseMultiplier를 사용")]
     public float brakeForceOverride = 1f;
-
-    [Tooltip("brakeForceOverride가 0 이하일 때만 사용: totalThrust에 곱해 역추력으로 사용")]
     public float reverseMultiplier = 0.25f;
-
-    [Tooltip("미세 흔들림 방지용 속도 스냅(이 값 이하로 떨어지면 0으로)")]
     public float stopSnapSpeed = 0.05f;
+
+    [Header("Rotation (Torque-based)")]
+    [Tooltip("기본 회전 토크 (추력 0이어도 최소 조향감을 줄지 여부)")]
+    public float baseTurnTorque = 0.0f;
+
+    [Tooltip("전체추력(totalThrust)을 회전 토크로 변환하는 계수. 높을수록 추력이 클 때 더 잘 돌아감.")]
+    public float thrustToTurnTorque = 1.0f;
+
+    [Tooltip("관성(모양) 계산 결과에 곱하는 스케일. 너무 둔하면 낮추고, 너무 민감하면 높이세요.")]
+    public float inertiaScale = 1.0f;
+
+    [Tooltip("아주 작은 관성 값 방지용 최소값")]
+    public float minInertia = 0.05f;
+
+    [Tooltip("회전 입력이 없을 때의 자연 감속(우주 느낌이면 0~작게)")]
+    public float angularDamping = 0.0f;
+
+    [Tooltip("엔진이 없을 때도 회전 가능하게 할지(코어 자체 RCS 같은 느낌)")]
+    public bool allowTurnWithoutEngines = true;
 
     ShipStats stats;
     Rigidbody2D rb;
@@ -58,55 +51,41 @@ public class ShipMovement : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         stats = GetComponent<ShipStats>();
 
-        // 우주 느낌: 자동 감속 금지 (drag는 0)
         rb.linearDamping = 0f;
         rb.angularDamping = 0f;
-
-        // 혹시 중력이 켜져있으면 꺼두기(프로젝트 설정에 따라 달라서 안전장치)
         rb.gravityScale = 0f;
     }
 
     void FixedUpdate()
     {
         if (stats == null) return;
-
-        // 플레이어만 조종(잔해/적은 별도 AI에서)
         if (!stats.isPlayerShip) return;
 
-        // 입력
         float thrustInput = Input.GetAxisRaw("Vertical");   // W=1, S=-1
         float turnInput   = Input.GetAxisRaw("Horizontal"); // D=1, A=-1
 
-        // 현재 엔진 기반 추력 방향 계산
-        Vector2 thrustDir = GetThrustDirection();
-
-        // 총추력/질량 (ShipStats가 모듈 합산으로 계산한 값)
+        // --- Mass / Thrust ---
         float mass = Mathf.Max(minRigidbodyMass, stats.totalMass);
         float totalThrust = Mathf.Max(0f, stats.totalThrust);
 
-        // ✅ 핵심 수정: Rigidbody2D.mass에 실제 질량을 반영해야
-        // 같은 추력이라도 무거운 배가 덜 가속합니다.
         if (syncRigidbodyMassWithShipStats)
-        {
-            // 매 프레임 동기화(모듈이 붙었다 떼도 즉시 반영)
             rb.mass = mass;
-        }
 
-        // (참고용) ShipStats 기반 가속도 추정치 (디버그/최대속도 계산용)
+        // --- Thrust direction (engine-weighted) ---
+        Vector2 thrustDir = GetThrustDirection();
+
+        // --- Linear accel estimate (for maxSpeed only) ---
         float accel = (totalThrust / mass) * accelMultiplier;
-
-        // 최대속도 (원래 로직 유지: thrust/mass에 비례해서 조금 올라가게)
         float maxSpeed = Mathf.Max(0.1f, baseMaxSpeed + accel * maxSpeedFromAccelMultiplier);
 
-        // --- 전진(W): 엔진 방향으로 가속 ---
+        // --- Forward thrust ---
         if (thrustInput > 0f && totalThrust > 0f)
         {
-            // AddForce는 Rigidbody2D.mass를 고려해 가속도가 결정됨.
             Vector2 force = thrustDir * (thrustInput * totalThrust);
             rb.AddForce(force, ForceMode2D.Force);
         }
 
-        // --- 감속/후진(S): 약한 역추력 ---
+        // --- Brake / reverse ---
         if (thrustInput < 0f)
         {
             float brakeForce = brakeForceOverride > 0f
@@ -119,28 +98,52 @@ public class ShipMovement : MonoBehaviour
                 rb.AddForce(force, ForceMode2D.Force);
             }
 
-            // 너무 느려지면 깔끔하게 정지 스냅
             if (rb.linearVelocity.magnitude < stopSnapSpeed)
                 rb.linearVelocity = Vector2.zero;
         }
 
-        // --- 최대속도 제한(관성 유지하되 상한만 둠) ---
+        // --- Clamp max speed ---
         float speed = rb.linearVelocity.magnitude;
         if (speed > maxSpeed)
-        {
             rb.linearVelocity = rb.linearVelocity.normalized * maxSpeed;
-        }
 
-        // --- 회전(A/D) ---
-        rb.MoveRotation(rb.rotation - turnInput * rotationSpeed * Time.fixedDeltaTime);
+        // =========================
+        // Rotation: torque-based
+        // =========================
+
+        // 1) 모양/질량 분포로 관성(inertia) 근사 계산
+        float inertia = ComputeInertiaApprox();
+        inertia = Mathf.Max(minInertia, inertia * Mathf.Max(0.0001f, inertiaScale));
+
+        // 2) 회전 토크: 기본 + (전체추력 기반)
+        //    - 추력 클수록 더 잘 돈다
+        float availableTurnTorque = baseTurnTorque + totalThrust * thrustToTurnTorque;
+
+        // 엔진이 하나도 없으면 totalThrust=0일 가능성이 큼 -> allowTurnWithoutEngines=false면 회전 금지
+        if (!allowTurnWithoutEngines && totalThrust <= 0.0001f)
+            availableTurnTorque = 0f;
+
+        // 3) 입력 -> 토크 적용
+        if (Mathf.Abs(turnInput) > 0.0001f && availableTurnTorque > 0f)
+        {
+            // AddTorque는 Rigidbody2D의 관성/각가속에 반영됨
+            // (관성은 Unity 내부값도 있지만, 우리는 "모양 관성"을 직접 반영하려고
+            //  availableTurnTorque를 inertia로 나눠 토크를 조정)
+            float torque = (-turnInput) * (availableTurnTorque / inertia);
+
+            rb.AddTorque(torque, ForceMode2D.Force);
+        }
+        else
+        {
+            // 입력 없을 때 약한 각속도 감쇠(우주 느낌이면 0으로)
+            if (angularDamping > 0f)
+                rb.angularVelocity = Mathf.MoveTowards(rb.angularVelocity, 0f, angularDamping * Time.fixedDeltaTime);
+        }
     }
 
     /// <summary>
-    /// 엔진 모듈이 있으면: 각 엔진의 방향(transform.up) * 엔진추력을 가중합한 결과 방향
+    /// 엔진 모듈이 있으면: 각 엔진 방향(transform.up) * thrust 가중합 방향
     /// 엔진이 없으면: 루트(transform.up)
-    ///
-    /// ※ 엔진의 "추력 방향"은 엔진 오브젝트의 up을 기준으로 합니다.
-    /// (모듈을 회전/스냅해 붙이면 그 방향대로 날아감)
     /// </summary>
     Vector2 GetThrustDirection()
     {
@@ -153,7 +156,6 @@ public class ShipMovement : MonoBehaviour
             {
                 if (m == null || m.data == null) continue;
 
-                // "엔진" 판정: thrust가 0보다 크면 엔진 취급
                 float t = m.data.thrust;
                 if (t <= 0f) continue;
 
@@ -165,5 +167,55 @@ public class ShipMovement : MonoBehaviour
             return transform.up;
 
         return sum.normalized;
+    }
+
+    /// <summary>
+    /// 모듈들의 질량과 중심으로부터의 거리로 2D 관성(I = Σ m r^2) 근사.
+    /// - 모양이 길게 퍼질수록 r이 커져 I 증가 => 회전 둔해짐
+    /// - 질량이 커질수록 I 증가 => 회전 둔해짐
+    ///
+    /// COM(질량중심)을 먼저 구해서 중심 기준 거리로 계산하면 더 정확해짐.
+    /// </summary>
+    float ComputeInertiaApprox()
+    {
+        var modules = GetComponentsInChildren<ModuleInstance>(true);
+        if (modules == null || modules.Length == 0)
+            return 1f;
+
+        // 1) COM 구하기(질량중심)
+        float totalM = 0f;
+        Vector2 com = Vector2.zero;
+
+        foreach (var m in modules)
+        {
+            if (m == null || m.data == null) continue;
+
+            float mm = Mathf.Max(0f, m.data.mass);
+            if (mm <= 0f) continue;
+
+            totalM += mm;
+            com += (Vector2)m.transform.position * mm;
+        }
+
+        if (totalM <= 0.0001f)
+            return 1f;
+
+        com /= totalM;
+
+        // 2) I = Σ m r^2
+        float I = 0f;
+        foreach (var m in modules)
+        {
+            if (m == null || m.data == null) continue;
+
+            float mm = Mathf.Max(0f, m.data.mass);
+            if (mm <= 0f) continue;
+
+            float r = Vector2.Distance((Vector2)m.transform.position, com);
+            I += mm * r * r;
+        }
+
+        // 최소값 보정
+        return Mathf.Max(0.0001f, I);
     }
 }
