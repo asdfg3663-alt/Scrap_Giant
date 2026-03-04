@@ -17,11 +17,11 @@ MonoBehaviour:
   tier: 1
   maxHP: 10
   powerGenPerSec: 0
-  powerUsePerSec: 3
+  powerUsePerSec: 5
   maxEnergy: 0
   thrust: 0
   mass: 5
-  weaponType: 0
+  weaponType: 1
   weaponDamage: 3
   weaponFireRate: 2
   weaponPowerPerShot: 0

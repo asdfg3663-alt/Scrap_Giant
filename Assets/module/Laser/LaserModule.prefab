@@ -25,7 +25,7 @@ Transform:
   m_GameObject: {fileID: 1374918821291708206}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.55, z: 0}
+  m_LocalPosition: {x: 0, y: 0.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -250,8 +250,14 @@ MonoBehaviour:
   hitMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  defaultRange: 12
-  drawDebugRay: 1
+  defaultRange: 100
+  startOffset: 0.25
+  beamThickness: 0.1
+  beamSortingOrder: 9999
+  beamSortingLayer: Default
+  beamColor: {r: 1, g: 0, b: 0, a: 1}
+  forwardAxis: 1
+  flipDirection: 0
 --- !u!1 &8072020437808565984
 GameObject:
   m_ObjectHideFlags: 0

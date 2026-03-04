@@ -1,104 +1,73 @@
 using UnityEngine;
-using UnityEngine.Rendering;
 
-/// <summary>
-/// WeaponLaser (Unity 6 / URP 대응 완성본)
-/// - Space(또는 ShipCombatInput.FireHeld) 누르는 동안: 라인 렌더러 표시 + 히트스캔
-/// - 데미지: weaponFireRate 기반 tick
-/// - 전력 소모: 발사 중에만 powerUsePerSec * dt + (옵션) tick마다 weaponPowerPerShot
-/// - 라인이 안 보이는 문제(URP 머티리얼/Sorting Layer/레이어 culling) 강제 해결
-/// </summary>
 [DisallowMultipleComponent]
 public class WeaponLaser : MonoBehaviour
 {
+    public enum ForwardAxis { Right, Up }
+
     [Header("Refs")]
     public Transform muzzle;
     public LayerMask hitMask = ~0;
 
     [Header("Raycast")]
     public float defaultRange = 20f;
+    public float startOffset = 0.25f;
 
-    [Header("Visual (Force Visible)")]
-    public bool useLineRenderer = true;
-    public LineRenderer line;
-    public float lineWidth = 0.25f;               // 일부러 크게 (안 보임 방지)
-    public string sortingLayerName = "Default";   // 스프라이트와 같은 레이어로
-    public int sortingOrder = 9999;
+    [Header("Beam Visual (Sprite)")]
+    public float beamThickness = 0.18f;
+    public int beamSortingOrder = 9999;
+    public string beamSortingLayer = "Default";
+    public Color beamColor = Color.red;
 
     [Header("Direction")]
-    public bool useRightAsForward = true;
+    public ForwardAxis forwardAxis = ForwardAxis.Right;
     public bool flipDirection = false;
-
-    [Header("Debug")]
-    public bool drawDebugRayInScene = false;
 
     float cd;
     ShipStats ship;
     ModuleInstance inst;
 
+    GameObject beamGO;
+    SpriteRenderer beamSR;
+    Transform beamT;
+    Sprite beamSprite;
+
     void Awake()
     {
         if (!muzzle) muzzle = transform;
-
         ship = GetComponentInParent<ShipStats>();
         inst = GetComponent<ModuleInstance>();
 
-        if (useLineRenderer)
-            EnsureLine();
+        EnsureBeam();
+        SetBeamVisible(false);
     }
 
-    void EnsureLine()
+    void EnsureBeam()
     {
-        if (line == null)
-        {
-            line = GetComponent<LineRenderer>();
-            if (!line) line = gameObject.AddComponent<LineRenderer>();
-        }
+        if (beamGO != null) return;
 
-        // 라인이 카메라 컬링에 안 걸리게: 같은 레이어 사용
-        line.gameObject.layer = gameObject.layer;
+        var tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+        tex.SetPixel(0, 0, Color.white);
+        tex.Apply();
+        beamSprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0f, 0.5f), 1f);
 
-        line.useWorldSpace = true;
-        line.positionCount = 2;
-        line.startWidth = lineWidth;
-        line.endWidth = lineWidth;
+        beamGO = new GameObject("LaserBeam");
+        beamGO.transform.SetParent(transform, worldPositionStays: true);
+        beamT = beamGO.transform;
 
-        // 2D 정렬 강제 (Sorting Layer까지)
-        line.sortingLayerName = sortingLayerName;
-        line.sortingOrder = sortingOrder;
-        line.alignment = LineAlignment.View;
+        beamSR = beamGO.AddComponent<SpriteRenderer>();
+        beamSR.sprite = beamSprite;
 
-        // 그림자/조명 영향 제거(URP에서 가끔 안 보이는 원인 제거)
-        line.shadowCastingMode = ShadowCastingMode.Off;
-        line.receiveShadows = false;
+        Shader sh =
+            Shader.Find("Universal Render Pipeline/2D/Sprite-Unlit-Default") ??
+            Shader.Find("Sprites/Default") ??
+            Shader.Find("Unlit/Texture");
 
-        // ✅ URP에서 "색/알파가 적용 안 돼서 안 보임" 방지: 머티리얼 강제 + 색 프로퍼티 동시 세팅
-        if (line.sharedMaterial == null)
-        {
-            Shader sh =
-                Shader.Find("Universal Render Pipeline/Unlit") ??
-                Shader.Find("Sprites/Default") ??
-                Shader.Find("Unlit/Color");
+        if (sh != null) beamSR.sharedMaterial = new Material(sh);
 
-            if (sh != null)
-                line.sharedMaterial = new Material(sh);
-        }
-
-        if (line.sharedMaterial != null)
-        {
-            // 흰색/알파1 강제
-            Color c = Color.white;
-
-            // URP Unlit 계열은 _BaseColor, 레거시는 _Color
-            if (line.sharedMaterial.HasProperty("_BaseColor"))
-                line.sharedMaterial.SetColor("_BaseColor", c);
-            if (line.sharedMaterial.HasProperty("_Color"))
-                line.sharedMaterial.SetColor("_Color", c);
-
-            // 혹시 투명 블렌딩 꼬임 방지: 기본 렌더큐 유지
-        }
-
-        line.enabled = false;
+        beamSR.color = beamColor;
+        beamSR.sortingLayerName = beamSortingLayer;
+        beamSR.sortingOrder = beamSortingOrder;
     }
 
     void Update()
@@ -106,68 +75,91 @@ public class WeaponLaser : MonoBehaviour
         bool fireHeld = ShipCombatInput.FireHeld || Input.GetKey(KeyCode.Space);
         if (!fireHeld)
         {
-            SetLineEnabled(false);
+            SetBeamVisible(false);
             return;
         }
 
         if (ship == null) ship = GetComponentInParent<ShipStats>();
         if (inst == null) inst = GetComponent<ModuleInstance>();
-
         if (inst == null || inst.data == null)
         {
-            SetLineEnabled(false);
+            SetBeamVisible(false);
             return;
         }
 
         var d = inst.data;
-
         if (d.weaponType != WeaponType.Laser)
         {
-            SetLineEnabled(false);
+            SetBeamVisible(false);
             return;
         }
 
         float fireRate = Mathf.Max(0f, d.weaponFireRate);
         if (fireRate <= 0f)
         {
-            SetLineEnabled(false);
+            SetBeamVisible(false);
             return;
         }
 
-        float damage = Mathf.Max(0f, d.weaponDamage);
-
-        // 에너지: 발사 중에만
-        float costPerSec = Mathf.Max(0f, d.powerUsePerSec);
-        float costThisFrame = costPerSec * Time.deltaTime;
-
-        if (ship != null && costThisFrame > 0f)
+        // 발사 중에만 에너지(초당 소모)
+        float costThisFrame = Mathf.Max(0f, d.powerUsePerSec) * Time.deltaTime;
+        if (ship != null && costThisFrame > 0f && !ship.TryConsumeBattery(costThisFrame))
         {
-            if (!ship.TryConsumeBattery(costThisFrame))
-            {
-                SetLineEnabled(false);
-                return;
-            }
+            SetBeamVisible(false);
+            return;
         }
 
-        // 레이캐스트 + 라인
-        var hit = DoRaycast(defaultRange, out Vector3 origin3, out Vector3 end3);
-        SetLine(origin3, end3);
+        Vector2 origin = muzzle ? (Vector2)muzzle.position : (Vector2)transform.position;
+        Vector2 dir = GetForwardDir();
+
+        // 자기 히트 방지(시작점을 살짝 앞으로)
+        origin += dir * startOffset;
+
+        float range = defaultRange;
+        Vector2 end = origin + dir * range;
+
+        // RaycastAll로 "내 배" 콜라이더는 무시하고 첫 번째 히트만 사용
+        var hits = Physics2D.RaycastAll(origin, dir, range, hitMask);
+        RaycastHit2D best = default;
+        bool found = false;
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            var h = hits[i];
+            if (h.collider == null) continue;
+            if (ship != null && h.collider.transform.IsChildOf(ship.transform)) continue;
+
+            best = h;
+            found = true;
+            break;
+        }
+
+        if (found) end = best.point;
+
+        // 빔 표시(매 프레임)
+        UpdateBeam(origin, end);
 
         // 데미지 tick
         cd -= Time.deltaTime;
         if (cd > 0f) return;
 
+        // (옵션) 샷당 소모
         float shotCost = Mathf.Max(0f, d.weaponPowerPerShot);
-        if (ship != null && shotCost > 0f)
-        {
-            if (!ship.TryConsumeBattery(shotCost))
-                return;
-        }
+        if (ship != null && shotCost > 0f && !ship.TryConsumeBattery(shotCost))
+            return;
 
-        if (hit.collider != null && damage > 0f)
+        float damage = Mathf.Max(0f, d.weaponDamage);
+
+        // ✅ Enemy/Module 공통: IDamageable로 처리
+        if (found && best.collider != null && damage > 0f)
         {
-            var hp = hit.collider.GetComponent<EnemyHP>();
-            if (hp != null) hp.TakeDamage(damage);
+            var dmgTarget = best.collider.GetComponentInParent<IDamageable>();
+            if (dmgTarget != null)
+            {
+                Vector2 normal = best.normal;
+                if (normal.sqrMagnitude < 0.0001f) normal = -dir;
+                dmgTarget.ApplyDamage(damage, best.point, normal, gameObject);
+            }
         }
 
         cd = 1f / fireRate;
@@ -175,51 +167,37 @@ public class WeaponLaser : MonoBehaviour
 
     Vector2 GetForwardDir()
     {
-        Vector2 dir = useRightAsForward ? (Vector2)muzzle.right : (Vector2)muzzle.up;
+        Vector2 dir = forwardAxis == ForwardAxis.Right ? (Vector2)muzzle.right : (Vector2)muzzle.up;
         if (flipDirection) dir = -dir;
         if (dir.sqrMagnitude < 0.0001f) dir = Vector2.right;
         return dir.normalized;
     }
 
-    RaycastHit2D DoRaycast(float range, out Vector3 origin3, out Vector3 end3)
+    void SetBeamVisible(bool on)
     {
-        Vector2 origin = muzzle ? (Vector2)muzzle.position : (Vector2)transform.position;
-        Vector2 dir = GetForwardDir();
-
-        var hit = Physics2D.Raycast(origin, dir, range, hitMask);
-        Vector2 end = (hit.collider != null) ? hit.point : origin + dir * range;
-
-        // ✅ 라인렌더러는 3D 포지션이므로 z를 "스프라이트와 같은 평면"으로 고정
-        float z = (muzzle != null) ? muzzle.position.z : transform.position.z;
-        origin3 = new Vector3(origin.x, origin.y, z);
-        end3 = new Vector3(end.x, end.y, z);
-
-        if (drawDebugRayInScene)
-            Debug.DrawRay(origin, dir * range, Color.red, 0.02f);
-
-        return hit;
+        if (beamGO == null) return;
+        if (beamGO.activeSelf != on) beamGO.SetActive(on);
     }
 
-    void SetLine(Vector3 a, Vector3 b)
+    void UpdateBeam(Vector2 origin, Vector2 end)
     {
-        if (!useLineRenderer) return;
-        EnsureLine();
+        EnsureBeam();
+        SetBeamVisible(true);
 
-        // 런타임 중 값이 바뀌었을 수 있어 재강제
-        line.sortingLayerName = sortingLayerName;
-        line.sortingOrder = sortingOrder;
-        line.startWidth = lineWidth;
-        line.endWidth = lineWidth;
+        Vector2 delta = end - origin;
+        float length = delta.magnitude;
+        if (length < 0.05f) length = 0.05f;
 
-        line.enabled = true;
-        line.SetPosition(0, a);
-        line.SetPosition(1, b);
-    }
+        float z = muzzle ? muzzle.position.z : transform.position.z;
+        beamT.position = new Vector3(origin.x, origin.y, z);
 
-    void SetLineEnabled(bool on)
-    {
-        if (!useLineRenderer) return;
-        if (line == null) return;
-        line.enabled = on;
+        float angle = Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg;
+        beamT.rotation = Quaternion.Euler(0f, 0f, angle);
+
+        beamT.localScale = new Vector3(length, beamThickness, 1f);
+
+        beamSR.color = beamColor;
+        beamSR.sortingLayerName = beamSortingLayer;
+        beamSR.sortingOrder = beamSortingOrder;
     }
 }
