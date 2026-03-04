@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 5197048203926549517}
   - component: {fileID: 6840824862846268514}
   - component: {fileID: 4956673531931807512}
+  - component: {fileID: 127720311866911711}
   m_Layer: 11
   m_Name: EngineModule
   m_TagString: Untagged
@@ -201,6 +202,26 @@ MonoBehaviour:
   apDown: {fileID: 0}
   apLeft: {fileID: 0}
   apRight: {fileID: 0}
+--- !u!114 &127720311866911711
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5628837094240442396}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 64918e830d464104b82930b74db6593f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ModuleHP
+  maxHP: 10
+  currentHP: 10
+  autoFromModuleData: 1
+  explosionVfxPrefab: {fileID: 0}
+  scrapPrefab: {fileID: 0}
+  scrapMin: 1
+  scrapMax: 10
+  scrapImpulse: 2.5
 --- !u!1 &8630463030346319192
 GameObject:
   m_ObjectHideFlags: 0

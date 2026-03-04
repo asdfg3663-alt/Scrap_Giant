@@ -3,67 +3,70 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class ModuleHP : MonoBehaviour, IDamageable
 {
-    [Header("HP")]
-    public int maxHP = 10;
-    public int currentHP = 10;
-
-    [Header("Optional: Auto from ModuleData")]
-    public bool autoFromModuleData = true;
-
     [Header("Death VFX")]
     public GameObject explosionVfxPrefab;
 
     [Header("Scrap Drop")]
-    public GameObject scrapPrefab;     // 떨어질 Scrap 프리팹(콜라이더/리짓바디 있으면 좋음)
+    public GameObject scrapPrefab;
     public int scrapMin = 0;
     public int scrapMax = 2;
     public float scrapImpulse = 2.5f;
 
-    ModuleInstance inst;
+    private ModuleInstance inst;
 
     void Awake()
     {
         inst = GetComponent<ModuleInstance>();
-
-        // ModuleData의 Max HP를 자동 반영(기획대로: "모듈 내구도 0이면 잔해")
-        if (autoFromModuleData && inst != null && inst.data != null)
+        if (inst != null)
         {
-            if (inst.data.maxHP > 0)
-                maxHP = inst.data.maxHP;
-        }
+            // data.maxHP -> inst.maxHp/hp 동기화
+            inst.SyncFromDataIfNeeded(forceReset: false);
 
-        // 초기화
-        if (currentHP <= 0 || currentHP > maxHP)
-            currentHP = maxHP;
+            // 만약 기존에 hp가 10으로 박혀서 꼬였던 경우를 방지: hp가 0이거나 비정상이면 max로
+            if (inst.hp <= 0) inst.hp = inst.maxHp;
+            inst.hp = Mathf.Clamp(inst.hp, 0, inst.maxHp);
+        }
     }
 
-    // ✅ 우리 프로젝트 IDamageable 규격(이미 존재하는 인터페이스)에 정확히 맞춤
+    // ✅ IDamageable 규격 그대로 유지
     public void ApplyDamage(float amount, Vector2 hitPoint, Vector2 hitNormal, GameObject attacker)
     {
+        if (inst == null)
+            inst = GetComponent<ModuleInstance>();
+
+        if (inst == null)
+        {
+            // 안전장치: ModuleInstance가 없으면 데미지 무시(프리팹 설정 오류)
+            return;
+        }
+
+        // 혹시 data가 나중에 들어왔으면 반영
+        if (inst.data != null && inst.maxHp <= 0)
+            inst.SyncFromDataIfNeeded(forceReset: true);
+
         int dmg = Mathf.CeilToInt(Mathf.Max(0f, amount));
         if (dmg <= 0) return;
 
-        currentHP -= dmg;
+        inst.hp -= dmg;
 
-        if (currentHP <= 0)
+        if (inst.hp <= 0)
+        {
+            inst.hp = 0;
             Die(hitPoint, hitNormal);
+        }
     }
 
     void Die(Vector2 hitPoint, Vector2 hitNormal)
     {
-        // 폭발 VFX
         if (explosionVfxPrefab)
             Instantiate(explosionVfxPrefab, hitPoint, Quaternion.identity);
 
-        // Scrap 드랍
         if (scrapPrefab)
         {
             int n = Random.Range(scrapMin, scrapMax + 1);
             for (int i = 0; i < n; i++)
             {
                 var go = Instantiate(scrapPrefab, hitPoint, Quaternion.identity);
-
-                // 퍼지기(있으면)
                 var rb = go.GetComponent<Rigidbody2D>();
                 if (rb)
                 {
@@ -73,7 +76,6 @@ public class ModuleHP : MonoBehaviour, IDamageable
             }
         }
 
-        // 모듈 파괴
         Destroy(gameObject);
     }
 }

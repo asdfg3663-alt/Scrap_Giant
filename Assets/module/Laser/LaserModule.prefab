@@ -46,6 +46,7 @@ GameObject:
   - component: {fileID: 8656768921309762206}
   - component: {fileID: 2118721487480888542}
   - component: {fileID: 5161615545839766581}
+  - component: {fileID: 210366115769398974}
   m_Layer: 11
   m_Name: LaserModule
   m_TagString: Untagged
@@ -258,6 +259,26 @@ MonoBehaviour:
   beamColor: {r: 1, g: 0, b: 0, a: 1}
   forwardAxis: 1
   flipDirection: 0
+--- !u!114 &210366115769398974
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1687058770715388412}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 64918e830d464104b82930b74db6593f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ModuleHP
+  maxHP: 10
+  currentHP: 10
+  autoFromModuleData: 1
+  explosionVfxPrefab: {fileID: 0}
+  scrapPrefab: {fileID: 0}
+  scrapMin: 0
+  scrapMax: 2
+  scrapImpulse: 2.5
 --- !u!1 &8072020437808565984
 GameObject:
   m_ObjectHideFlags: 0

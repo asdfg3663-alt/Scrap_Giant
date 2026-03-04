@@ -22,8 +22,8 @@ MonoBehaviour:
   thrust: 0
   mass: 5
   weaponType: 1
-  weaponDamage: 3
-  weaponFireRate: 2
+  weaponDamage: 2
+  weaponFireRate: 1
   weaponPowerPerShot: 0
   weaponHeatPerShot: 0
   weaponAmmoPerShot: 0

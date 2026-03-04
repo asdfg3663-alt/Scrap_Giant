@@ -72,15 +72,27 @@ public class WeaponLaser : MonoBehaviour
 
     void Update()
     {
-        bool fireHeld = ShipCombatInput.FireHeld || Input.GetKey(KeyCode.Space);
+        // 최신 참조 보정
+        if (ship == null) ship = GetComponentInParent<ShipStats>();
+        if (inst == null) inst = GetComponent<ModuleInstance>();
+
+        // === [문제 1 해결] ===
+        // 1) 함선에 "부착"된 모듈이어야 함 (부착 안된 월드 모듈은 ship == null)
+        // 2) 플레이어 함선 소유 모듈이어야 입력으로 발사 가능
+        if (ship == null || !ship.isPlayerShip)
+        {
+            SetBeamVisible(false);
+            return;
+        }
+
+        // 입력은 ShipCombatInput만 사용 (스페이스바 직접 체크 제거: 중립 모듈 오발 방지)
+        bool fireHeld = ShipCombatInput.FireHeld;
         if (!fireHeld)
         {
             SetBeamVisible(false);
             return;
         }
 
-        if (ship == null) ship = GetComponentInParent<ShipStats>();
-        if (inst == null) inst = GetComponent<ModuleInstance>();
         if (inst == null || inst.data == null)
         {
             SetBeamVisible(false);
@@ -103,7 +115,7 @@ public class WeaponLaser : MonoBehaviour
 
         // 발사 중에만 에너지(초당 소모)
         float costThisFrame = Mathf.Max(0f, d.powerUsePerSec) * Time.deltaTime;
-        if (ship != null && costThisFrame > 0f && !ship.TryConsumeBattery(costThisFrame))
+        if (costThisFrame > 0f && !ship.TryConsumeBattery(costThisFrame))
         {
             SetBeamVisible(false);
             return;
@@ -116,25 +128,47 @@ public class WeaponLaser : MonoBehaviour
         origin += dir * startOffset;
 
         float range = defaultRange;
-        Vector2 end = origin + dir * range;
+        Vector2 endDefault = origin + dir * range;
 
-        // RaycastAll로 "내 배" 콜라이더는 무시하고 첫 번째 히트만 사용
+        // RaycastAll로 충돌 전체 수집
         var hits = Physics2D.RaycastAll(origin, dir, range, hitMask);
-        RaycastHit2D best = default;
-        bool found = false;
+
+        // === [문제 2 해결] ===
+        // - 빔 끝점: "첫 번째 유효 충돌"을 사용 (시각적 일관성)
+        // - 데미지 대상: hits 중 IDamageable이 있는 첫 번째 대상을 우선 선택
+        RaycastHit2D firstHit = default;
+        bool hasFirstHit = false;
+
+        RaycastHit2D damageHit = default;
+        bool hasDamageHit = false;
 
         for (int i = 0; i < hits.Length; i++)
         {
             var h = hits[i];
             if (h.collider == null) continue;
-            if (ship != null && h.collider.transform.IsChildOf(ship.transform)) continue;
 
-            best = h;
-            found = true;
-            break;
+            // 내 배(플레이어 함선)의 콜라이더는 무시
+            if (h.collider.transform.IsChildOf(ship.transform)) continue;
+
+            // 첫 유효 히트(빔 끝점 용)
+            if (!hasFirstHit)
+            {
+                firstHit = h;
+                hasFirstHit = true;
+            }
+
+            // 데미지 줄 수 있는 대상 우선 선택
+            var dmgTarget = h.collider.GetComponentInParent<IDamageable>();
+            if (dmgTarget != null)
+            {
+                damageHit = h;
+                hasDamageHit = true;
+                break; // 첫 IDamageable을 우선 사용
+            }
         }
 
-        if (found) end = best.point;
+        // 빔 끝점 결정
+        Vector2 end = hasFirstHit ? firstHit.point : endDefault;
 
         // 빔 표시(매 프레임)
         UpdateBeam(origin, end);
@@ -145,20 +179,20 @@ public class WeaponLaser : MonoBehaviour
 
         // (옵션) 샷당 소모
         float shotCost = Mathf.Max(0f, d.weaponPowerPerShot);
-        if (ship != null && shotCost > 0f && !ship.TryConsumeBattery(shotCost))
+        if (shotCost > 0f && !ship.TryConsumeBattery(shotCost))
             return;
 
         float damage = Mathf.Max(0f, d.weaponDamage);
 
-        // ✅ Enemy/Module 공통: IDamageable로 처리
-        if (found && best.collider != null && damage > 0f)
+        // IDamageable 대상에만 데미지 적용
+        if (hasDamageHit && damageHit.collider != null && damage > 0f)
         {
-            var dmgTarget = best.collider.GetComponentInParent<IDamageable>();
+            var dmgTarget = damageHit.collider.GetComponentInParent<IDamageable>();
             if (dmgTarget != null)
             {
-                Vector2 normal = best.normal;
+                Vector2 normal = damageHit.normal;
                 if (normal.sqrMagnitude < 0.0001f) normal = -dir;
-                dmgTarget.ApplyDamage(damage, best.point, normal, gameObject);
+                dmgTarget.ApplyDamage(damage, damageHit.point, normal, gameObject);
             }
         }
 

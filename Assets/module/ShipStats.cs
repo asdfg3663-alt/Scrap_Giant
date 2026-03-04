@@ -2,6 +2,13 @@ using UnityEngine;
 
 public class ShipStats : MonoBehaviour
 {
+    [Header("Identity")]
+    [Tooltip("플레이어 조종 함선이면 true (인스펙터에서 Player ShipStats에만 체크)")]
+    public bool isPlayerShip = false;
+
+    [Tooltip("true면 이 오브젝트가 Tag=Player일 때 isPlayerShip를 자동으로 true로 설정")]
+    public bool autoDetectPlayerByTag = true;
+
     public int maxHP;
     public int currentHP;
 
@@ -27,6 +34,12 @@ public class ShipStats : MonoBehaviour
     public float weaponAmmoPerSecPotential;
 
     ModuleInstance[] modules;
+
+    void Awake()
+    {
+        if (autoDetectPlayerByTag && CompareTag("Player"))
+            isPlayerShip = true;
+    }
 
     void Start()
     {

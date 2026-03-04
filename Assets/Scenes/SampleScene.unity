@@ -132,6 +132,7 @@ GameObject:
   - component: {fileID: 10065785}
   - component: {fileID: 10065788}
   - component: {fileID: 10065789}
+  - component: {fileID: 10065790}
   m_Layer: 0
   m_Name: PlayerShip
   m_TagString: Untagged
@@ -208,6 +209,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6d4d61bfde45d074282e04af5d610454, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShipStats
+  isPlayerShip: 1
+  autoDetectPlayerByTag: 1
   maxHP: 0
   currentHP: 0
   powerGenPerSec: 0
@@ -218,6 +221,9 @@ MonoBehaviour:
   totalThrust: 0
   totalMass: 0
   totalDps: 0
+  weaponPowerPerSecPotential: 0
+  weaponHeatPerSecPotential: 0
+  weaponAmmoPerSecPotential: 0
 --- !u!114 &10065789
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -246,6 +252,18 @@ MonoBehaviour:
   longPressTime: 0.25
   dragStartDistance: 0.15
   drawDebug: 0
+--- !u!114 &10065790
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 10065784}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac5919cbfa2df084fb854588ae173e32, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShipCombatInput
 --- !u!1 &29519077
 GameObject:
   m_ObjectHideFlags: 0
@@ -406,7 +424,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 16, y: -16}
+  m_AnchoredPosition: {x: 16, y: -15}
   m_SizeDelta: {x: 280, y: 30}
   m_Pivot: {x: 1, y: 1}
 --- !u!114 &164302049
@@ -456,8 +474,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 22
-  m_fontSizeBase: 22
+  m_fontSize: 20
+  m_fontSizeBase: 20
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -633,7 +651,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TutorialSpawner
   shipRoot: {fileID: 10065787}
   enginePrefab: {fileID: 5628837094240442396, guid: 283a4e87cc406cf46a05e4211c207c47, type: 3}
-  laserPrefab: {fileID: 0}
+  laserPrefab: {fileID: 1687058770715388412, guid: 2910086d369e1834f8a6b663f0c1f584, type: 3}
   engineOffset: {x: 3, y: 0}
   laserOffset: {x: 3, y: 2}
 --- !u!4 &342639404
@@ -692,8 +710,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -180.00002, y: -160}
-  m_SizeDelta: {x: 280, y: 140}
+  m_AnchoredPosition: {x: -500, y: -160}
+  m_SizeDelta: {x: 280, y: 180}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!114 &361567277
 MonoBehaviour:
@@ -749,6 +767,7 @@ MonoBehaviour:
   hpText: {fileID: 969222328}
   powerText: {fileID: 1272457449}
   batteryText: {fileID: 1587359860}
+  extraText: {fileID: 0}
   screenOffset: {x: 0, y: 30}
   clampToScreen: 1
 --- !u!225 &361567280
@@ -5801,7 +5820,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ModuleInstance
   data: {fileID: 11400000, guid: 7b876c0dd20edc6419ee1b7098262a6b, type: 2}
-  hp: 0
+  hp: 30
+  maxHp: 30
+  resetHpOnDataAssign: 1
 --- !u!114 &485038386
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6056,6 +6077,7 @@ MonoBehaviour:
   hpText: {fileID: 969222328}
   powerText: {fileID: 1272457449}
   batteryText: {fileID: 1587359860}
+  extraText: {fileID: 0}
   screenOffset: {x: 0, y: 30}
   clampToScreen: 1
 --- !u!1 &619394800
@@ -6267,7 +6289,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 16, y: -52}
+  m_AnchoredPosition: {x: 16, y: -40}
   m_SizeDelta: {x: 280, y: 30}
   m_Pivot: {x: 1, y: 1}
 --- !u!114 &969222328
@@ -6317,8 +6339,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 18
-  m_fontSizeBase: 18
+  m_fontSize: 16
+  m_fontSizeBase: 16
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -6506,7 +6528,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 16, y: -80}
+  m_AnchoredPosition: {x: 16, y: -60}
   m_SizeDelta: {x: 280, y: 30}
   m_Pivot: {x: 1, y: 1}
 --- !u!114 &1272457449
@@ -6556,8 +6578,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 18
-  m_fontSizeBase: 18
+  m_fontSize: 16
+  m_fontSizeBase: 16
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -6765,7 +6787,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 16, y: -108}
+  m_AnchoredPosition: {x: 16, y: -80}
   m_SizeDelta: {x: 280, y: 30}
   m_Pivot: {x: 1, y: 1}
 --- !u!114 &1587359860
@@ -6815,8 +6837,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 18
-  m_fontSizeBase: 18
+  m_fontSize: 16
+  m_fontSizeBase: 16
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
