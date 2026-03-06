@@ -6,7 +6,7 @@ public class ShipStats : MonoBehaviour
     [Tooltip("플레이어 조종 함선이면 true (인스펙터에서 Player ShipStats에만 체크)")]
     public bool isPlayerShip = false;
 
-    [Tooltip("true면 이 오브젝트가 Tag=Player일 때 isPlayerShip를 자동으로 true로 설정")]
+    [Tooltip("true면 오브젝트가 Tag=Player일 때 isPlayerShip을 자동으로 true로 설정")]
     public bool autoDetectPlayerByTag = true;
 
     public int maxHP;
@@ -28,12 +28,13 @@ public class ShipStats : MonoBehaviour
     [Header("Combat (MVP)")]
     public float totalDps;
 
-    // '가능 최대치' 기반(입력/탄약/전력 부족 등은 아직 미반영)
+    // 가상 최대치 기반(입력/탄약/열 관리 없음, 아직 미반영)
     public float weaponPowerPerSecPotential;
     public float weaponHeatPerSecPotential;
     public float weaponAmmoPerSecPotential;
 
     ModuleInstance[] modules;
+    bool rebuildQueued;
 
     void Awake()
     {
@@ -45,17 +46,35 @@ public class ShipStats : MonoBehaviour
     {
         Rebuild();
 
-        // 시작은 풀충전
-        if (energyCurrent <= 0f) energyCurrent = energyMax;
+        if (energyCurrent <= 0f)
+            energyCurrent = energyMax;
+
+        if (isPlayerShip)
+            PlayerHudRuntime.EnsureForPlayer(this);
     }
 
     void Update()
     {
-        // 초당 전력 흐름만큼 배터리 충/방전 (시스템 유지비/발전만 반영)
         energyCurrent += netPowerPerSec * Time.deltaTime;
-
-        // 0 ~ energyMax 사이로 제한
         energyCurrent = Mathf.Clamp(energyCurrent, 0f, energyMax);
+    }
+
+    void LateUpdate()
+    {
+        if (!rebuildQueued) return;
+
+        rebuildQueued = false;
+        Rebuild();
+    }
+
+    void OnTransformChildrenChanged()
+    {
+        ScheduleRebuild();
+    }
+
+    public void ScheduleRebuild()
+    {
+        rebuildQueued = true;
     }
 
     public void Rebuild()
@@ -81,7 +100,6 @@ public class ShipStats : MonoBehaviour
             if (m == null || m.data == null) continue;
             var d = m.data;
 
-            // 기본 스탯 합산
             maxHP += d.maxHP;
             powerGenPerSec += d.powerGenPerSec;
 
@@ -89,24 +107,17 @@ public class ShipStats : MonoBehaviour
             totalMass += d.mass;
             energyMax += d.maxEnergy;
 
-            // ✅ 무기 판정
-            bool isWeapon = (d.type == ModuleType.Weapon) || (d.weaponType != WeaponType.None) || (d.dps > 0f);
-
-            // ✅ 상시 유지비는 "무기 제외"
-            // 무기(powerUsePerSec)는 WeaponLaser 같은 무기 스크립트에서 "발사 중에만" 배터리 소모로 처리한다.
+            bool isWeapon = d.type == ModuleType.Weapon || d.weaponType != WeaponType.None || d.dps > 0f;
             if (!isWeapon)
-            {
                 powerUsePerSec += d.powerUsePerSec;
-            }
 
-            // Weapon DPS: dps가 0이면 weaponDamage*weaponFireRate로 자동 계산
             if (isWeapon)
             {
                 float dps = d.dps;
-                if (dps <= 0f) dps = Mathf.Max(0f, d.weaponDamage) * Mathf.Max(0f, d.weaponFireRate);
+                if (dps <= 0f)
+                    dps = Mathf.Max(0f, d.weaponDamage) * Mathf.Max(0f, d.weaponFireRate);
 
                 totalDps += dps;
-
                 weaponPowerPerSecPotential += Mathf.Max(0f, d.weaponPowerPerShot) * Mathf.Max(0f, d.weaponFireRate);
                 weaponHeatPerSecPotential += Mathf.Max(0f, d.weaponHeatPerShot) * Mathf.Max(0f, d.weaponFireRate);
                 weaponAmmoPerSecPotential += Mathf.Max(0f, d.weaponAmmoPerShot) * Mathf.Max(0f, d.weaponFireRate);
@@ -114,25 +125,18 @@ public class ShipStats : MonoBehaviour
         }
 
         netPowerPerSec = powerGenPerSec - powerUsePerSec;
-
-        // MVP: 현재HP는 일단 maxHP로 맞춰 시작(추후 파손/수리 반영)
         currentHP = maxHP;
-
-        // energyMax가 바뀌었으니 현재 에너지도 범위 안으로
         energyCurrent = Mathf.Clamp(energyCurrent, 0f, energyMax);
     }
 
     public bool TryConsumeBattery(float amount)
     {
         if (amount <= 0f) return true;
-
-        if (energyCurrent < amount)
-            return false;
+        if (energyCurrent < amount) return false;
 
         energyCurrent -= amount;
-
-        // 혹시 모를 음수 방지
-        if (energyCurrent < 0f) energyCurrent = 0f;
+        if (energyCurrent < 0f)
+            energyCurrent = 0f;
 
         return true;
     }

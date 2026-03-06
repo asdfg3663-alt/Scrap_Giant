@@ -19,7 +19,7 @@ MonoBehaviour:
   powerGenPerSec: 0
   powerUsePerSec: 0
   maxEnergy: 10
-  thrust: 10
+  thrust: 20
   mass: 5
   weaponType: 0
   weaponDamage: 0
