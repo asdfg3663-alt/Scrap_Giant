@@ -77,7 +77,7 @@ public class ShipMovement : MonoBehaviour
                     if (m == null || m.data == null) continue;
 
                     // 전제: m.data.thrust (엔진 추력)
-                    float t = m.data.thrust;
+                    float t = m.GetThrust();
                     if (t <= 0f) continue;
 
                     Vector2 dir = (Vector2)m.transform.up;
@@ -155,7 +155,7 @@ public class ShipMovement : MonoBehaviour
             if (m == null || m.data == null) continue;
 
             // 전제: m.data.mass (모듈 질량)
-            float mm = Mathf.Max(0f, m.data.mass);
+            float mm = Mathf.Max(0f, m.GetMass());
             if (mm < minModuleMassForCOM) continue;
 
             totalM += mm;

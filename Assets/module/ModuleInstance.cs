@@ -16,6 +16,7 @@ public class ModuleInstance : MonoBehaviour
 
     public int CurrentTier => data != null ? Mathf.Max(1, data.tier + upgradeLevel) : Mathf.Max(1, upgradeLevel);
     public string DisplayName => FormatDisplayName(data != null ? data.displayName : "Module", CurrentTier);
+    public float TierMultiplier => Mathf.Pow(2f, Mathf.Max(0, upgradeLevel));
 
     void Awake()
     {
@@ -46,6 +47,29 @@ public class ModuleInstance : MonoBehaviour
     {
         upgradeLevel = Mathf.Max(0, upgradeLevel + amount);
         SyncFromDataIfNeeded(forceReset: false);
+    }
+
+    public int GetMaxHp()
+    {
+        return data != null ? Mathf.Max(1, data.maxHP) : Mathf.Max(1, maxHp);
+    }
+
+    public float GetPowerGenPerSec() { return data != null ? data.powerGenPerSec * TierMultiplier : 0f; }
+    public float GetPowerUsePerSec() { return data != null ? data.powerUsePerSec * TierMultiplier : 0f; }
+    public float GetMaxEnergy() { return data != null ? data.maxEnergy * TierMultiplier : 0f; }
+    public float GetThrust() { return data != null ? data.thrust * TierMultiplier : 0f; }
+    public float GetMass() { return data != null ? data.mass * TierMultiplier : 0f; }
+    public float GetWeaponDamage() { return data != null ? data.weaponDamage * TierMultiplier : 0f; }
+    public float GetWeaponFireRate() { return data != null ? data.weaponFireRate * TierMultiplier : 0f; }
+    public float GetWeaponPowerPerShot() { return data != null ? data.weaponPowerPerShot * TierMultiplier : 0f; }
+    public float GetWeaponHeatPerShot() { return data != null ? data.weaponHeatPerShot * TierMultiplier : 0f; }
+    public float GetWeaponAmmoPerShot() { return data != null ? data.weaponAmmoPerShot * TierMultiplier : 0f; }
+
+    public float GetDps()
+    {
+        if (data == null) return 0f;
+        if (data.dps > 0f) return data.dps * TierMultiplier;
+        return Mathf.Max(0f, GetWeaponDamage()) * Mathf.Max(0f, GetWeaponFireRate());
     }
 
     public static string FormatDisplayName(string rawName, int tier)

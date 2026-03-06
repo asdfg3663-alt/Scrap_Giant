@@ -100,27 +100,25 @@ public class ShipStats : MonoBehaviour
             if (m == null || m.data == null) continue;
             var d = m.data;
 
-            maxHP += d.maxHP;
-            powerGenPerSec += d.powerGenPerSec;
+            maxHP += m.GetMaxHp();
+            powerGenPerSec += m.GetPowerGenPerSec();
 
-            totalThrust += d.thrust;
-            totalMass += d.mass;
-            energyMax += d.maxEnergy;
+            totalThrust += m.GetThrust();
+            totalMass += m.GetMass();
+            energyMax += m.GetMaxEnergy();
 
             bool isWeapon = d.type == ModuleType.Weapon || d.weaponType != WeaponType.None || d.dps > 0f;
             if (!isWeapon)
-                powerUsePerSec += d.powerUsePerSec;
+                powerUsePerSec += m.GetPowerUsePerSec();
 
             if (isWeapon)
             {
-                float dps = d.dps;
-                if (dps <= 0f)
-                    dps = Mathf.Max(0f, d.weaponDamage) * Mathf.Max(0f, d.weaponFireRate);
+                float dps = m.GetDps();
 
                 totalDps += dps;
-                weaponPowerPerSecPotential += Mathf.Max(0f, d.weaponPowerPerShot) * Mathf.Max(0f, d.weaponFireRate);
-                weaponHeatPerSecPotential += Mathf.Max(0f, d.weaponHeatPerShot) * Mathf.Max(0f, d.weaponFireRate);
-                weaponAmmoPerSecPotential += Mathf.Max(0f, d.weaponAmmoPerShot) * Mathf.Max(0f, d.weaponFireRate);
+                weaponPowerPerSecPotential += Mathf.Max(0f, m.GetWeaponPowerPerShot()) * Mathf.Max(0f, m.GetWeaponFireRate());
+                weaponHeatPerSecPotential += Mathf.Max(0f, m.GetWeaponHeatPerShot()) * Mathf.Max(0f, m.GetWeaponFireRate());
+                weaponAmmoPerSecPotential += Mathf.Max(0f, m.GetWeaponAmmoPerShot()) * Mathf.Max(0f, m.GetWeaponFireRate());
             }
         }
 

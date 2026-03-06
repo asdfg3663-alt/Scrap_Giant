@@ -105,7 +105,7 @@ public class WeaponLaser : MonoBehaviour
         return;
     }
 
-    float fireRate = Mathf.Max(0f, d.weaponFireRate);
+    float fireRate = Mathf.Max(0f, inst.GetWeaponFireRate());
     if (fireRate <= 0f)
     {
         SetBeamVisible(false);
@@ -113,7 +113,7 @@ public class WeaponLaser : MonoBehaviour
     }
 
     // 발사 중에만 에너지
-    float costThisFrame = Mathf.Max(0f, d.powerUsePerSec) * Time.deltaTime;
+    float costThisFrame = Mathf.Max(0f, inst.GetPowerUsePerSec()) * Time.deltaTime;
     if (costThisFrame > 0f && !ship.TryConsumeBattery(costThisFrame))
     {
         SetBeamVisible(false);
@@ -149,11 +149,11 @@ public class WeaponLaser : MonoBehaviour
     cd -= Time.deltaTime;
     if (cd > 0f) return;
 
-    float shotCost = Mathf.Max(0f, d.weaponPowerPerShot);
+    float shotCost = Mathf.Max(0f, inst.GetWeaponPowerPerShot());
     if (shotCost > 0f && !ship.TryConsumeBattery(shotCost))
         return;
 
-    float damage = Mathf.Max(0f, d.weaponDamage);
+    float damage = Mathf.Max(0f, inst.GetWeaponDamage());
 
     if (found && best.collider != null && damage > 0f)
     {

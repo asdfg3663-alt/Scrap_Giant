@@ -102,39 +102,39 @@ public class ModuleInfoUI : MonoBehaviour
 
         BeginLines();
 
-        AddLine($"HP: {module.hp} / {module.maxHp}");
+        if (module.CurrentTier > 0) AddLine($"Tier: {module.CurrentTier}");
+        AddLine($"HP: {module.hp} / {module.GetMaxHp()}");
 
-        if (data.powerGenPerSec > 0f || data.powerUsePerSec > 0f)
-            AddLine($"Power: +{data.powerGenPerSec:0.##}/s  -{data.powerUsePerSec:0.##}/s");
+        float powerGen = module.GetPowerGenPerSec();
+        float powerUse = module.GetPowerUsePerSec();
+        if (powerGen > 0f || powerUse > 0f)
+            AddLine($"Power: +{powerGen:0.##}/s  -{powerUse:0.##}/s");
 
         var ship = module.GetComponentInParent<ShipStats>();
         if (ship != null && ship.energyMax > 0f)
             AddLine($"Battery: {ship.energyCurrent:0.##} / {ship.energyMax:0.##}");
 
-        if (data.mass > 0f) AddLine($"Mass: {data.mass:0.##}");
-        if (data.thrust > 0f) AddLine($"Thrust: {data.thrust:0.##}");
-        if (data.maxEnergy > 0f) AddLine($"Energy Cap: {data.maxEnergy:0.##}");
-        if (module.CurrentTier > 0) AddLine($"Tier: T{module.CurrentTier}");
+        float mass = module.GetMass();
+        float thrust = module.GetThrust();
+        float energyCap = module.GetMaxEnergy();
+
+        if (mass > 0f) AddLine($"Mass: {mass:0.##}");
+        if (thrust > 0f) AddLine($"Thrust: {thrust:0.##}");
+        if (energyCap > 0f) AddLine($"Energy Cap: {energyCap:0.##}");
 
         bool hasWeapon =
             data.weaponType != WeaponType.None ||
-            data.weaponDamage > 0f ||
-            data.weaponFireRate > 0f ||
+            module.GetWeaponDamage() > 0f ||
+            module.GetWeaponFireRate() > 0f ||
             data.dps > 0f ||
-            data.weaponPowerPerShot > 0f ||
-            data.weaponHeatPerShot > 0f ||
-            data.weaponAmmoPerShot > 0f;
+            module.GetWeaponPowerPerShot() > 0f ||
+            module.GetWeaponHeatPerShot() > 0f ||
+            module.GetWeaponAmmoPerShot() > 0f;
 
         if (hasWeapon)
         {
-            float dps = data.dps > 0f ? data.dps : data.weaponDamage * data.weaponFireRate;
-            if (dps > 0f) AddLine($"DPS: {dps:0.##} ({data.weaponType})");
-            if (data.weaponDamage > 0f) AddLine($"Damage: {data.weaponDamage:0.##}");
-            if (data.weaponFireRate > 0f) AddLine($"FireRate: {data.weaponFireRate:0.##}/s");
-            if (data.weaponPowerPerShot > 0f) AddLine($"Power/Shot: {data.weaponPowerPerShot:0.##}");
-            if (data.weaponHeatPerShot > 0f) AddLine($"Heat/Shot: {data.weaponHeatPerShot:0.##}");
-            if (data.weaponAmmoPerShot > 0f) AddLine($"Ammo/Shot: {data.weaponAmmoPerShot:0.##}");
-            if (data.powerUsePerSec > 0f) AddLine($"Power Use(Firing): {data.powerUsePerSec:0.##}/s");
+            float dps = module.GetDps();
+            if (dps > 0f) AddLine($"DPS: {dps:0.##}");
         }
 
         EndLines();
@@ -155,7 +155,7 @@ public class ModuleInfoUI : MonoBehaviour
             int fill = Mathf.Clamp(Mathf.RoundToInt(progress * 10f), 0, 10);
             string bar = new string('#', fill) + new string('-', 10 - fill);
 
-            upgradeActionLine.text = $"Upgrading [{bar}] {progress * 100f:0}%";
+            upgradeActionLine.text = $"<mark=#214B3D padding=\"14,14,6,6\">UPGRADING [{bar}] {progress * 100f:0}%</mark>";
             upgradeActionLine.color = upgradeProgressColor;
             upgradeActionLine.raycastTarget = false;
             upgradeButton.interactable = false;
@@ -165,7 +165,7 @@ public class ModuleInfoUI : MonoBehaviour
 
         if (upgradeSystem.CanStartUpgrade(module, out string reason))
         {
-            upgradeActionLine.text = $"Upgrade -> T{info.targetTier}  ({info.scrapCost} Scrap / {info.duration:0.#}s)";
+            upgradeActionLine.text = $"<mark=#5A6218 padding=\"14,14,6,6\">UPGRADE TO {info.targetTier}  {info.scrapCost} SCRAP  {info.duration:0.#}s</mark>";
             upgradeActionLine.color = upgradeReadyColor;
             upgradeActionLine.raycastTarget = true;
             upgradeButton.interactable = true;
@@ -173,7 +173,7 @@ public class ModuleInfoUI : MonoBehaviour
             return;
         }
 
-        upgradeActionLine.text = $"Upgrade Locked - {reason}";
+        upgradeActionLine.text = $"<mark=#444A54 padding=\"14,14,6,6\">UPGRADE LOCKED  {reason.ToUpperInvariant()}</mark>";
         upgradeActionLine.color = upgradeLockedColor;
         upgradeActionLine.raycastTarget = false;
         upgradeButton.interactable = false;
@@ -205,9 +205,11 @@ public class ModuleInfoUI : MonoBehaviour
 
         upgradeActionLine = go.GetComponent<TMP_Text>();
         upgradeActionLine.fontStyle = FontStyles.Bold;
+        upgradeActionLine.alignment = TextAlignmentOptions.Center;
         upgradeActionLine.text = "";
         upgradeActionLine.color = upgradeReadyColor;
         upgradeActionLine.raycastTarget = true;
+        upgradeActionLine.rectTransform.sizeDelta = new Vector2(320f, 28f);
 
         upgradeButton = go.GetComponent<Button>();
         if (upgradeButton == null) upgradeButton = go.AddComponent<Button>();

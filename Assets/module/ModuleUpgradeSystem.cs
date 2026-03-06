@@ -183,13 +183,13 @@ public class ModuleUpgradeSystem : MonoBehaviour
     int CalculateScrapCost(ModuleInstance module)
     {
         if (module == null || module.data == null) return 0;
-        return Mathf.CeilToInt(Mathf.Max(0f, module.data.mass * 10f));
+        return Mathf.CeilToInt(Mathf.Max(0f, module.GetMass() * 10f));
     }
 
     float CalculateDuration(ModuleInstance module)
     {
         if (module == null || module.data == null) return 0f;
-        return Mathf.Max(0.1f, module.data.mass * 3f);
+        return Mathf.Max(0.1f, module.GetMass() * 3f);
     }
 
     void CompleteUpgrade()
