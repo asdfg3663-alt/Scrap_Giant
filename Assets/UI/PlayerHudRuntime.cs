@@ -76,9 +76,12 @@ public class PlayerHudRuntime : MonoBehaviour
     GameObject inventoryBody;
     GameObject inventoryEmptyState;
 
+    Image assemblyPreviewImage;
     TMP_Text bestValueText;
     TMP_Text currentScoreText;
-    TMP_Text assemblyStatusText;
+    TMP_Text assemblyTitleText;
+    TMP_Text assemblyPrimaryText;
+    TMP_Text assemblySecondaryText;
     TMP_Text inventoryCountText;
     TMP_Text inventoryButtonText;
 
@@ -91,8 +94,10 @@ public class PlayerHudRuntime : MonoBehaviour
     bool ammoUiDirty;
     bool inventoryUiDirty;
 
-    string assemblyLabel = "Idle";
+    string assemblyPrimaryLabel = "No active upgrade";
+    string assemblySecondaryLabel = "Idle";
     bool assemblyActive;
+    Sprite assemblySprite;
 
     readonly List<ResourceEntry> resources = new();
     readonly List<ResourceEntry> ammoEntries = new();
@@ -198,13 +203,14 @@ public class PlayerHudRuntime : MonoBehaviour
         ammoUiDirty = true;
     }
 
-    public void SetAssemblyState(bool active, string label)
+    public void SetAssemblyState(bool active, string primary, string secondary, Sprite sprite = null)
     {
         assemblyActive = active;
-        assemblyLabel = string.IsNullOrWhiteSpace(label) ? "Idle" : label;
+        assemblyPrimaryLabel = string.IsNullOrWhiteSpace(primary) ? "No active upgrade" : primary;
+        assemblySecondaryLabel = string.IsNullOrWhiteSpace(secondary) ? "Idle" : secondary;
+        assemblySprite = sprite;
 
-        if (assemblyStatusText != null)
-            assemblyStatusText.text = assemblyActive ? $"Assembling: {assemblyLabel}" : $"Assembly: {assemblyLabel}";
+        RefreshAssemblyPanel();
     }
 
     public void SetInventoryItem(string id, string label, int amount, Color color)
@@ -317,7 +323,9 @@ public class PlayerHudRuntime : MonoBehaviour
             ammoEntries.Add(new ResourceEntry("ammo", "Ammo", 120, new Color(0.96f, 0.32f, 0.24f, 1f)));
 
         assemblyActive = false;
-        assemblyLabel = "Idle";
+        assemblyPrimaryLabel = "No active upgrade";
+        assemblySecondaryLabel = "Idle";
+        assemblySprite = null;
 
         resourceUiDirty = true;
         ammoUiDirty = true;
@@ -355,7 +363,7 @@ public class PlayerHudRuntime : MonoBehaviour
         BuildScorePanel(scorePanel);
 
         var assemblyPanel = CreateRect("AssemblyPanel", topRoot);
-        SetAnchored(assemblyPanel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(320f, 0f), new Vector2(260f, 82f));
+        SetAnchored(assemblyPanel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(360f, 0f), new Vector2(340f, 82f));
         CreateBackPlate(assemblyPanel, new Color(0.05f, 0.1f, 0.12f, 0.9f));
         BuildAssemblyPanel(assemblyPanel);
     }
@@ -394,16 +402,29 @@ public class PlayerHudRuntime : MonoBehaviour
 
     void BuildAssemblyPanel(RectTransform panel)
     {
-        var iconRoot = CreateRect("AssemblyIcon", panel);
-        SetAnchored(iconRoot, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(18f, 0f), new Vector2(28f, 28f));
-        CreateImage(iconRoot, new Color(0.34f, 0.88f, 0.67f, 1f));
+        var previewFrame = CreateRect("AssemblyPreviewFrame", panel);
+        SetAnchored(previewFrame, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(16f, 0f), new Vector2(60f, 60f));
+        CreateBackPlate(previewFrame, new Color(0.08f, 0.18f, 0.14f, 0.95f));
 
-        var inner = CreateRect("AssemblyIconInner", iconRoot);
-        Stretch(inner, new Vector2(0.22f, 0.22f), new Vector2(0.78f, 0.78f), Vector2.zero, Vector2.zero);
-        CreateImage(inner, new Color(0.07f, 0.18f, 0.14f, 1f));
+        var previewImageRect = CreateRect("AssemblyPreview", previewFrame);
+        Stretch(previewImageRect, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), Vector2.zero, Vector2.zero);
+        assemblyPreviewImage = CreateImage(previewImageRect, Color.white);
+        assemblyPreviewImage.type = Image.Type.Simple;
+        assemblyPreviewImage.preserveAspect = true;
 
-        CreateLabel(panel, "ASSEMBLY", 15f, new Color(0.72f, 0.94f, 0.88f, 1f), TextAlignmentOptions.TopLeft, new Vector2(56f, -12f), new Vector2(0f, 1f), FontStyles.Bold);
-        assemblyStatusText = CreateLabel(panel, "Assembly: Idle", 15f, Color.white, TextAlignmentOptions.MidlineLeft, new Vector2(56f, 8f), new Vector2(0f, 0.5f), FontStyles.Normal);
+        assemblyTitleText = CreateLabel(panel, "ASSEMBLY", 15f, new Color(0.72f, 0.94f, 0.88f, 1f), TextAlignmentOptions.TopLeft, new Vector2(86f, -10f), new Vector2(0f, 1f), FontStyles.Bold);
+        assemblyPrimaryText = CreateLabel(panel, "No active upgrade", 16f, Color.white, TextAlignmentOptions.TopLeft, new Vector2(86f, -30f), new Vector2(0f, 1f), FontStyles.Bold);
+        assemblySecondaryText = CreateLabel(panel, "Idle", 13f, new Color(0.74f, 0.86f, 0.9f, 1f), TextAlignmentOptions.TopLeft, new Vector2(86f, -52f), new Vector2(0f, 1f), FontStyles.Normal);
+
+        assemblyPrimaryText.textWrappingMode = TextWrappingModes.NoWrap;
+        assemblyPrimaryText.overflowMode = TextOverflowModes.Ellipsis;
+        assemblyPrimaryText.rectTransform.sizeDelta = new Vector2(230f, 22f);
+
+        assemblySecondaryText.textWrappingMode = TextWrappingModes.NoWrap;
+        assemblySecondaryText.overflowMode = TextOverflowModes.Ellipsis;
+        assemblySecondaryText.rectTransform.sizeDelta = new Vector2(230f, 20f);
+
+        RefreshAssemblyPanel();
     }
 
     void CreateInventoryPanel()
@@ -460,7 +481,7 @@ public class PlayerHudRuntime : MonoBehaviour
         }
 
         RefreshScore(force);
-        SetAssemblyState(assemblyActive, assemblyLabel);
+        RefreshAssemblyPanel();
         RefreshResourceRows();
         RefreshAmmoRows();
         RefreshInventoryRows();
@@ -526,6 +547,29 @@ public class PlayerHudRuntime : MonoBehaviour
         if (inventoryCountText != null) inventoryCountText.text = $"{inventoryEntries.Count} parts";
 
         inventoryUiDirty = false;
+    }
+
+    void RefreshAssemblyPanel()
+    {
+        if (assemblyTitleText == null || assemblyPrimaryText == null || assemblySecondaryText == null || assemblyPreviewImage == null)
+            return;
+
+        assemblyTitleText.text = assemblyActive ? "UPGRADING" : "ASSEMBLY";
+        assemblyPrimaryText.text = assemblyPrimaryLabel;
+        assemblySecondaryText.text = assemblySecondaryLabel;
+
+        if (assemblySprite != null)
+        {
+            assemblyPreviewImage.sprite = assemblySprite;
+            assemblyPreviewImage.color = Color.white;
+        }
+        else
+        {
+            assemblyPreviewImage.sprite = GetSolidSprite();
+            assemblyPreviewImage.color = assemblyActive
+                ? new Color(0.34f, 0.88f, 0.67f, 1f)
+                : new Color(0.2f, 0.34f, 0.29f, 1f);
+        }
     }
 
     void SyncValueRows(List<ResourceEntry> source, RectTransform parent, List<ValueRow> pool)

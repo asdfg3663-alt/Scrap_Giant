@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 [DisallowMultipleComponent]
@@ -27,8 +28,12 @@ public class ModuleInfoUI : MonoBehaviour
     Camera cam;
 
     TMP_Text nameLine;
+    TMP_Text upgradeHintLine;
     TMP_Text upgradeActionLine;
     Button upgradeButton;
+    EventTrigger upgradeTrigger;
+    string upgradeHoverMessage;
+    bool isUpgradeHovered;
 
     readonly List<TMP_Text> pool = new();
     int useCount;
@@ -155,28 +160,34 @@ public class ModuleInfoUI : MonoBehaviour
             int fill = Mathf.Clamp(Mathf.RoundToInt(progress * 10f), 0, 10);
             string bar = new string('#', fill) + new string('-', 10 - fill);
 
-            upgradeActionLine.text = $"<mark=#214B3D padding=\"14,14,6,6\">UPGRADING [{bar}] {progress * 100f:0}%</mark>";
+            upgradeActionLine.text = $"<mark=#214B3D padding=\"18,18,7,7\">UPGRADING [{bar}]</mark>";
             upgradeActionLine.color = upgradeProgressColor;
-            upgradeActionLine.raycastTarget = false;
-            upgradeButton.interactable = false;
+            upgradeActionLine.raycastTarget = true;
+            upgradeButton.interactable = true;
+            upgradeHoverMessage = $"{module.DisplayName} {progress * 100f:0}%";
+            RefreshUpgradeHintVisibility();
             upgradeActionLine.gameObject.SetActive(true);
             return;
         }
 
         if (upgradeSystem.CanStartUpgrade(module, out string reason))
         {
-            upgradeActionLine.text = $"<mark=#5A6218 padding=\"14,14,6,6\">UPGRADE TO {info.targetTier}  {info.scrapCost} SCRAP  {info.duration:0.#}s</mark>";
+            upgradeActionLine.text = "<mark=#5A6218 padding=\"22,22,7,7\">UPGRADE</mark>";
             upgradeActionLine.color = upgradeReadyColor;
             upgradeActionLine.raycastTarget = true;
             upgradeButton.interactable = true;
+            upgradeHoverMessage = $"{info.scrapCost} Scrap / {info.duration:0.#}s";
+            RefreshUpgradeHintVisibility();
             upgradeActionLine.gameObject.SetActive(true);
             return;
         }
 
-        upgradeActionLine.text = $"<mark=#444A54 padding=\"14,14,6,6\">UPGRADE LOCKED  {reason.ToUpperInvariant()}</mark>";
+        upgradeActionLine.text = "<mark=#444A54 padding=\"22,22,7,7\">UPGRADE</mark>";
         upgradeActionLine.color = upgradeLockedColor;
-        upgradeActionLine.raycastTarget = false;
-        upgradeButton.interactable = false;
+        upgradeActionLine.raycastTarget = true;
+        upgradeButton.interactable = true;
+        upgradeHoverMessage = reason;
+        RefreshUpgradeHintVisibility();
         upgradeActionLine.gameObject.SetActive(true);
     }
 
@@ -199,6 +210,8 @@ public class ModuleInfoUI : MonoBehaviour
         if (upgradeActionLine != null || lineTemplate == null) return;
 
         Transform parent = lineTemplate.transform.parent != null ? lineTemplate.transform.parent : transform;
+        EnsureUpgradeHintLine(parent);
+
         var go = Instantiate(lineTemplate.gameObject, parent);
         go.name = "UpgradeActionLine";
         go.SetActive(true);
@@ -206,10 +219,11 @@ public class ModuleInfoUI : MonoBehaviour
         upgradeActionLine = go.GetComponent<TMP_Text>();
         upgradeActionLine.fontStyle = FontStyles.Bold;
         upgradeActionLine.alignment = TextAlignmentOptions.Center;
+        upgradeActionLine.textWrappingMode = TextWrappingModes.NoWrap;
         upgradeActionLine.text = "";
         upgradeActionLine.color = upgradeReadyColor;
         upgradeActionLine.raycastTarget = true;
-        upgradeActionLine.rectTransform.sizeDelta = new Vector2(320f, 28f);
+        upgradeActionLine.rectTransform.sizeDelta = new Vector2(220f, 30f);
 
         upgradeButton = go.GetComponent<Button>();
         if (upgradeButton == null) upgradeButton = go.AddComponent<Button>();
@@ -217,6 +231,29 @@ public class ModuleInfoUI : MonoBehaviour
         upgradeButton.targetGraphic = upgradeActionLine;
         upgradeButton.onClick.RemoveAllListeners();
         upgradeButton.onClick.AddListener(OnUpgradeClicked);
+
+        upgradeTrigger = go.GetComponent<EventTrigger>();
+        if (upgradeTrigger == null) upgradeTrigger = go.AddComponent<EventTrigger>();
+        upgradeTrigger.triggers = new List<EventTrigger.Entry>();
+        AddTrigger(EventTriggerType.PointerEnter, _ => ShowUpgradeHint());
+        AddTrigger(EventTriggerType.PointerExit, _ => HideUpgradeHint());
+    }
+
+    void EnsureUpgradeHintLine(Transform parent)
+    {
+        if (upgradeHintLine != null || lineTemplate == null) return;
+
+        var go = Instantiate(lineTemplate.gameObject, parent);
+        go.name = "UpgradeHintLine";
+        go.SetActive(false);
+
+        upgradeHintLine = go.GetComponent<TMP_Text>();
+        upgradeHintLine.fontSize = Mathf.Max(12f, lineTemplate.fontSize - 1f);
+        upgradeHintLine.color = new Color(0.82f, 0.88f, 0.92f, 1f);
+        upgradeHintLine.textWrappingMode = TextWrappingModes.NoWrap;
+        upgradeHintLine.overflowMode = TextOverflowModes.Ellipsis;
+        upgradeHintLine.rectTransform.sizeDelta = new Vector2(320f, 24f);
+        upgradeHintLine.raycastTarget = false;
     }
 
     void BeginLines()
@@ -270,6 +307,47 @@ public class ModuleInfoUI : MonoBehaviour
         ModuleUpgradeSystem.Instance.StartUpgrade(module);
     }
 
+    void ShowUpgradeHint()
+    {
+        isUpgradeHovered = true;
+        if (upgradeHintLine == null || string.IsNullOrWhiteSpace(upgradeHoverMessage))
+            return;
+
+        upgradeHintLine.text = upgradeHoverMessage;
+        upgradeHintLine.gameObject.SetActive(true);
+        upgradeHintLine.transform.SetAsLastSibling();
+        upgradeActionLine.transform.SetAsLastSibling();
+    }
+
+    void HideUpgradeHint()
+    {
+        isUpgradeHovered = false;
+        if (upgradeHintLine != null)
+            upgradeHintLine.gameObject.SetActive(false);
+    }
+
+    void RefreshUpgradeHintVisibility()
+    {
+        if (isUpgradeHovered)
+            ShowUpgradeHint();
+        else if (upgradeHintLine != null)
+            upgradeHintLine.gameObject.SetActive(false);
+    }
+
+    void ForceHideUpgradeHint()
+    {
+        isUpgradeHovered = false;
+        if (upgradeHintLine != null)
+            upgradeHintLine.gameObject.SetActive(false);
+    }
+
+    void AddTrigger(EventTriggerType type, UnityEngine.Events.UnityAction<BaseEventData> action)
+    {
+        var entry = new EventTrigger.Entry { eventID = type };
+        entry.callback.AddListener(action);
+        upgradeTrigger.triggers.Add(entry);
+    }
+
     void FollowSelected(ModuleInstance module)
     {
         if (!cam) cam = Camera.main;
@@ -302,6 +380,7 @@ public class ModuleInfoUI : MonoBehaviour
         cg.interactable = false;
 
         if (nameLine != null) nameLine.gameObject.SetActive(false);
+        ForceHideUpgradeHint();
         if (upgradeActionLine != null) upgradeActionLine.gameObject.SetActive(false);
 
         useCount = 0;

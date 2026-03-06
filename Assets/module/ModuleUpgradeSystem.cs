@@ -224,12 +224,24 @@ public class ModuleUpgradeSystem : MonoBehaviour
 
         if (activeUpgrade == null || activeUpgrade.module == null)
         {
-            hud.SetAssemblyState(false, "Idle");
+            hud.SetAssemblyState(false, "No active upgrade", "Idle", null);
             return;
         }
 
         float progress01 = Mathf.Clamp01(activeUpgrade.elapsed / Mathf.Max(0.01f, activeUpgrade.duration));
-        hud.SetAssemblyState(true, $"Upgrade {activeUpgrade.module.DisplayName} {progress01 * 100f:0}%");
+        hud.SetAssemblyState(
+            true,
+            activeUpgrade.module.DisplayName,
+            $"{progress01 * 100f:0}% complete",
+            GetModuleSprite(activeUpgrade.module));
+    }
+
+    Sprite GetModuleSprite(ModuleInstance module)
+    {
+        if (module == null) return null;
+
+        var renderer = module.GetComponentInChildren<SpriteRenderer>(true);
+        return renderer != null ? renderer.sprite : null;
     }
 
     AudioClip CreateCompletionClip()
