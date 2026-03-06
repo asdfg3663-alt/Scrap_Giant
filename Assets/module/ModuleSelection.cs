@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.EventSystems;
 
 public class ModuleSelection : MonoBehaviour
 {
@@ -22,6 +23,9 @@ public class ModuleSelection : MonoBehaviour
 
     void TrySelectAtScreen(Vector2 screenPos)
     {
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
+
         var cam = Camera.main;
         if (!cam) return;
 

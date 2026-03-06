@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 [DisallowMultipleComponent]
@@ -6,14 +7,15 @@ public class ModuleInstance : MonoBehaviour
     public ModuleData data;
 
     [Header("Runtime (per-instance)")]
-    [Tooltip("현재 HP (각 모듈 인스턴스마다 따로 깎이는 값)")]
     public int hp;
-
-    [Tooltip("최대 HP (data.maxHP에서 복사됨)")]
     public int maxHp;
-
-    [Tooltip("true면 data 변경/초기 생성 시 hp를 maxHp로 재설정")]
     public bool resetHpOnDataAssign = true;
+
+    [Header("Upgrade")]
+    [Min(0)] public int upgradeLevel = 0;
+
+    public int CurrentTier => data != null ? Mathf.Max(1, data.tier + upgradeLevel) : Mathf.Max(1, upgradeLevel);
+    public string DisplayName => FormatDisplayName(data != null ? data.displayName : "Module", CurrentTier);
 
     void Awake()
     {
@@ -22,7 +24,6 @@ public class ModuleInstance : MonoBehaviour
 
     void OnValidate()
     {
-        // 에디터에서 data를 끼웠을 때도 값이 맞도록(플레이 중엔 영향 거의 없음)
         SyncFromDataIfNeeded(forceReset: false);
     }
 
@@ -31,15 +32,37 @@ public class ModuleInstance : MonoBehaviour
         if (data == null) return;
 
         int newMax = Mathf.Max(1, data.maxHP);
-        bool maxChanged = (maxHp != newMax);
+        bool maxChanged = maxHp != newMax;
 
         maxHp = newMax;
 
         if (forceReset || (resetHpOnDataAssign && (hp <= 0 || maxChanged)))
-        {
             hp = maxHp;
-        }
 
         hp = Mathf.Clamp(hp, 0, maxHp);
+    }
+
+    public void ApplyUpgrade(int amount = 1)
+    {
+        upgradeLevel = Mathf.Max(0, upgradeLevel + amount);
+        SyncFromDataIfNeeded(forceReset: false);
+    }
+
+    public static string FormatDisplayName(string rawName, int tier)
+    {
+        string baseName = string.IsNullOrWhiteSpace(rawName) ? "Module" : rawName.Trim();
+
+        int underscoreTier = baseName.LastIndexOf("_T", StringComparison.OrdinalIgnoreCase);
+        int parsedTier;
+        if (underscoreTier >= 0 && int.TryParse(baseName.Substring(underscoreTier + 2), out parsedTier))
+            baseName = baseName.Substring(0, underscoreTier);
+        else
+        {
+            int spaceTier = baseName.LastIndexOf(" T", StringComparison.OrdinalIgnoreCase);
+            if (spaceTier >= 0 && int.TryParse(baseName.Substring(spaceTier + 2), out parsedTier))
+                baseName = baseName.Substring(0, spaceTier);
+        }
+
+        return $"{baseName}_T{Mathf.Max(1, tier)}";
     }
 }

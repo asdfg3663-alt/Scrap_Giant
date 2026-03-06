@@ -132,6 +132,31 @@ public class PlayerHudRuntime : MonoBehaviour
         RefreshScore(force: true);
     }
 
+    public int GetResourceAmount(string id)
+    {
+        var entry = FindResource(resources, id);
+        return entry != null ? entry.amount : 0;
+    }
+
+    public bool HasResource(string id, int amount)
+    {
+        return GetResourceAmount(id) >= Mathf.Max(0, amount);
+    }
+
+    public bool TryConsumeResource(string id, int amount)
+    {
+        amount = Mathf.Max(0, amount);
+        if (amount == 0) return true;
+
+        var entry = FindResource(resources, id);
+        if (entry == null || entry.amount < amount)
+            return false;
+
+        entry.amount -= amount;
+        resourceUiDirty = true;
+        return true;
+    }
+
     public void SetResource(string id, string label, int amount, Color color)
     {
         if (string.IsNullOrWhiteSpace(id)) return;
