@@ -70,6 +70,16 @@ public class ShipBuilder : MonoBehaviour
         }
     }
 
+    struct RigidbodyState2D
+    {
+        public Rigidbody2D body;
+        public Vector2 position;
+        public float rotation;
+        public Vector2 linearVelocity;
+        public float angularVelocity;
+        public bool wasSleeping;
+    }
+
     void Awake()
     {
         if (!cam) cam = Camera.main;
@@ -135,17 +145,25 @@ public class ShipBuilder : MonoBehaviour
                 if (pressT >= longPressTime && dist >= dragStartDistance)
                 {
                     isDragging = true;
+                    BeginDragPreview(draggingTf);
 
                     if (wasAttachedAtDragStart)
+                    {
                         DetachModule(draggingTf);
+                        BeginDragPreview(draggingTf);
+                    }
                 }
             }
         }
 
         if (pointerDown && up)
         {
+            bool dropped = false;
             if (isDragging)
-                TryDrop();
+                dropped = TryDrop();
+
+            if (isDragging && draggingTf && !dropped)
+                EndDetachedDrag(draggingTf);
 
             pointerDown = false;
             isDragging = false;
@@ -170,38 +188,42 @@ public class ShipBuilder : MonoBehaviour
         }
     }
 
-    void TryDrop()
+    bool TryDrop()
     {
-        if (!draggingTf) return;
+        if (!draggingTf) return false;
 
         var cand = FindBestSnapCandidate(pointerWorldNow, draggingTf);
-        if (!cand.valid) return;
+        if (!cand.valid) return false;
 
         // 겹침 체크
-        if (IsOccupied(cand.grid)) return;
-        if (WouldOverlapAt(cand.grid, cand.rot90, draggingTf)) return;
+        if (IsOccupied(cand.grid)) return false;
+        if (WouldOverlapAt(cand.grid, cand.rot90, draggingTf)) return false;
 
         // TODO: 여기서 모듈별 룰(엔진은 뒤만, 코어 1개 등)을 추가 가능
 
         AttachModule(draggingTf, cand.grid, cand.rot90);
         RebuildOccupiedMap();
         if (shipStats) shipStats.Rebuild();
+        return true;
     }
 
     void AttachModule(Transform moduleTf, Vector2Int grid, int rot90)
     {
         if (!shipRoot) return;
 
-        moduleTf.SetParent(shipRoot, true);
-        moduleTf.position = GridToWorld(grid);
+        var shipBodies = CaptureShipBodyStates();
         var frame = GridFrame();
-        moduleTf.rotation = (frame ? frame.rotation : Quaternion.identity) * Quaternion.Euler(0, 0, rot90 * 90f);
+        Vector3 targetPosition = GridToWorld(grid);
+        Quaternion targetRotation = (frame ? frame.rotation : Quaternion.identity) * Quaternion.Euler(0, 0, rot90 * 90f);
 
         SetModulePhysics(moduleTf, attachedToShip: true);
 
-        // 내부 모듈끼리 충돌로 인한 '계속 밀림' 방지
         IgnoreCollisionsWithShip(moduleTf, true);
+        moduleTf.SetParent(shipRoot, true);
+        moduleTf.SetPositionAndRotation(targetPosition, targetRotation);
+        Physics2D.SyncTransforms();
 
+        // 내부 모듈끼리 충돌로 인한 '계속 밀림' 방지
         // attachment metadata
         var att = moduleTf.GetComponent<ModuleAttachment>();
         if (!att) att = moduleTf.gameObject.AddComponent<ModuleAttachment>();
@@ -209,22 +231,7 @@ public class ShipBuilder : MonoBehaviour
         att.gridPos = grid;
         att.rot90 = rot90;
 
-var shipRb = shipRoot ? shipRoot.GetComponent<Rigidbody2D>() : null;
-if (shipRb)
-{
-    shipRb.linearVelocity = Vector2.zero;
-    shipRb.angularVelocity = 0f;
-}
-
-// 부착 직후 코어/함선의 남은 관성 제거
-var coreRb = coreModule ? coreModule.GetComponent<Rigidbody2D>() : null;
-if (coreRb)
-{
-    coreRb.linearVelocity = Vector2.zero;
-    coreRb.angularVelocity = 0f;
-    coreRb.Sleep(); // 남은 힘/적분을 잠재움
-}
-
+        RestoreShipBodyStates(shipBodies);
 
 
 
@@ -235,11 +242,13 @@ if (coreRb)
     void DetachModule(Transform moduleTf)
 {
     // ship에 붙어있던 동안 무시했던 내부 충돌 복구
-    IgnoreCollisionsWithShip(moduleTf, false);
+    var shipBodies = CaptureShipBodyStates();
 
     moduleTf.SetParent(null, true);
-
     SetModulePhysics(moduleTf, attachedToShip: false);
+    Physics2D.SyncTransforms();
+    IgnoreCollisionsWithShip(moduleTf, false);
+    RestoreShipBodyStates(shipBodies);
 
     var mod = moduleTf.GetComponent<Module>();
     if (mod == null) return;
@@ -271,6 +280,7 @@ if (coreRb)
 
         // 물리로 흔들리거나 밀리지 않게 고정
         rb.constraints = RigidbodyConstraints2D.FreezeAll;
+        rb.Sleep();
     }
     else
     {
@@ -279,8 +289,77 @@ if (coreRb)
 
         // 우주에 떠다니는 상태에서는 회전은 허용할지/금지할지 취향
         rb.constraints = RigidbodyConstraints2D.None;
+        rb.WakeUp();
     }
 }
+
+    void BeginDragPreview(Transform moduleTf)
+    {
+        var rb = moduleTf ? moduleTf.GetComponent<Rigidbody2D>() : null;
+        if (!rb) return;
+
+        rb.linearVelocity = Vector2.zero;
+        rb.angularVelocity = 0f;
+        rb.bodyType = RigidbodyType2D.Kinematic;
+        rb.constraints = RigidbodyConstraints2D.FreezeAll;
+        rb.simulated = false;
+    }
+
+    void EndDetachedDrag(Transform moduleTf)
+    {
+        if (!moduleTf) return;
+
+        SetModulePhysics(moduleTf, attachedToShip: false);
+        Physics2D.SyncTransforms();
+    }
+
+    RigidbodyState2D[] CaptureShipBodyStates()
+    {
+        var states = new List<RigidbodyState2D>(2);
+        AddBodyState(shipRoot ? shipRoot.GetComponent<Rigidbody2D>() : null, states);
+        AddBodyState(coreModule ? coreModule.GetComponent<Rigidbody2D>() : null, states);
+        return states.ToArray();
+    }
+
+    void AddBodyState(Rigidbody2D rb, List<RigidbodyState2D> states)
+    {
+        if (!rb) return;
+
+        for (int i = 0; i < states.Count; i++)
+        {
+            if (states[i].body == rb)
+                return;
+        }
+
+        states.Add(new RigidbodyState2D
+        {
+            body = rb,
+            position = rb.position,
+            rotation = rb.rotation,
+            linearVelocity = rb.linearVelocity,
+            angularVelocity = rb.angularVelocity,
+            wasSleeping = rb.IsSleeping()
+        });
+    }
+
+    void RestoreShipBodyStates(RigidbodyState2D[] states)
+    {
+        if (states == null) return;
+
+        for (int i = 0; i < states.Length; i++)
+        {
+            var state = states[i];
+            if (!state.body) continue;
+
+            state.body.position = state.position;
+            state.body.rotation = state.rotation;
+            state.body.linearVelocity = state.linearVelocity;
+            state.body.angularVelocity = state.angularVelocity;
+
+            if (state.wasSleeping) state.body.Sleep();
+            else state.body.WakeUp();
+        }
+    }
 
     // =========================
     // Snap logic (Captain Forever style)
