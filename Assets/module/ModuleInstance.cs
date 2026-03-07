@@ -87,6 +87,6 @@ public class ModuleInstance : MonoBehaviour
                 baseName = baseName.Substring(0, spaceTier);
         }
 
-        return $"{baseName}_T{Mathf.Max(1, tier)}";
+        return baseName;
     }
 }

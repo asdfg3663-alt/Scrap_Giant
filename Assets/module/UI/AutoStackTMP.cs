@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 [DisallowMultipleComponent]
 public class AutoStackTMP : MonoBehaviour
@@ -97,6 +98,10 @@ public class AutoStackTMP : MonoBehaviour
         for (int i = 0; i < root.childCount; i++)
         {
             var child = root.GetChild(i);
+
+            var layout = child.GetComponent<LayoutElement>();
+            if (layout != null && layout.ignoreLayout)
+                continue;
 
             var tmp = child.GetComponent<TextMeshProUGUI>();
             if (tmp != null) _ordered.Add(tmp);
