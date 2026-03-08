@@ -22,6 +22,10 @@ public class ShipMovement : MonoBehaviour
     public float thrustToManualTurnTorque = 1.0f;
     public float baseManualTurnTorque = 0.0f;
     public float angularDamping = 0.0f;
+    [Tooltip("이 RPM 이하로 느려지면 아래의 저속 감쇠를 사용합니다.")]
+    public float lowAngularStopStartRPM = 6f;
+    [Tooltip("저속 회전 구간에서 0RPM으로 천천히 수렴시키는 감쇠량(deg/sec^2).")]
+    public float lowAngularStopDamping = 6f;
 
     [Header("Engine Torque Model")]
     public bool useModuleCenterOfMass = true;
@@ -129,8 +133,14 @@ public class ShipMovement : MonoBehaviour
         }
         else
         {
-            if (angularDamping > 0f)
-                rb.angularVelocity = Mathf.MoveTowards(rb.angularVelocity, 0f, angularDamping * Time.fixedDeltaTime);
+            float angularSpeedRpm = Mathf.Abs(rb.angularVelocity) * 60f / 360f;
+            float damping = angularDamping;
+
+            if (angularSpeedRpm <= lowAngularStopStartRPM && lowAngularStopDamping > 0f)
+                damping = lowAngularStopDamping;
+
+            if (damping > 0f)
+                rb.angularVelocity = Mathf.MoveTowards(rb.angularVelocity, 0f, damping * Time.fixedDeltaTime);
         }
 
         // ===== Clamp max angular speed (RPM limit) =====
