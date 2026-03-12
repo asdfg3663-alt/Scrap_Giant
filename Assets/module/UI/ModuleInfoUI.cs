@@ -60,20 +60,29 @@ public class ModuleInfoUI : MonoBehaviour
     void LateUpdate()
     {
         var module = ModuleSelection.Selected;
-        if (module == null || module.data == null)
+        var scrap = ModuleSelection.SelectedScrap;
+        bool hasModuleSelection = module != null && module.data != null;
+        bool hasScrapSelection = scrap != null;
+
+        if (!hasModuleSelection && !hasScrapSelection)
         {
             Hide();
             return;
         }
 
         Show();
-        BuildLines(module);
+        if (hasModuleSelection)
+            BuildLines(module);
+        else
+            BuildScrapLines(scrap);
 
         if (autoStack != null)
             autoStack.Rebuild();
 
-        LayoutUpgradeControls();
-        FollowSelected(module);
+        if (hasModuleSelection)
+            LayoutUpgradeControls();
+
+        FollowSelected(hasModuleSelection ? module.transform : scrap.transform);
     }
 
     void ResolveTemplates()
@@ -150,6 +159,23 @@ public class ModuleInfoUI : MonoBehaviour
 
         EndLines();
         UpdateUpgradeAction(module);
+    }
+
+    void BuildScrapLines(FloatingScrap scrap)
+    {
+        EnsureNameLine();
+        nameLine.text = scrap.DisplayName;
+        nameLine.transform.SetAsFirstSibling();
+        nameLine.gameObject.SetActive(true);
+
+        BeginLines();
+        AddLine($"HP: {scrap.CurrentHP} / {scrap.MaxHP}");
+        AddLine($"Mass: {scrap.Mass:0.##}");
+        EndLines();
+
+        ForceHideUpgradeHint();
+        if (upgradeActionLine != null)
+            upgradeActionLine.gameObject.SetActive(false);
     }
 
     void UpdateUpgradeAction(ModuleInstance module)
@@ -414,11 +440,13 @@ public class ModuleInfoUI : MonoBehaviour
         upgradeTrigger.triggers.Add(entry);
     }
 
-    void FollowSelected(ModuleInstance module)
+    void FollowSelected(Transform target)
     {
         if (!cam) cam = Camera.main;
+        if (target == null)
+            return;
 
-        Vector3 screenPos = cam.WorldToScreenPoint(module.transform.position);
+        Vector3 screenPos = cam.WorldToScreenPoint(target.position);
         Vector2 pos = (Vector2)screenPos + screenOffset;
 
         if (clampToScreen)

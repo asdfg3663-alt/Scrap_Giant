@@ -65,6 +65,7 @@ public class ShipStats : MonoBehaviour
         if (isPlayerShip)
         {
             PlayerHudRuntime.EnsureForPlayer(this);
+            WorldSpawnDirector.RegisterPlayer(this);
             RefreshHudFuel();
         }
     }

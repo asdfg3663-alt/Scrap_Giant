@@ -5,6 +5,7 @@ using UnityEngine.EventSystems;
 public class ModuleSelection : MonoBehaviour
 {
     public static ModuleInstance Selected { get; private set; }
+    public static FloatingScrap SelectedScrap { get; private set; }
 
     void Update()
     {
@@ -39,10 +40,20 @@ public class ModuleSelection : MonoBehaviour
             if (module != null)
             {
                 Selected = module;
+                SelectedScrap = null;
+                return;
+            }
+
+            var scrap = hit.collider.GetComponentInParent<FloatingScrap>();
+            if (scrap != null)
+            {
+                Selected = null;
+                SelectedScrap = scrap;
                 return;
             }
         }
 
         Selected = null;
+        SelectedScrap = null;
     }
 }

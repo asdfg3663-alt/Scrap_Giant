@@ -17,10 +17,16 @@ public class TutorialSpawner : MonoBehaviour
             shipRoot = GameObject.Find("PlayerShip")?.transform;
 
         if (enginePrefab && shipRoot)
-            Instantiate(enginePrefab, (Vector2)shipRoot.position + engineOffset, Quaternion.identity);
+        {
+            var engine = Instantiate(enginePrefab, (Vector2)shipRoot.position + engineOffset, Quaternion.identity);
+            AddWorldDespawn(engine);
+        }
 
         if (laserPrefab && shipRoot)
-            Instantiate(laserPrefab, (Vector2)shipRoot.position + laserOffset, Quaternion.identity);
+        {
+            var laser = Instantiate(laserPrefab, (Vector2)shipRoot.position + laserOffset, Quaternion.identity);
+            AddWorldDespawn(laser);
+        }
 
         if (fuelTankPrefab && shipRoot)
         {
@@ -87,5 +93,17 @@ public class TutorialSpawner : MonoBehaviour
                 Physics2D.IgnoreCollision(a, b, true);
             }
         }
+    }
+
+    void AddWorldDespawn(GameObject go)
+    {
+        if (go == null)
+            return;
+
+        var despawn = go.GetComponent<WorldDistanceDespawn>();
+        if (despawn == null)
+            despawn = go.AddComponent<WorldDistanceDespawn>();
+
+        despawn.axisLimit = WorldSpawnDirector.CurrentDespawnAxisLimit;
     }
 }

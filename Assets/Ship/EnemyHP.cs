@@ -8,47 +8,30 @@ public class EnemyHP : MonoBehaviour, IDamageable
 
     [Header("Death")]
     public GameObject explosionVfxPrefab;
-    public GameObject scrapPrefab;
-    public int scrapMin = 1;
-    public int scrapMax = 3;
-    public float scrapImpulse = 2.5f;
 
     void Awake()
     {
-        if (currentHP <= 0) currentHP = maxHP;
+        if (currentHP <= 0)
+            currentHP = maxHP;
     }
 
-    // ✅ WeaponLaser가 호출할 공통 인터페이스
     public void ApplyDamage(float amount, Vector2 hitPoint, Vector2 hitNormal, GameObject attacker)
     {
-        int dmg = Mathf.CeilToInt(Mathf.Max(0f, amount));
-        if (dmg <= 0) return;
+        int damage = Mathf.CeilToInt(Mathf.Max(0f, amount));
+        if (damage <= 0)
+            return;
 
-        currentHP -= dmg;
+        currentHP -= damage;
         if (currentHP <= 0)
-            Die(hitPoint, hitNormal);
+            Die(hitPoint);
     }
 
-    void Die(Vector2 hitPoint, Vector2 hitNormal)
+    void Die(Vector2 hitPoint)
     {
         if (explosionVfxPrefab)
             Instantiate(explosionVfxPrefab, hitPoint, Quaternion.identity);
 
-        if (scrapPrefab)
-        {
-            int n = Random.Range(scrapMin, scrapMax + 1);
-            for (int i = 0; i < n; i++)
-            {
-                var go = Instantiate(scrapPrefab, hitPoint, Quaternion.identity);
-                var rb = go.GetComponent<Rigidbody2D>();
-                if (rb)
-                {
-                    Vector2 dir = (Random.insideUnitCircle.normalized + hitNormal).normalized;
-                    rb.AddForce(dir * scrapImpulse, ForceMode2D.Impulse);
-                }
-            }
-        }
-
+        WorldResourceUtility.AwardScrap(Mathf.Max(1, maxHP));
         Destroy(gameObject);
     }
 }

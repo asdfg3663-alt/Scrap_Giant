@@ -5891,6 +5891,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 517838429}
+  - component: {fileID: 517838430}
   m_Layer: 0
   m_Name: GameSystems
   m_TagString: Untagged
@@ -5914,6 +5915,46 @@ Transform:
   - {fileID: 391441757}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &517838430
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 517838428}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d9b2d6a1e6a4f119c0dd64a27f53b91, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WorldSpawnDirector
+  scrapVisualPrefab: {fileID: 4312000000000000001, guid: b7f2137a4d1c43d7b54c3a21440f57a2, type: 3}
+  coreModulePrefab: {fileID: 2311000000000000001, guid: c1b4ef0a7e4b4f8dad6777a29dcb5b11, type: 3}
+  engineModulePrefab: {fileID: 5628837094240442396, guid: 283a4e87cc406cf46a05e4211c207c47, type: 3}
+  fuelTankModulePrefab: {fileID: 7443228181453321000, guid: 6b8e7d91c8a94c57a5f2d9b8e4c31761, type: 3}
+  laserModulePrefab: {fileID: 1687058770715388412, guid: 2910086d369e1834f8a6b663f0c1f584, type: 3}
+  maxFloatingScraps: 5
+  maxEnemyShips: 5
+  spawnCheckInterval: 1.25
+  minSpawnDistance: 10
+  maxSpawnDistance: 100
+  despawnAxisDistance: 100
+  scrapMassFromPlayerMassMultiplier: 0.5
+  scrapDriftImpulse: 1.25
+  enemyDesiredRange: 30
+  enemyAttackRange: 28
+  enemyFireConeAngle: 24
+  enemyMaxSpeed: 10
+  threatScoreScale: 0.18
+  threatLogBase: 2
+  baseThreat: 1
+  extraEngineThreatStep: 1.35
+  extraFuelTankThreatStep: 1.7
+  extraLaserThreatStep: 1.1
+  weaponTierThreatStep: 1.4
+  maxExtraEngines: 4
+  maxExtraFuelTanks: 4
+  maxExtraLasers: 4
+  maxLaserUpgradeLevel: 4
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0

@@ -513,7 +513,25 @@ public class ShipBuilder : MonoBehaviour
 
         // 모듈 루트가 콜라이더 자식일 수도 있으니 Module 컴포넌트 있는 상위로 끌어올림
         var m = hit.GetComponentInParent<Module>();
+        if (m != null && !CanManipulateModule(m.transform))
+            return null;
+
         return m ? m.transform : hit.transform;
+    }
+
+    bool CanManipulateModule(Transform moduleTf)
+    {
+        if (!moduleTf)
+            return false;
+
+        var ownerShip = moduleTf.GetComponentInParent<ShipStats>();
+        if (ownerShip == null)
+            return true;
+
+        if (shipStats == null)
+            return ownerShip.isPlayerShip;
+
+        return ownerShip == shipStats || ownerShip.isPlayerShip;
     }
 
     bool WouldOverlapAt(Vector2Int grid, int rot90, Transform moduleTf)

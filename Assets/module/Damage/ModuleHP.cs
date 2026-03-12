@@ -6,7 +6,7 @@ public class ModuleHP : MonoBehaviour, IDamageable
     [Header("Death VFX")]
     public GameObject explosionVfxPrefab;
 
-    [Header("Scrap Drop")]
+    [Header("Legacy Drop Fields")]
     public GameObject scrapPrefab;
     public int scrapMin = 0;
     public int scrapMax = 2;
@@ -41,15 +41,16 @@ public class ModuleHP : MonoBehaviour, IDamageable
         if (inst.data != null && inst.maxHp <= 0)
             inst.SyncFromDataIfNeeded(forceReset: true);
 
-        int dmg = Mathf.CeilToInt(Mathf.Max(0f, amount));
-        if (dmg <= 0) return;
+        int damage = Mathf.CeilToInt(Mathf.Max(0f, amount));
+        if (damage <= 0)
+            return;
 
-        inst.hp -= dmg;
-        if (inst.hp <= 0)
-        {
-            inst.hp = 0;
-            Die(hitPoint, hitNormal);
-        }
+        inst.hp -= damage;
+        if (inst.hp > 0)
+            return;
+
+        inst.hp = 0;
+        Die(hitPoint, hitNormal);
     }
 
     void Die(Vector2 hitPoint, Vector2 hitNormal)
@@ -57,19 +58,17 @@ public class ModuleHP : MonoBehaviour, IDamageable
         if (explosionVfxPrefab)
             Instantiate(explosionVfxPrefab, hitPoint, Quaternion.identity);
 
-        if (scrapPrefab)
+        var currentShip = GetComponentInParent<ShipStats>();
+        bool isPlayerOwned = currentShip != null && currentShip.isPlayerShip;
+
+        if (!isPlayerOwned && inst != null)
+            WorldResourceUtility.AwardScrapFromMass(inst.GetMass());
+
+        if (!isPlayerOwned && inst != null && inst.data != null && inst.data.type == ModuleType.Core)
         {
-            int n = Random.Range(scrapMin, scrapMax + 1);
-            for (int i = 0; i < n; i++)
-            {
-                var go = Instantiate(scrapPrefab, hitPoint, Quaternion.identity);
-                var rb = go.GetComponent<Rigidbody2D>();
-                if (rb)
-                {
-                    Vector2 dir = (Random.insideUnitCircle.normalized + hitNormal).normalized;
-                    rb.AddForce(dir * scrapImpulse, ForceMode2D.Impulse);
-                }
-            }
+            var enemyRuntime = currentShip != null ? currentShip.GetComponent<EnemyShipRuntime>() : GetComponentInParent<EnemyShipRuntime>();
+            if (enemyRuntime != null)
+                enemyRuntime.OnCoreDestroyed(hitPoint, hitNormal);
         }
 
         Destroy(gameObject);
