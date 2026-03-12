@@ -222,6 +222,8 @@ public class ShipBuilder : MonoBehaviour
         Quaternion targetRotation = (frame ? frame.rotation : Quaternion.identity) * Quaternion.Euler(0, 0, rot90 * 90f);
 
         SetModulePhysics(moduleTf, attachedToShip: true);
+        if (shipStats != null && shipStats.isPlayerShip)
+            WorldSpawnDirector.NeutralizeDetachedModule(moduleTf);
 
         IgnoreCollisionsWithShip(moduleTf, true);
         moduleTf.SetParent(shipRoot, true);

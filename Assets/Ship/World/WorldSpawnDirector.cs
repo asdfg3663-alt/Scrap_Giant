@@ -18,7 +18,7 @@ public class WorldSpawnDirector : MonoBehaviour
     public float enemyInitialSpawnDelay = 10f;
 
     [Header("Spawn Range")]
-    public float minSpawnDistance = 10f;
+    public float minSpawnDistance = 30f;
     public float maxSpawnDistance = 100f;
     public float despawnAxisDistance = 100f;
 
@@ -28,12 +28,12 @@ public class WorldSpawnDirector : MonoBehaviour
 
     [Header("Enemy Combat")]
     public float enemyDesiredRange = 30f;
-    public float enemyAttackRange = 14f;
+    public float enemyAttackRange = 20f;
     public float enemyFireConeAngle = 24f;
     public float enemyMaxSpeed = 10f;
     public Color enemyOutlineColor = new Color(1f, 0.2f, 0.18f, 0.95f);
     public float enemyOutlineScale = 1.08f;
-    [Range(0f, 1f)] public float enemySaturationMultiplier = 0.5f;
+    [Range(0f, 1f)] public float enemySaturationMultiplier = 0.08f;
 
     [Header("Threat Scaling")]
     public float threatScoreScale = 0.18f;
@@ -113,6 +113,37 @@ public class WorldSpawnDirector : MonoBehaviour
     public static EnemyShipRuntime GetNearestEnemyShip(Vector3 origin)
     {
         return instance != null ? instance.FindNearest(instance.enemyShips, origin) : null;
+    }
+
+    public static void NeutralizeDetachedModule(Transform moduleRoot)
+    {
+        if (moduleRoot == null)
+            return;
+
+        var renderers = moduleRoot.GetComponentsInChildren<SpriteRenderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            var renderer = renderers[i];
+            if (renderer == null)
+                continue;
+
+            if (renderer.name == "EnemyOutline")
+            {
+                Destroy(renderer.gameObject);
+                continue;
+            }
+
+            var marker = renderer.GetComponent<EnemyVisualMarker>();
+            if (marker != null)
+            {
+                marker.Restore(renderer);
+                continue;
+            }
+
+            Transform orphanOutline = renderer.transform.Find("EnemyOutline");
+            if (orphanOutline != null)
+                Destroy(orphanOutline.gameObject);
+        }
     }
 
     void Awake()
@@ -433,19 +464,24 @@ public class WorldSpawnDirector : MonoBehaviour
             if (renderer.name == "LaserBeam" || renderer.transform.parent != shipRoot)
                 continue;
 
+            var marker = renderer.GetComponent<EnemyVisualMarker>();
+            if (marker == null)
+                marker = renderer.gameObject.AddComponent<EnemyVisualMarker>();
+
+            marker.Capture(renderer);
             renderer.color = Desaturate(renderer.color, enemySaturationMultiplier);
-            EnsureOutline(renderer);
+            marker.outlineRenderer = EnsureOutline(renderer);
         }
     }
 
-    void EnsureOutline(SpriteRenderer source)
+    SpriteRenderer EnsureOutline(SpriteRenderer source)
     {
         if (source == null)
-            return;
+            return null;
 
         Transform existing = source.transform.Find("EnemyOutline");
         if (existing != null)
-            return;
+            return existing.GetComponent<SpriteRenderer>();
 
         var outlineGO = new GameObject("EnemyOutline");
         outlineGO.transform.SetParent(source.transform, false);
@@ -455,13 +491,15 @@ public class WorldSpawnDirector : MonoBehaviour
 
         var outline = outlineGO.AddComponent<SpriteRenderer>();
         outline.sprite = source.sprite;
-        outline.drawMode = source.drawMode;
-        outline.size = source.size;
+        outline.drawMode = SpriteDrawMode.Simple;
         outline.color = enemyOutlineColor;
         outline.sharedMaterial = source.sharedMaterial;
         outline.sortingLayerID = source.sortingLayerID;
         outline.sortingOrder = source.sortingOrder - 1;
         outline.maskInteraction = source.maskInteraction;
+        outline.flipX = source.flipX;
+        outline.flipY = source.flipY;
+        return outline;
     }
 
     static Color Desaturate(Color color, float saturation)

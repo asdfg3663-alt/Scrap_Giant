@@ -37,6 +37,16 @@ public class EnemyShipRuntime : MonoBehaviour
     {
         moduleTransform.SetParent(null, true);
 
+        var attachment = moduleTransform.GetComponent<ModuleAttachment>();
+        if (attachment != null)
+        {
+            attachment.shipRoot = null;
+            attachment.gridPos = default;
+            attachment.rot90 = 0;
+        }
+
+        WorldSpawnDirector.NeutralizeDetachedModule(moduleTransform);
+
         var rb = moduleTransform.GetComponent<Rigidbody2D>();
         if (rb != null)
         {

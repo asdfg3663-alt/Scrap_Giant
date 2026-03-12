@@ -13,6 +13,10 @@ public class WeaponLaser : MonoBehaviour
     public float defaultRange = 20f;
     public float startOffset = 0.25f;
 
+    [Header("Damage Falloff")]
+    public float fullDamageRange = 5f;
+    [Range(0f, 1f)] public float minDamageMultiplierAtMaxRange = 0.5f;
+
     [Header("Beam Visual (Sprite)")]
     public float beamThickness = 0.12f;
     public int beamSortingOrder = 9999;
@@ -120,7 +124,9 @@ public class WeaponLaser : MonoBehaviour
                 return;
         }
 
-        float damage = Mathf.Max(0f, inst.GetWeaponDamage());
+        float hitDistance = found ? Vector2.Distance(origin, end) : defaultRange;
+        float damageMultiplier = GetDamageMultiplier(hitDistance);
+        float damage = Mathf.Max(0f, inst.GetWeaponDamage()) * damageMultiplier;
         if (found && best.collider != null && damage > 0f)
         {
             var target = best.collider.GetComponentInParent<IDamageable>();
@@ -135,6 +141,19 @@ public class WeaponLaser : MonoBehaviour
         }
 
         cooldown = 1f / fireRate;
+    }
+
+    float GetDamageMultiplier(float distance)
+    {
+        float maxRange = Mathf.Max(fullDamageRange, defaultRange);
+        if (distance <= fullDamageRange)
+            return 1f;
+
+        if (maxRange <= fullDamageRange)
+            return 1f;
+
+        float t = Mathf.InverseLerp(fullDamageRange, maxRange, distance);
+        return Mathf.Lerp(1f, Mathf.Clamp01(minDamageMultiplierAtMaxRange), t);
     }
 
     bool ShouldFire(ShipStats ship)

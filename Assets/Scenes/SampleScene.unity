@@ -5936,18 +5936,18 @@ MonoBehaviour:
   maxEnemyShips: 5
   spawnCheckInterval: 1.25
   enemyInitialSpawnDelay: 10
-  minSpawnDistance: 10
+  minSpawnDistance: 30
   maxSpawnDistance: 100
   despawnAxisDistance: 100
   scrapMassFromPlayerMassMultiplier: 1
   scrapDriftImpulse: 1.25
   enemyDesiredRange: 30
-  enemyAttackRange: 14
+  enemyAttackRange: 20
   enemyFireConeAngle: 24
   enemyMaxSpeed: 10
   enemyOutlineColor: {r: 1, g: 0.2, b: 0.18, a: 0.95}
   enemyOutlineScale: 1.08
-  enemySaturationMultiplier: 0.5
+  enemySaturationMultiplier: 0.08
   threatScoreScale: 0.18
   threatLogBase: 2
   baseThreat: 1

@@ -5,21 +5,38 @@ using UnityEngine;
 [RequireComponent(typeof(ShipStats))]
 public class EnemyShipAI : MonoBehaviour
 {
+    enum BehaviorBand
+    {
+        Far,
+        Mid,
+        Close
+    }
+
+    [Header("Ranges")]
+    public float closeRange = 20f;
+    public float mediumRange = 30f;
+
     [Header("Movement")]
-    public float desiredRange = 30f;
-    public float rangeTolerance = 8f;
     public float maxSpeed = 12f;
     public float playerSpeedRatio = 0.12f;
     public float baseTurnTorque = 1.1f;
     public float thrustTurnTorqueMultiplier = 0.08f;
-    public float aggressiveAimTurnMultiplier = 4.5f;
-    public float approachThrottle = 0.035f;
-    public float retreatThrottle = 0.02f;
+    public float turnTorqueScale = 0.2f;
+    public float aimTurnMultiplier = 1.15f;
+    public float wanderForwardThrottle = 0.03f;
     public float idleBrake = 7f;
     public float retaliationDuration = 12f;
 
+    [Header("Behavior Timing")]
+    public float decisionInterval = 5f;
+    public float wanderTurnDurationMin = 0.6f;
+    public float wanderTurnDurationMax = 1.4f;
+    public float wanderTurnAngle = 50f;
+    [Range(0f, 1f)] public float midRangePlayerAimChance = 0.5f;
+    [Range(0f, 1f)] public float closeRangeAttackChance = 0.5f;
+
     [Header("Combat")]
-    public float attackRange = 14f;
+    public float attackRange = 20f;
     public float fireConeAngle = 14f;
 
     Rigidbody2D rb;
@@ -28,8 +45,19 @@ public class EnemyShipAI : MonoBehaviour
     ShipMovement playerMovement;
     Transform player;
     ShipStats retaliationTarget;
-    bool wantsToFire;
+    Vector2 steeringDirection = Vector2.up;
+    float throttleCommand;
     float retaliationUntilTime;
+    float nextBehaviorDecisionTime;
+    float nextAttackRollTime;
+    float wanderTurnUntilTime;
+    float wanderHeadingDegrees;
+    bool wantsToFire;
+    bool shouldBrake;
+    bool prefersAimTurn;
+    bool midRangeTracksPlayer;
+    bool closeRangeCanAttack;
+    BehaviorBand activeBand = BehaviorBand.Far;
 
     public bool WantsToFire => wantsToFire;
 
@@ -37,12 +65,14 @@ public class EnemyShipAI : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         stats = GetComponent<ShipStats>();
+        wanderHeadingDegrees = rb != null ? rb.rotation : transform.eulerAngles.z;
     }
 
     public void Initialize(float desiredRange, float attackRange, float fireConeAngle, float maxSpeed)
     {
-        this.desiredRange = desiredRange;
-        this.attackRange = attackRange;
+        mediumRange = Mathf.Max(attackRange, desiredRange);
+        closeRange = Mathf.Max(1f, attackRange);
+        this.attackRange = Mathf.Max(closeRange, attackRange);
         this.fireConeAngle = fireConeAngle;
         this.maxSpeed = maxSpeed;
     }
@@ -62,6 +92,10 @@ public class EnemyShipAI : MonoBehaviour
         wantsToFire = false;
         playerStats = null;
         playerMovement = null;
+        throttleCommand = 0f;
+        shouldBrake = true;
+        prefersAimTurn = false;
+        steeringDirection = transform.up;
 
         ShipStats targetShip = ResolveCurrentTarget();
         if (targetShip == null)
@@ -80,9 +114,13 @@ public class EnemyShipAI : MonoBehaviour
 
         ResetModuleOrientations();
 
-        float angleToTarget = Vector2.Angle(transform.up, toTarget.normalized);
         bool isRetaliating = retaliationTarget != null && targetShip == retaliationTarget;
-        wantsToFire = angleToTarget <= fireConeAngle && (toTarget.magnitude <= attackRange || isRetaliating);
+        EvaluateBehavior(toTarget, isRetaliating);
+
+        float angleToTarget = Vector2.Angle(transform.up, toTarget.normalized);
+        bool inWeaponRange = toTarget.magnitude <= attackRange;
+        bool mayAttack = isRetaliating || (activeBand == BehaviorBand.Close && closeRangeCanAttack);
+        wantsToFire = mayAttack && inWeaponRange && angleToTarget <= fireConeAngle;
     }
 
     void FixedUpdate()
@@ -90,62 +128,148 @@ public class EnemyShipAI : MonoBehaviour
         if (rb == null || stats == null)
             return;
 
-        ShipStats targetShip = ResolveCurrentTarget();
-        if (targetShip == null)
-            return;
-
-        Transform target = targetShip.GetCoreTransform();
-        if (target == null)
-            return;
-
-        if (playerStats == null || playerStats != targetShip)
-            playerStats = targetShip;
-
-        if (playerMovement == null || playerMovement.gameObject != targetShip.gameObject)
-            playerMovement = targetShip.GetComponent<ShipMovement>();
-
-        Vector2 toTarget = (Vector2)(target.position - transform.position);
-        float distance = toTarget.magnitude;
-        if (distance <= 0.001f)
-            return;
-
-        Vector2 targetDir = toTarget / distance;
-        bool isRetaliating = retaliationTarget != null && targetShip == retaliationTarget;
-        bool preferDirectAim = isRetaliating || distance <= attackRange * 2f;
-        Vector2 steeringDir = targetDir;
-
         float speedCap = ComputeSpeedCap();
-        float steeringAngle = Mathf.Atan2(steeringDir.y, steeringDir.x) * Mathf.Rad2Deg - 90f;
+        Vector2 targetDir = steeringDirection.sqrMagnitude > 0.001f ? steeringDirection.normalized : (Vector2)transform.up;
+        float steeringAngle = Mathf.Atan2(targetDir.y, targetDir.x) * Mathf.Rad2Deg - 90f;
         float angleDelta = Mathf.DeltaAngle(rb.rotation, steeringAngle);
+        float turnInput = Mathf.Clamp(angleDelta / 45f, -1f, 1f);
 
-        float turnInput = Mathf.Clamp(angleDelta / 30f, -1f, 1f);
-        float turnTorque = baseTurnTorque + Mathf.Max(0f, stats.totalThrust) * thrustTurnTorqueMultiplier;
-        if (preferDirectAim)
-            turnTorque *= aggressiveAimTurnMultiplier;
-        rb.AddTorque(-turnInput * turnTorque, ForceMode2D.Force);
+        float turnTorque = (baseTurnTorque + Mathf.Max(0f, stats.totalThrust) * thrustTurnTorqueMultiplier) * turnTorqueScale;
+        if (prefersAimTurn)
+            turnTorque *= aimTurnMultiplier;
 
-        float facingDot = Mathf.Clamp(Vector2.Dot(transform.up, targetDir), -1f, 1f);
-        float steeringDot = Mathf.Clamp(Vector2.Dot(transform.up, steeringDir), -1f, 1f);
-        float thrust = Mathf.Max(1f, stats.totalThrust);
-        float distanceError = distance - desiredRange;
+        rb.AddTorque(turnInput * turnTorque, ForceMode2D.Force);
 
-        if (distanceError > rangeTolerance * 1.25f)
-        {
-            float drive = Mathf.Clamp01((steeringDot + 0.2f) * 0.5f);
-            rb.AddForce((Vector2)transform.up * (thrust * approachThrottle * drive), ForceMode2D.Force);
-        }
-        else if (distanceError < -rangeTolerance)
-        {
-            float retreatDrive = Mathf.Clamp01((facingDot + 1f) * 0.5f);
-            rb.AddForce(-(Vector2)transform.up * (thrust * retreatThrottle * retreatDrive), ForceMode2D.Force);
-        }
-        else
+        if (shouldBrake)
         {
             rb.linearVelocity = Vector2.MoveTowards(rb.linearVelocity, Vector2.zero, idleBrake * Time.fixedDeltaTime);
+        }
+        else if (throttleCommand > 0f)
+        {
+            float thrust = Mathf.Max(1f, stats.totalThrust);
+            float steeringDot = Mathf.Clamp(Vector2.Dot(transform.up, targetDir), -1f, 1f);
+            float drive = Mathf.Clamp01((steeringDot + 0.2f) * 0.5f);
+            rb.AddForce((Vector2)transform.up * (thrust * throttleCommand * drive), ForceMode2D.Force);
         }
 
         if (rb.linearVelocity.magnitude > speedCap)
             rb.linearVelocity = rb.linearVelocity.normalized * speedCap;
+    }
+
+    void EvaluateBehavior(Vector2 toTarget, bool isRetaliating)
+    {
+        float distance = toTarget.magnitude;
+        Vector2 targetDir = distance > 0.001f ? toTarget / distance : (Vector2)transform.up;
+
+        if (isRetaliating)
+        {
+            activeBand = BehaviorBand.Close;
+            steeringDirection = targetDir;
+            prefersAimTurn = true;
+            shouldBrake = true;
+            closeRangeCanAttack = true;
+            return;
+        }
+
+        BehaviorBand nextBand = distance <= closeRange
+            ? BehaviorBand.Close
+            : (distance <= mediumRange ? BehaviorBand.Mid : BehaviorBand.Far);
+
+        if (nextBand != activeBand)
+        {
+            activeBand = nextBand;
+            nextBehaviorDecisionTime = 0f;
+            nextAttackRollTime = 0f;
+            closeRangeCanAttack = false;
+        }
+
+        switch (activeBand)
+        {
+            case BehaviorBand.Far:
+                RunFarBehavior();
+                break;
+
+            case BehaviorBand.Mid:
+                RunMidBehavior(targetDir);
+                break;
+
+            default:
+                RunCloseBehavior(targetDir);
+                break;
+        }
+    }
+
+    void RunFarBehavior()
+    {
+        if (Time.time >= nextBehaviorDecisionTime)
+        {
+            ScheduleWanderTurn();
+            nextBehaviorDecisionTime = Time.time + Mathf.Max(0.5f, decisionInterval);
+        }
+
+        Vector2 wanderDir = HeadingToVector(wanderHeadingDegrees);
+        steeringDirection = Time.time < wanderTurnUntilTime ? wanderDir : (Vector2)transform.up;
+        throttleCommand = Time.time < wanderTurnUntilTime ? 0f : wanderForwardThrottle;
+        shouldBrake = false;
+        prefersAimTurn = false;
+        closeRangeCanAttack = false;
+    }
+
+    void RunMidBehavior(Vector2 targetDir)
+    {
+        if (Time.time >= nextBehaviorDecisionTime)
+        {
+            midRangeTracksPlayer = Random.value < midRangePlayerAimChance;
+            if (!midRangeTracksPlayer)
+                ScheduleWanderTurn();
+
+            nextBehaviorDecisionTime = Time.time + Mathf.Max(0.5f, decisionInterval);
+        }
+
+        if (midRangeTracksPlayer)
+        {
+            steeringDirection = targetDir;
+            throttleCommand = 0f;
+            shouldBrake = true;
+            prefersAimTurn = true;
+        }
+        else
+        {
+            Vector2 wanderDir = HeadingToVector(wanderHeadingDegrees);
+            steeringDirection = Time.time < wanderTurnUntilTime ? wanderDir : (Vector2)transform.up;
+            throttleCommand = Time.time < wanderTurnUntilTime ? 0f : wanderForwardThrottle;
+            shouldBrake = false;
+            prefersAimTurn = false;
+        }
+
+        closeRangeCanAttack = false;
+    }
+
+    void RunCloseBehavior(Vector2 targetDir)
+    {
+        if (Time.time >= nextAttackRollTime)
+        {
+            closeRangeCanAttack = Random.value < closeRangeAttackChance;
+            nextAttackRollTime = Time.time + Mathf.Max(0.5f, decisionInterval);
+        }
+
+        steeringDirection = targetDir;
+        throttleCommand = 0f;
+        shouldBrake = true;
+        prefersAimTurn = true;
+    }
+
+    void ScheduleWanderTurn()
+    {
+        float offset = Random.Range(-wanderTurnAngle, wanderTurnAngle);
+        wanderHeadingDegrees = rb != null ? rb.rotation + offset : transform.eulerAngles.z + offset;
+        wanderTurnUntilTime = Time.time + Random.Range(wanderTurnDurationMin, wanderTurnDurationMax);
+    }
+
+    static Vector2 HeadingToVector(float degrees)
+    {
+        float radians = degrees * Mathf.Deg2Rad;
+        return new Vector2(Mathf.Cos(radians + Mathf.PI * 0.5f), Mathf.Sin(radians + Mathf.PI * 0.5f));
     }
 
     ShipStats ResolveCurrentTarget()

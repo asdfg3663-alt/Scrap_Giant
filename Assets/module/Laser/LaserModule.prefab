@@ -251,7 +251,7 @@ MonoBehaviour:
   hitMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  defaultRange: 100
+  defaultRange: 20
   startOffset: 0.25
   beamThickness: 0.1
   beamSortingOrder: 9999
