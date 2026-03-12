@@ -16,7 +16,7 @@ public class EnemyShipAI : MonoBehaviour
     public float approachThrottle = 0.035f;
     public float retreatThrottle = 0.02f;
     public float idleBrake = 7f;
-    public float orbitAngleOffset = 8f;
+    public float retaliationDuration = 12f;
 
     [Header("Combat")]
     public float attackRange = 14f;
@@ -27,8 +27,9 @@ public class EnemyShipAI : MonoBehaviour
     ShipStats playerStats;
     ShipMovement playerMovement;
     Transform player;
+    ShipStats retaliationTarget;
     bool wantsToFire;
-    float orbitSign;
+    float retaliationUntilTime;
 
     public bool WantsToFire => wantsToFire;
 
@@ -36,7 +37,6 @@ public class EnemyShipAI : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         stats = GetComponent<ShipStats>();
-        orbitSign = Random.value < 0.5f ? -1f : 1f;
     }
 
     public void Initialize(float desiredRange, float attackRange, float fireConeAngle, float maxSpeed)
@@ -47,6 +47,15 @@ public class EnemyShipAI : MonoBehaviour
         this.maxSpeed = maxSpeed;
     }
 
+    public void OnAttackedBy(ShipStats attacker)
+    {
+        if (attacker == null || attacker == stats)
+            return;
+
+        retaliationTarget = attacker;
+        retaliationUntilTime = Time.time + retaliationDuration;
+    }
+
     void Update()
     {
         player = WorldSpawnDirector.PlayerTransform;
@@ -54,18 +63,26 @@ public class EnemyShipAI : MonoBehaviour
         playerStats = null;
         playerMovement = null;
 
-        if (player == null)
+        ShipStats targetShip = ResolveCurrentTarget();
+        if (targetShip == null)
             return;
 
-        playerStats = player.GetComponent<ShipStats>();
-        playerMovement = player.GetComponent<ShipMovement>();
-
-        Vector2 toPlayer = player.position - transform.position;
-        if (toPlayer.sqrMagnitude <= 0.001f)
+        Transform target = targetShip.GetCoreTransform();
+        if (target == null)
             return;
 
-        float angleToTarget = Vector2.Angle(transform.up, toPlayer.normalized);
-        wantsToFire = toPlayer.magnitude <= attackRange && angleToTarget <= fireConeAngle;
+        playerStats = targetShip;
+        playerMovement = targetShip.GetComponent<ShipMovement>();
+
+        Vector2 toTarget = target.position - transform.position;
+        if (toTarget.sqrMagnitude <= 0.001f)
+            return;
+
+        ResetModuleOrientations();
+
+        float angleToTarget = Vector2.Angle(transform.up, toTarget.normalized);
+        bool isRetaliating = retaliationTarget != null && targetShip == retaliationTarget;
+        wantsToFire = angleToTarget <= fireConeAngle && (toTarget.magnitude <= attackRange || isRetaliating);
     }
 
     void FixedUpdate()
@@ -73,30 +90,29 @@ public class EnemyShipAI : MonoBehaviour
         if (rb == null || stats == null)
             return;
 
-        if (player == null)
-            player = WorldSpawnDirector.PlayerTransform;
-
-        if (player == null)
+        ShipStats targetShip = ResolveCurrentTarget();
+        if (targetShip == null)
             return;
 
-        if (playerStats == null)
-            playerStats = player.GetComponent<ShipStats>();
+        Transform target = targetShip.GetCoreTransform();
+        if (target == null)
+            return;
 
-        if (playerMovement == null)
-            playerMovement = player.GetComponent<ShipMovement>();
+        if (playerStats == null || playerStats != targetShip)
+            playerStats = targetShip;
 
-        Vector2 toPlayer = (Vector2)(player.position - transform.position);
-        float distance = toPlayer.magnitude;
+        if (playerMovement == null || playerMovement.gameObject != targetShip.gameObject)
+            playerMovement = targetShip.GetComponent<ShipMovement>();
+
+        Vector2 toTarget = (Vector2)(target.position - transform.position);
+        float distance = toTarget.magnitude;
         if (distance <= 0.001f)
             return;
 
-        Vector2 targetDir = toPlayer / distance;
-        bool preferDirectAim = distance <= attackRange * 1.45f;
-        float orbitBlend = preferDirectAim
-            ? 0f
-            : Mathf.InverseLerp(desiredRange + rangeTolerance * 2f, desiredRange * 0.7f, distance);
-        float targetAngleOffset = orbitAngleOffset * orbitSign * orbitBlend;
-        Vector2 steeringDir = Quaternion.Euler(0f, 0f, targetAngleOffset) * targetDir;
+        Vector2 targetDir = toTarget / distance;
+        bool isRetaliating = retaliationTarget != null && targetShip == retaliationTarget;
+        bool preferDirectAim = isRetaliating || distance <= attackRange * 2f;
+        Vector2 steeringDir = targetDir;
 
         float speedCap = ComputeSpeedCap();
         float steeringAngle = Mathf.Atan2(steeringDir.y, steeringDir.x) * Mathf.Rad2Deg - 90f;
@@ -130,6 +146,35 @@ public class EnemyShipAI : MonoBehaviour
 
         if (rb.linearVelocity.magnitude > speedCap)
             rb.linearVelocity = rb.linearVelocity.normalized * speedCap;
+    }
+
+    ShipStats ResolveCurrentTarget()
+    {
+        if (retaliationTarget != null)
+        {
+            if (Time.time <= retaliationUntilTime && retaliationTarget.gameObject.activeInHierarchy)
+                return retaliationTarget;
+
+            retaliationTarget = null;
+        }
+
+        if (player == null)
+            player = WorldSpawnDirector.PlayerTransform;
+
+        return player != null ? player.GetComponent<ShipStats>() : null;
+    }
+
+    void ResetModuleOrientations()
+    {
+        var attachments = GetComponentsInChildren<ModuleAttachment>(true);
+        for (int i = 0; i < attachments.Length; i++)
+        {
+            var attachment = attachments[i];
+            if (attachment == null)
+                continue;
+
+            attachment.transform.localRotation = Quaternion.identity;
+        }
     }
 
     float ComputeSpeedCap()

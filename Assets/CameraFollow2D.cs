@@ -1,28 +1,157 @@
 using UnityEngine;
 
+[RequireComponent(typeof(Camera))]
 public class CameraFollow2D : MonoBehaviour
 {
     public Transform target;
     public Vector2 offset = Vector2.zero;
 
     [Header("Follow Feel")]
-    public float smoothTime = 0.18f;  // 작을수록 더 딱 붙음
-    public float maxSpeed = 999f;     // 카메라 최고 추적 속도 제한(원하면)
+    public float smoothTime = 0.18f;
+    public float maxSpeed = 999f;
 
-    Vector3 vel;
+    [Header("Zoom")]
+    public float baselineViewMultiplier = 2f;
+    public float minimumAutoSize = 10f;
+    public float scrollZoomSpeed = 0.12f;
+    public float pinchZoomSensitivity = 0.005f;
+    public float minZoomMultiplier = 0.5f;
+    public float maxZoomMultiplier = 2f;
+    public float zoomSmoothTime = 0.15f;
+    public float moduleCountMaxForZoom = 100f;
+    public float moduleCountBaseThreshold = 10f;
+    public float maxAutoWidthMultiplier = 2f;
+    public float backgroundOverscan = 1.35f;
+
+    Vector3 followVelocity;
+    Camera cam;
+    ShipStats trackedShip;
+    float baselineOrthoSize;
+    float userZoomMultiplier = 1f;
+    float zoomVelocity;
+    SpriteRenderer backgroundRenderer;
+    Vector3 backgroundBaseScale = Vector3.one;
+    bool backgroundCached;
+
+    void Awake()
+    {
+        cam = GetComponent<Camera>();
+        baselineOrthoSize = Mathf.Max(minimumAutoSize, cam.orthographicSize * baselineViewMultiplier);
+    }
 
     void LateUpdate()
     {
-        if (!target) return;
+        ResolveTarget();
+        HandleZoomInput();
+
+        if (target == null)
+            return;
 
         Vector3 desired = new Vector3(
             target.position.x + offset.x,
             target.position.y + offset.y,
-            transform.position.z
-        );
+            transform.position.z);
 
         transform.position = Vector3.SmoothDamp(
-            transform.position, desired, ref vel, smoothTime, maxSpeed, Time.deltaTime
-        );
+            transform.position,
+            desired,
+            ref followVelocity,
+            smoothTime,
+            maxSpeed,
+            Time.deltaTime);
+
+        float autoSize = ComputeAutoSize();
+        float desiredSize = Mathf.Clamp(autoSize * userZoomMultiplier, autoSize * minZoomMultiplier, autoSize * maxZoomMultiplier);
+        cam.orthographicSize = Mathf.SmoothDamp(cam.orthographicSize, desiredSize, ref zoomVelocity, zoomSmoothTime, Mathf.Infinity, Time.deltaTime);
+        FitBackgroundToViewport();
+    }
+
+    void ResolveTarget()
+    {
+        if (trackedShip == null)
+        {
+            if (target != null)
+                trackedShip = target.GetComponentInParent<ShipStats>() ?? target.GetComponent<ShipStats>();
+
+            if (trackedShip == null && WorldSpawnDirector.PlayerTransform != null)
+                trackedShip = WorldSpawnDirector.PlayerTransform.GetComponent<ShipStats>();
+        }
+
+        if (trackedShip == null)
+            return;
+
+        target = trackedShip.GetCoreTransform();
+    }
+
+    float ComputeAutoSize()
+    {
+        if (trackedShip == null)
+            return baselineOrthoSize;
+
+        float moduleCount = Mathf.Max(1f, trackedShip.GetInstalledModuleCount());
+        float normalized = Mathf.InverseLerp(moduleCountBaseThreshold, moduleCountMaxForZoom, moduleCount);
+        float widthMultiplier = Mathf.Lerp(1f, maxAutoWidthMultiplier, normalized);
+        return Mathf.Max(minimumAutoSize, baselineOrthoSize * widthMultiplier);
+    }
+
+    void HandleZoomInput()
+    {
+        float scroll = Input.mouseScrollDelta.y;
+        if (Mathf.Abs(scroll) > 0.001f)
+        {
+            userZoomMultiplier *= 1f - scroll * scrollZoomSpeed;
+            userZoomMultiplier = Mathf.Clamp(userZoomMultiplier, minZoomMultiplier, maxZoomMultiplier);
+        }
+
+        if (Input.touchCount < 2)
+            return;
+
+        Touch touch0 = Input.GetTouch(0);
+        Touch touch1 = Input.GetTouch(1);
+        Vector2 previous0 = touch0.position - touch0.deltaPosition;
+        Vector2 previous1 = touch1.position - touch1.deltaPosition;
+
+        float previousDistance = Vector2.Distance(previous0, previous1);
+        float currentDistance = Vector2.Distance(touch0.position, touch1.position);
+        if (previousDistance <= 0.001f || currentDistance <= 0.001f)
+            return;
+
+        float pinchRatio = previousDistance / currentDistance;
+        float pinchDelta = Mathf.Lerp(1f, pinchRatio, pinchZoomSensitivity * 100f);
+        userZoomMultiplier = Mathf.Clamp(userZoomMultiplier * pinchDelta, minZoomMultiplier, maxZoomMultiplier);
+    }
+
+    void FitBackgroundToViewport()
+    {
+        if (cam == null)
+            return;
+
+        if (!backgroundCached)
+        {
+            Transform backgroundTransform = transform.Find("Backgrounds");
+            if (backgroundTransform != null)
+            {
+                backgroundRenderer = backgroundTransform.GetComponent<SpriteRenderer>();
+                backgroundBaseScale = backgroundTransform.localScale;
+            }
+
+            backgroundCached = true;
+        }
+
+        if (backgroundRenderer == null || backgroundRenderer.sprite == null)
+            return;
+
+        float viewportHeight = cam.orthographicSize * 2f * backgroundOverscan;
+        float viewportWidth = viewportHeight * cam.aspect;
+
+        Vector2 spriteSize = backgroundRenderer.sprite.bounds.size;
+        if (spriteSize.x <= 0.0001f || spriteSize.y <= 0.0001f)
+            return;
+
+        float scale = Mathf.Max(viewportWidth / spriteSize.x, viewportHeight / spriteSize.y);
+        backgroundRenderer.transform.localScale = new Vector3(
+            backgroundBaseScale.x * scale,
+            backgroundBaseScale.y * scale,
+            backgroundBaseScale.z);
     }
 }

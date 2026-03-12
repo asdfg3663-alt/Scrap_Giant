@@ -23,7 +23,7 @@ public class WorldSpawnDirector : MonoBehaviour
     public float despawnAxisDistance = 100f;
 
     [Header("Floating Scrap")]
-    public float scrapMassFromPlayerMassMultiplier = 0.5f;
+    public float scrapMassFromPlayerMassMultiplier = 1f;
     public float scrapDriftImpulse = 1.25f;
 
     [Header("Enemy Combat")]
@@ -31,6 +31,9 @@ public class WorldSpawnDirector : MonoBehaviour
     public float enemyAttackRange = 14f;
     public float enemyFireConeAngle = 24f;
     public float enemyMaxSpeed = 10f;
+    public Color enemyOutlineColor = new Color(1f, 0.2f, 0.18f, 0.95f);
+    public float enemyOutlineScale = 1.08f;
+    [Range(0f, 1f)] public float enemySaturationMultiplier = 0.5f;
 
     [Header("Threat Scaling")]
     public float threatScoreScale = 0.18f;
@@ -250,6 +253,7 @@ public class WorldSpawnDirector : MonoBehaviour
             AttachModule(root.transform, laserModulePrefab, LaserSlots[i], weaponUpgradeLevel);
 
         IgnoreShipInternalCollisions(root.transform);
+        ApplyEnemyVisualStyle(root.transform);
         shipStats.Rebuild();
         runtime.Initialize(core);
 
@@ -412,6 +416,63 @@ public class WorldSpawnDirector : MonoBehaviour
         }
 
         return nearest;
+    }
+
+    void ApplyEnemyVisualStyle(Transform shipRoot)
+    {
+        if (shipRoot == null)
+            return;
+
+        var renderers = shipRoot.GetComponentsInChildren<SpriteRenderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            var renderer = renderers[i];
+            if (renderer == null || renderer.sprite == null)
+                continue;
+
+            if (renderer.name == "LaserBeam" || renderer.transform.parent != shipRoot)
+                continue;
+
+            renderer.color = Desaturate(renderer.color, enemySaturationMultiplier);
+            EnsureOutline(renderer);
+        }
+    }
+
+    void EnsureOutline(SpriteRenderer source)
+    {
+        if (source == null)
+            return;
+
+        Transform existing = source.transform.Find("EnemyOutline");
+        if (existing != null)
+            return;
+
+        var outlineGO = new GameObject("EnemyOutline");
+        outlineGO.transform.SetParent(source.transform, false);
+        outlineGO.transform.localPosition = Vector3.zero;
+        outlineGO.transform.localRotation = Quaternion.identity;
+        outlineGO.transform.localScale = Vector3.one * enemyOutlineScale;
+
+        var outline = outlineGO.AddComponent<SpriteRenderer>();
+        outline.sprite = source.sprite;
+        outline.drawMode = source.drawMode;
+        outline.size = source.size;
+        outline.color = enemyOutlineColor;
+        outline.sharedMaterial = source.sharedMaterial;
+        outline.sortingLayerID = source.sortingLayerID;
+        outline.sortingOrder = source.sortingOrder - 1;
+        outline.maskInteraction = source.maskInteraction;
+    }
+
+    static Color Desaturate(Color color, float saturation)
+    {
+        saturation = Mathf.Clamp01(saturation);
+        float luminance = color.r * 0.299f + color.g * 0.587f + color.b * 0.114f;
+        return new Color(
+            Mathf.Lerp(luminance, color.r, saturation),
+            Mathf.Lerp(luminance, color.g, saturation),
+            Mathf.Lerp(luminance, color.b, saturation),
+            color.a);
     }
 
     struct EnemyLoadout

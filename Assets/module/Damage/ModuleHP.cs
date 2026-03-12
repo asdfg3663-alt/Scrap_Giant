@@ -45,6 +45,8 @@ public class ModuleHP : MonoBehaviour, IDamageable
         if (damage <= 0)
             return;
 
+        NotifyDefender(attacker);
+
         inst.hp -= damage;
         if (inst.hp > 0)
             return;
@@ -72,6 +74,21 @@ public class ModuleHP : MonoBehaviour, IDamageable
         }
 
         Destroy(gameObject);
+    }
+
+    void NotifyDefender(GameObject attacker)
+    {
+        var defenderShip = GetComponentInParent<ShipStats>();
+        if (defenderShip == null || defenderShip.isPlayerShip || attacker == null)
+            return;
+
+        var attackerShip = attacker.GetComponentInParent<ShipStats>();
+        if (attackerShip == null || attackerShip == defenderShip)
+            return;
+
+        var enemyAI = defenderShip.GetComponent<EnemyShipAI>();
+        if (enemyAI != null)
+            enemyAI.OnAttackedBy(attackerShip);
     }
 
     void OnDestroy()

@@ -5939,12 +5939,15 @@ MonoBehaviour:
   minSpawnDistance: 10
   maxSpawnDistance: 100
   despawnAxisDistance: 100
-  scrapMassFromPlayerMassMultiplier: 0.5
+  scrapMassFromPlayerMassMultiplier: 1
   scrapDriftImpulse: 1.25
   enemyDesiredRange: 30
   enemyAttackRange: 14
   enemyFireConeAngle: 24
   enemyMaxSpeed: 10
+  enemyOutlineColor: {r: 1, g: 0.2, b: 0.18, a: 0.95}
+  enemyOutlineScale: 1.08
+  enemySaturationMultiplier: 0.5
   threatScoreScale: 0.18
   threatLogBase: 2
   baseThreat: 1
@@ -6112,6 +6115,17 @@ MonoBehaviour:
   offset: {x: 0, y: 0}
   smoothTime: 0.18
   maxSpeed: 999
+  baselineViewMultiplier: 2
+  minimumAutoSize: 10
+  scrollZoomSpeed: 0.12
+  pinchZoomSensitivity: 0.005
+  minZoomMultiplier: 0.5
+  maxZoomMultiplier: 2
+  zoomSmoothTime: 0.15
+  moduleCountMaxForZoom: 100
+  moduleCountBaseThreshold: 10
+  maxAutoWidthMultiplier: 2
+  backgroundOverscan: 1.35
 --- !u!1 &619394800
 GameObject:
   m_ObjectHideFlags: 0

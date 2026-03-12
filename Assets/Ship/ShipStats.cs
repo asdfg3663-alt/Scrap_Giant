@@ -235,6 +235,21 @@ public class ShipStats : MonoBehaviour
         return transform;
     }
 
+    public int GetInstalledModuleCount()
+    {
+        if (modules == null || modules.Length == 0)
+            modules = GetComponentsInChildren<ModuleInstance>(true);
+
+        int count = 0;
+        for (int i = 0; i < modules.Length; i++)
+        {
+            if (modules[i] != null && modules[i].data != null)
+                count++;
+        }
+
+        return count;
+    }
+
     public string GetFuelAssemblyPrimaryText()
     {
         if (!HasFuelSystem())
@@ -261,7 +276,7 @@ public class ShipStats : MonoBehaviour
         {
             var hud = PlayerHudRuntime.Instance;
             if (hud == null || !hud.HasResource("scrap", 1f))
-                return "1 Scrap -> 2 Fuel";
+                return "1 Scrap -> 10 Fuel";
 
             return $"{fuelSynthesisPerSec:0.#} fuel/sec";
         }
@@ -291,7 +306,7 @@ public class ShipStats : MonoBehaviour
         if (hud == null)
             return;
 
-        synthesisScrapProgress += (fuelSynthesisPerSec * deltaTime) * 0.5f;
+        synthesisScrapProgress += (fuelSynthesisPerSec * deltaTime) / 10f;
 
         float missingFuel = fuelMax - fuelCurrent;
         if (missingFuel <= 0f)
@@ -307,7 +322,7 @@ public class ShipStats : MonoBehaviour
         if (!hud.TryConsumeResource("scrap", scrapToSpend))
             return;
 
-        float fuelToAdd = Mathf.Min(missingFuel, scrapToSpend * 2f);
+        float fuelToAdd = Mathf.Min(missingFuel, scrapToSpend * 10f);
         fuelCurrent = Mathf.Clamp(fuelCurrent + fuelToAdd, 0f, fuelMax);
         synthesisScrapProgress = Mathf.Max(0f, synthesisScrapProgress - scrapToSpend);
     }
