@@ -22,9 +22,7 @@ public class ShipMovement : MonoBehaviour
     public float thrustToManualTurnTorque = 1.0f;
     public float baseManualTurnTorque = 0.0f;
     public float angularDamping = 0.0f;
-    [Tooltip("이 RPM 이하로 느려지면 아래의 저속 감쇠를 사용합니다.")]
     public float lowAngularStopStartRPM = 6f;
-    [Tooltip("저속 회전 구간에서 0RPM으로 천천히 수렴시키는 감쇠량(deg/sec^2).")]
     public float lowAngularStopDamping = 6f;
 
     [Header("Engine Torque Model")]
@@ -32,7 +30,6 @@ public class ShipMovement : MonoBehaviour
     public float minModuleMassForCOM = 0.001f;
 
     [Header("Rotation Limit (RPM)")]
-    [Tooltip("최대 회전속도(RPM). 예: 60RPM = 초당 1바퀴(360deg/s)")]
     public float maxRPM = 60f;
 
     ShipStats stats;
@@ -50,19 +47,21 @@ public class ShipMovement : MonoBehaviour
 
     void FixedUpdate()
     {
-        if (stats == null) return;
-        if (!stats.isPlayerShip) return;
+        if (stats == null || !stats.isPlayerShip)
+            return;
 
-        float thrustInput = Input.GetAxisRaw("Vertical");   // W=1, S=-1
-        float turnInput   = Input.GetAxisRaw("Horizontal"); // D=1, A=-1
+        float thrustInput = Input.GetAxisRaw("Vertical");
+        float turnInput = Input.GetAxisRaw("Horizontal");
 
         float mass = Mathf.Max(minRigidbodyMass, stats.totalMass);
         float totalThrust = Mathf.Max(0f, stats.totalThrust);
+        float effectiveTotalThrust = Mathf.Max(0f, stats.GetEffectiveTotalThrust());
+        float thrustScale = totalThrust > 0f ? (effectiveTotalThrust / totalThrust) : 0f;
 
         if (syncRigidbodyMassWithShipStats)
             rb.mass = mass;
 
-        float accelEst = (totalThrust / mass) * accelMultiplier;
+        float accelEst = (effectiveTotalThrust / mass) * accelMultiplier;
         float maxSpeed = Mathf.Max(0.1f, baseMaxSpeed + accelEst * maxSpeedFromAccelMultiplier);
 
         var modules = GetComponentsInChildren<ModuleInstance>(true);
@@ -71,23 +70,24 @@ public class ShipMovement : MonoBehaviour
         Vector2 sumForce = Vector2.zero;
         float sumTorque = 0f;
 
-        // ===== Forward thrust (W) =====
-        if (thrustInput > 0f && totalThrust > 0f)
+        if (thrustInput > 0f && effectiveTotalThrust > 0f)
         {
+            stats.ConsumeFuelForThrust(Time.fixedDeltaTime);
+
             if (modules != null)
             {
-                foreach (var m in modules)
+                foreach (var module in modules)
                 {
-                    if (m == null || m.data == null) continue;
+                    if (module == null || module.data == null)
+                        continue;
 
-                    // 전제: m.data.thrust (엔진 추력)
-                    float t = m.GetThrust();
-                    if (t <= 0f) continue;
+                    float thrust = module.GetThrust() * thrustScale;
+                    if (thrust <= 0f)
+                        continue;
 
-                    Vector2 dir = (Vector2)m.transform.up;
-                    Vector2 force = dir * (t * thrustInput);
-                    Vector2 r = (Vector2)m.transform.position - com;
-
+                    Vector2 dir = module.transform.up;
+                    Vector2 force = dir * (thrust * thrustInput);
+                    Vector2 r = (Vector2)module.transform.position - com;
                     float torque = r.x * force.y - r.y * force.x;
 
                     sumForce += force;
@@ -99,19 +99,18 @@ public class ShipMovement : MonoBehaviour
             rb.AddTorque(sumTorque, ForceMode2D.Force);
         }
 
-        // ===== Brake / reverse (S) =====
         if (thrustInput < 0f)
         {
             float brakeForce = brakeForceOverride > 0f
                 ? brakeForceOverride
-                : (totalThrust * Mathf.Max(0f, reverseMultiplier));
+                : (effectiveTotalThrust * Mathf.Max(0f, reverseMultiplier));
 
             if (brakeForce > 0f)
             {
-                Vector2 v = rb.linearVelocity;
-                if (v.sqrMagnitude > 0.000001f)
+                Vector2 velocity = rb.linearVelocity;
+                if (velocity.sqrMagnitude > 0.000001f)
                 {
-                    Vector2 brakeDir = -v.normalized;
+                    Vector2 brakeDir = -velocity.normalized;
                     rb.AddForce(brakeDir * ((-thrustInput) * brakeForce), ForceMode2D.Force);
                 }
             }
@@ -120,13 +119,11 @@ public class ShipMovement : MonoBehaviour
                 rb.linearVelocity = Vector2.zero;
         }
 
-        // ===== Clamp max linear speed =====
         float speed = rb.linearVelocity.magnitude;
         if (speed > maxSpeed)
             rb.linearVelocity = rb.linearVelocity.normalized * maxSpeed;
 
-        // ===== Manual turning (A/D) =====
-        float manualTurnTorque = baseManualTurnTorque + totalThrust * thrustToManualTurnTorque;
+        float manualTurnTorque = baseManualTurnTorque + effectiveTotalThrust * thrustToManualTurnTorque;
         if (Mathf.Abs(turnInput) > 0.0001f && manualTurnTorque > 0f)
         {
             rb.AddTorque(-turnInput * manualTurnTorque, ForceMode2D.Force);
@@ -143,13 +140,9 @@ public class ShipMovement : MonoBehaviour
                 rb.angularVelocity = Mathf.MoveTowards(rb.angularVelocity, 0f, damping * Time.fixedDeltaTime);
         }
 
-        // ===== Clamp max angular speed (RPM limit) =====
-        // Rigidbody2D.angularVelocity 단위는 deg/sec
-        float maxAngularDegPerSec = Mathf.Max(0f, maxRPM) * 360f / 60f; // RPM -> deg/s
+        float maxAngularDegPerSec = Mathf.Max(0f, maxRPM) * 360f / 60f;
         if (maxAngularDegPerSec > 0f)
-        {
             rb.angularVelocity = Mathf.Clamp(rb.angularVelocity, -maxAngularDegPerSec, maxAngularDegPerSec);
-        }
     }
 
     Vector2 ComputeModuleCOM(ModuleInstance[] modules)
@@ -157,24 +150,25 @@ public class ShipMovement : MonoBehaviour
         if (modules == null || modules.Length == 0)
             return rb.worldCenterOfMass;
 
-        float totalM = 0f;
-        Vector2 sum = Vector2.zero;
+        float totalModuleMass = 0f;
+        Vector2 weightedSum = Vector2.zero;
 
-        foreach (var m in modules)
+        foreach (var module in modules)
         {
-            if (m == null || m.data == null) continue;
+            if (module == null || module.data == null)
+                continue;
 
-            // 전제: m.data.mass (모듈 질량)
-            float mm = Mathf.Max(0f, m.GetMass());
-            if (mm < minModuleMassForCOM) continue;
+            float moduleMass = Mathf.Max(0f, module.GetMass());
+            if (moduleMass < minModuleMassForCOM)
+                continue;
 
-            totalM += mm;
-            sum += (Vector2)m.transform.position * mm;
+            totalModuleMass += moduleMass;
+            weightedSum += (Vector2)module.transform.position * moduleMass;
         }
 
-        if (totalM <= 0.0001f)
+        if (totalModuleMass <= 0.0001f)
             return rb.worldCenterOfMass;
 
-        return sum / totalM;
+        return weightedSum / totalModuleMass;
     }
 }

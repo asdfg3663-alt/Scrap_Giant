@@ -124,10 +124,14 @@ public class ModuleInfoUI : MonoBehaviour
         float mass = module.GetMass();
         float thrust = module.GetThrust();
         float energyCap = module.GetMaxEnergy();
+        float fuelCap = module.GetMaxFuel();
+        float fuelSynth = module.GetFuelSynthesisPerSec();
 
         if (mass > 0f) AddLine($"Mass: {mass:0.##}");
         if (thrust > 0f) AddLine($"Thrust: {thrust:0.##}");
         if (energyCap > 0f) AddLine($"Energy Cap: {energyCap:0.##}");
+        if (fuelCap > 0f) AddLine($"Fuel Cap: {fuelCap:0.##}");
+        if (fuelSynth > 0f) AddLine($"Fuel Synth: {fuelSynth:0.##}/s");
 
         bool hasWeapon =
             data.weaponType != WeaponType.None ||

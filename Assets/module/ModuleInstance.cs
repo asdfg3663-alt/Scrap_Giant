@@ -57,6 +57,8 @@ public class ModuleInstance : MonoBehaviour
     public float GetPowerGenPerSec() { return data != null ? data.powerGenPerSec * TierMultiplier : 0f; }
     public float GetPowerUsePerSec() { return data != null ? data.powerUsePerSec * TierMultiplier : 0f; }
     public float GetMaxEnergy() { return data != null ? data.maxEnergy * TierMultiplier : 0f; }
+    public float GetMaxFuel() { return data != null ? data.maxFuel * TierMultiplier : 0f; }
+    public float GetFuelSynthesisPerSec() { return data != null ? data.fuelSynthesisPerSec * TierMultiplier : 0f; }
     public float GetThrust() { return data != null ? data.thrust * TierMultiplier : 0f; }
     public float GetMass() { return data != null ? data.mass * TierMultiplier : 0f; }
     public float GetWeaponDamage() { return data != null ? data.weaponDamage * TierMultiplier : 0f; }

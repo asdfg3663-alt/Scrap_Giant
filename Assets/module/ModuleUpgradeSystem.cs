@@ -224,7 +224,10 @@ public class ModuleUpgradeSystem : MonoBehaviour
 
         if (activeUpgrade == null || activeUpgrade.module == null)
         {
-            hud.SetAssemblyState(false, "No active upgrade", "Idle", null);
+            var ship = hud.TrackedShip;
+            string primary = ship != null ? ship.GetFuelAssemblyPrimaryText() : "Fuel synthesis ready";
+            string secondary = ship != null ? ship.GetFuelAssemblySecondaryText() : string.Empty;
+            hud.SetAssemblyState(false, primary, secondary, null);
             return;
         }
 

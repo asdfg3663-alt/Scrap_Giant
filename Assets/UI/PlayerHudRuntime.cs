@@ -19,15 +19,17 @@ public class PlayerHudRuntime : MonoBehaviour
     {
         public string id;
         public string label;
-        public int amount;
+        public float amount;
         public Color color;
+        public string displayText;
 
-        public ResourceEntry(string id, string label, int amount, Color color)
+        public ResourceEntry(string id, string label, float amount, Color color, string displayText = null)
         {
             this.id = id;
             this.label = label;
             this.amount = amount;
             this.color = color;
+            this.displayText = displayText;
         }
     }
 
@@ -94,8 +96,8 @@ public class PlayerHudRuntime : MonoBehaviour
     bool ammoUiDirty;
     bool inventoryUiDirty;
 
-    string assemblyPrimaryLabel = "No active upgrade";
-    string assemblySecondaryLabel = "Idle";
+    string assemblyPrimaryLabel = "Fuel synthesis ready";
+    string assemblySecondaryLabel = string.Empty;
     bool assemblyActive;
     Sprite assemblySprite;
 
@@ -114,6 +116,7 @@ public class PlayerHudRuntime : MonoBehaviour
     }
 
     public static PlayerHudRuntime Instance => instance;
+    public ShipStats TrackedShip => trackedShip;
 
     public static void EnsureForPlayer(ShipStats ship)
     {
@@ -140,29 +143,39 @@ public class PlayerHudRuntime : MonoBehaviour
     public int GetResourceAmount(string id)
     {
         var entry = FindResource(resources, id);
-        return entry != null ? entry.amount : 0;
+        return entry != null ? Mathf.FloorToInt(entry.amount) : 0;
     }
 
     public bool HasResource(string id, int amount)
     {
-        return GetResourceAmount(id) >= Mathf.Max(0, amount);
+        return HasResource(id, (float)amount);
     }
 
-    public bool TryConsumeResource(string id, int amount)
+    public bool HasResource(string id, float amount)
     {
-        amount = Mathf.Max(0, amount);
-        if (amount == 0) return true;
+        var entry = FindResource(resources, id);
+        return entry != null && entry.amount + 0.0001f >= Mathf.Max(0f, amount);
+    }
+
+    public bool TryConsumeResource(string id, float amount)
+    {
+        amount = Mathf.Max(0f, amount);
+        if (amount <= 0f) return true;
 
         var entry = FindResource(resources, id);
-        if (entry == null || entry.amount < amount)
+        if (entry == null || entry.amount + 0.0001f < amount)
             return false;
 
         entry.amount -= amount;
+        if (entry.amount < 0f)
+            entry.amount = 0f;
+
+        entry.displayText = null;
         resourceUiDirty = true;
         return true;
     }
 
-    public void SetResource(string id, string label, int amount, Color color)
+    public void SetResource(string id, string label, float amount, Color color)
     {
         if (string.IsNullOrWhiteSpace(id)) return;
 
@@ -174,15 +187,35 @@ public class PlayerHudRuntime : MonoBehaviour
             entry.label = string.IsNullOrWhiteSpace(label) ? entry.label : label;
             entry.amount = amount;
             entry.color = color;
+            entry.displayText = null;
         }
 
         resourceUiDirty = true;
     }
 
-    public void AddResource(string id, string label, int amount, Color color)
+    public void SetResourceDisplay(string id, string label, float amount, Color color, string displayText)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return;
+
+        var entry = FindResource(resources, id);
+        if (entry == null)
+            resources.Add(new ResourceEntry(id, string.IsNullOrWhiteSpace(label) ? id.ToUpperInvariant() : label, amount, color, displayText));
+        else
+        {
+            entry.label = string.IsNullOrWhiteSpace(label) ? entry.label : label;
+            entry.amount = amount;
+            entry.color = color;
+            entry.displayText = displayText;
+        }
+
+        resourceUiDirty = true;
+    }
+
+    public void AddResource(string id, string label, float amount, Color color)
     {
         var entry = FindOrCreate(resources, id, label, color);
         entry.amount += amount;
+        entry.displayText = null;
         resourceUiDirty = true;
     }
 
@@ -206,8 +239,8 @@ public class PlayerHudRuntime : MonoBehaviour
     public void SetAssemblyState(bool active, string primary, string secondary, Sprite sprite = null)
     {
         assemblyActive = active;
-        assemblyPrimaryLabel = string.IsNullOrWhiteSpace(primary) ? "No active upgrade" : primary;
-        assemblySecondaryLabel = string.IsNullOrWhiteSpace(secondary) ? "Idle" : secondary;
+        assemblyPrimaryLabel = string.IsNullOrWhiteSpace(primary) ? "Fuel synthesis ready" : primary;
+        assemblySecondaryLabel = string.IsNullOrWhiteSpace(secondary) ? string.Empty : secondary;
         assemblySprite = sprite;
 
         RefreshAssemblyPanel();
@@ -317,14 +350,17 @@ public class PlayerHudRuntime : MonoBehaviour
     void InitializeDefaults()
     {
         if (resources.Count == 0)
-            resources.Add(new ResourceEntry("scrap", "Scrap", 240, new Color(0.97f, 0.63f, 0.22f, 1f)));
+            resources.Add(new ResourceEntry("scrap", "Scrap", 240f, new Color(0.97f, 0.63f, 0.22f, 1f)));
+
+        if (FindResource(resources, "fuel") == null)
+            resources.Add(new ResourceEntry("fuel", "Fuel", 0f, new Color(0.38f, 0.85f, 0.95f, 1f), "0 / 0"));
 
         if (ammoEntries.Count == 0)
             ammoEntries.Add(new ResourceEntry("ammo", "Ammo", 120, new Color(0.96f, 0.32f, 0.24f, 1f)));
 
         assemblyActive = false;
-        assemblyPrimaryLabel = "No active upgrade";
-        assemblySecondaryLabel = "Idle";
+        assemblyPrimaryLabel = "Fuel synthesis ready";
+        assemblySecondaryLabel = string.Empty;
         assemblySprite = null;
 
         resourceUiDirty = true;
@@ -413,8 +449,8 @@ public class PlayerHudRuntime : MonoBehaviour
         assemblyPreviewImage.preserveAspect = true;
 
         assemblyTitleText = CreateLabel(panel, "ASSEMBLY", 15f, new Color(0.72f, 0.94f, 0.88f, 1f), TextAlignmentOptions.TopLeft, new Vector2(86f, -10f), new Vector2(0f, 1f), FontStyles.Bold);
-        assemblyPrimaryText = CreateLabel(panel, "No active upgrade", 16f, Color.white, TextAlignmentOptions.TopLeft, new Vector2(86f, -30f), new Vector2(0f, 1f), FontStyles.Bold);
-        assemblySecondaryText = CreateLabel(panel, "Idle", 13f, new Color(0.74f, 0.86f, 0.9f, 1f), TextAlignmentOptions.TopLeft, new Vector2(86f, -52f), new Vector2(0f, 1f), FontStyles.Normal);
+        assemblyPrimaryText = CreateLabel(panel, "Fuel synthesis ready", 16f, Color.white, TextAlignmentOptions.TopLeft, new Vector2(86f, -30f), new Vector2(0f, 1f), FontStyles.Bold);
+        assemblySecondaryText = CreateLabel(panel, string.Empty, 13f, new Color(0.74f, 0.86f, 0.9f, 1f), TextAlignmentOptions.TopLeft, new Vector2(86f, -52f), new Vector2(0f, 1f), FontStyles.Normal);
 
         assemblyPrimaryText.textWrappingMode = TextWrappingModes.NoWrap;
         assemblyPrimaryText.overflowMode = TextOverflowModes.Ellipsis;
@@ -557,6 +593,7 @@ public class PlayerHudRuntime : MonoBehaviour
         assemblyTitleText.text = assemblyActive ? "UPGRADING" : "ASSEMBLY";
         assemblyPrimaryText.text = assemblyPrimaryLabel;
         assemblySecondaryText.text = assemblySecondaryLabel;
+        assemblySecondaryText.gameObject.SetActive(!string.IsNullOrWhiteSpace(assemblySecondaryLabel));
 
         if (assemblySprite != null)
         {
@@ -586,7 +623,7 @@ public class PlayerHudRuntime : MonoBehaviour
             var entry = source[i];
             pool[i].icon.color = entry.color;
             pool[i].label.text = entry.label;
-            pool[i].value.text = entry.amount.ToString();
+            pool[i].value.text = FormatResourceValue(entry);
         }
     }
 
@@ -608,10 +645,10 @@ public class PlayerHudRuntime : MonoBehaviour
         var icon = CreateImage(iconRect, Color.white);
 
         var label = CreateInlineLabel(row, "Label", 14f, new Color(0.77f, 0.87f, 0.9f, 1f), FontStyles.Normal);
-        label.rectTransform.sizeDelta = new Vector2(70f, 20f);
+        label.rectTransform.sizeDelta = new Vector2(56f, 20f);
 
         var value = CreateInlineLabel(row, "Value", 15f, Color.white, FontStyles.Bold);
-        value.rectTransform.sizeDelta = new Vector2(56f, 20f);
+        value.rectTransform.sizeDelta = new Vector2(96f, 20f);
 
         return new ValueRow
         {
@@ -687,9 +724,23 @@ public class PlayerHudRuntime : MonoBehaviour
         var entry = FindResource(source, id);
         if (entry != null) return entry;
 
-        entry = new ResourceEntry(id, string.IsNullOrWhiteSpace(label) ? id : label, 0, color);
+        entry = new ResourceEntry(id, string.IsNullOrWhiteSpace(label) ? id : label, 0f, color);
         source.Add(entry);
         return entry;
+    }
+
+    string FormatResourceValue(ResourceEntry entry)
+    {
+        if (entry == null)
+            return "0";
+
+        if (!string.IsNullOrWhiteSpace(entry.displayText))
+            return entry.displayText;
+
+        if (Mathf.Abs(entry.amount - Mathf.Round(entry.amount)) <= 0.001f)
+            return Mathf.RoundToInt(entry.amount).ToString();
+
+        return entry.amount.ToString("0.#");
     }
 
     InventoryEntry FindInventory(string id)

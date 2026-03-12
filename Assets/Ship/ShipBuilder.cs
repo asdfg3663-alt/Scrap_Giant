@@ -97,6 +97,11 @@ public class ShipBuilder : MonoBehaviour
         RebuildOccupiedMap();
     }
 
+    void OnTransformChildrenChanged()
+    {
+        RebuildOccupiedMap();
+    }
+
     void Update()
     {
         pointerWorldNow = MouseWorld();
