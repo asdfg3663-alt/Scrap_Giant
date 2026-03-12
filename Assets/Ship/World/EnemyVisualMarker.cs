@@ -4,7 +4,9 @@ using UnityEngine;
 public class EnemyVisualMarker : MonoBehaviour
 {
     public Color originalColor = Color.white;
-    public SpriteRenderer outlineRenderer;
+    public Material originalMaterial;
+    public bool hasOriginalMaterial;
+    public Transform outlineRoot;
     public bool hasOriginalColor;
 
     public void Capture(SpriteRenderer source)
@@ -14,15 +16,27 @@ public class EnemyVisualMarker : MonoBehaviour
 
         originalColor = source.color;
         hasOriginalColor = true;
+
+        if (!hasOriginalMaterial)
+        {
+            originalMaterial = source.sharedMaterial;
+            hasOriginalMaterial = true;
+        }
     }
 
     public void Restore(SpriteRenderer source)
     {
-        if (source != null && hasOriginalColor)
-            source.color = originalColor;
+        if (source != null)
+        {
+            if (hasOriginalColor)
+                source.color = originalColor;
 
-        if (outlineRenderer != null)
-            Object.Destroy(outlineRenderer.gameObject);
+            if (hasOriginalMaterial)
+                source.sharedMaterial = originalMaterial;
+        }
+
+        if (outlineRoot != null)
+            Object.Destroy(outlineRoot.gameObject);
 
         Object.Destroy(this);
     }

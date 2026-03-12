@@ -32,7 +32,7 @@ public class WorldSpawnDirector : MonoBehaviour
     public float enemyFireConeAngle = 24f;
     public float enemyMaxSpeed = 10f;
     public Color enemyOutlineColor = new Color(1f, 0.2f, 0.18f, 0.95f);
-    public float enemyOutlineScale = 1.08f;
+    public float enemyOutlinePixelSize = 7f;
     [Range(0f, 1f)] public float enemySaturationMultiplier = 0.08f;
 
     [Header("Threat Scaling")]
@@ -49,6 +49,7 @@ public class WorldSpawnDirector : MonoBehaviour
     public int maxLaserUpgradeLevel = 4;
 
     static WorldSpawnDirector instance;
+    static Material enemyDesaturateMaterial;
 
     readonly List<FloatingScrap> floatingScraps = new();
     readonly List<EnemyShipRuntime> enemyShips = new();
@@ -469,48 +470,85 @@ public class WorldSpawnDirector : MonoBehaviour
                 marker = renderer.gameObject.AddComponent<EnemyVisualMarker>();
 
             marker.Capture(renderer);
-            renderer.color = Desaturate(renderer.color, enemySaturationMultiplier);
-            marker.outlineRenderer = EnsureOutline(renderer);
+            renderer.color = marker.originalColor;
+            Material desaturateMaterial = GetEnemyDesaturateMaterial();
+            if (desaturateMaterial != null)
+                renderer.sharedMaterial = desaturateMaterial;
+            marker.outlineRoot = EnsureOutline(renderer, marker.originalMaterial);
         }
     }
 
-    SpriteRenderer EnsureOutline(SpriteRenderer source)
+    Material GetEnemyDesaturateMaterial()
+    {
+        if (enemyDesaturateMaterial != null)
+        {
+            enemyDesaturateMaterial.SetFloat("_Saturation", enemySaturationMultiplier);
+            return enemyDesaturateMaterial;
+        }
+
+        Shader shader = Shader.Find("Custom/EnemyDesaturateSprite");
+        if (shader == null)
+            return null;
+
+        enemyDesaturateMaterial = new Material(shader)
+        {
+            hideFlags = HideFlags.HideAndDontSave
+        };
+        enemyDesaturateMaterial.SetFloat("_Saturation", enemySaturationMultiplier);
+        return enemyDesaturateMaterial;
+    }
+
+    Transform EnsureOutline(SpriteRenderer source, Material outlineMaterial)
     {
         if (source == null)
             return null;
 
         Transform existing = source.transform.Find("EnemyOutline");
         if (existing != null)
-            return existing.GetComponent<SpriteRenderer>();
+            return existing;
 
-        var outlineGO = new GameObject("EnemyOutline");
-        outlineGO.transform.SetParent(source.transform, false);
-        outlineGO.transform.localPosition = Vector3.zero;
-        outlineGO.transform.localRotation = Quaternion.identity;
-        outlineGO.transform.localScale = Vector3.one * enemyOutlineScale;
+        var outlineRoot = new GameObject("EnemyOutline");
+        outlineRoot.transform.SetParent(source.transform, false);
+        outlineRoot.transform.localPosition = Vector3.zero;
+        outlineRoot.transform.localRotation = Quaternion.identity;
 
-        var outline = outlineGO.AddComponent<SpriteRenderer>();
-        outline.sprite = source.sprite;
-        outline.drawMode = SpriteDrawMode.Simple;
-        outline.color = enemyOutlineColor;
-        outline.sharedMaterial = source.sharedMaterial;
-        outline.sortingLayerID = source.sortingLayerID;
-        outline.sortingOrder = source.sortingOrder - 1;
-        outline.maskInteraction = source.maskInteraction;
-        outline.flipX = source.flipX;
-        outline.flipY = source.flipY;
-        return outline;
-    }
+        float pixelsPerUnit = source.sprite != null && source.sprite.pixelsPerUnit > 0f
+            ? source.sprite.pixelsPerUnit
+            : 128f;
+        float offset = Mathf.Max(1f, enemyOutlinePixelSize) / pixelsPerUnit;
 
-    static Color Desaturate(Color color, float saturation)
-    {
-        saturation = Mathf.Clamp01(saturation);
-        float luminance = color.r * 0.299f + color.g * 0.587f + color.b * 0.114f;
-        return new Color(
-            Mathf.Lerp(luminance, color.r, saturation),
-            Mathf.Lerp(luminance, color.g, saturation),
-            Mathf.Lerp(luminance, color.b, saturation),
-            color.a);
+        Vector2[] directions =
+        {
+            new Vector2(1f, 0f),
+            new Vector2(-1f, 0f),
+            new Vector2(0f, 1f),
+            new Vector2(0f, -1f),
+            new Vector2(0.7071f, 0.7071f),
+            new Vector2(0.7071f, -0.7071f),
+            new Vector2(-0.7071f, 0.7071f),
+            new Vector2(-0.7071f, -0.7071f)
+        };
+
+        for (int i = 0; i < directions.Length; i++)
+        {
+            var segment = new GameObject("OutlinePart");
+            segment.transform.SetParent(outlineRoot.transform, false);
+            segment.transform.localPosition = (Vector3)(directions[i] * offset);
+            segment.transform.localRotation = Quaternion.identity;
+
+            var outline = segment.AddComponent<SpriteRenderer>();
+            outline.sprite = source.sprite;
+            outline.drawMode = SpriteDrawMode.Simple;
+            outline.color = enemyOutlineColor;
+            outline.sharedMaterial = outlineMaterial;
+            outline.sortingLayerID = source.sortingLayerID;
+            outline.sortingOrder = source.sortingOrder - 1;
+            outline.maskInteraction = source.maskInteraction;
+            outline.flipX = source.flipX;
+            outline.flipY = source.flipY;
+        }
+
+        return outlineRoot.transform;
     }
 
     struct EnemyLoadout

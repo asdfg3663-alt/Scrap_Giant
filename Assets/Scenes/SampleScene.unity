@@ -5946,7 +5946,7 @@ MonoBehaviour:
   enemyFireConeAngle: 24
   enemyMaxSpeed: 10
   enemyOutlineColor: {r: 1, g: 0.2, b: 0.18, a: 0.95}
-  enemyOutlineScale: 1.08
+  enemyOutlinePixelSize: 7
   enemySaturationMultiplier: 0.08
   threatScoreScale: 0.18
   threatLogBase: 2

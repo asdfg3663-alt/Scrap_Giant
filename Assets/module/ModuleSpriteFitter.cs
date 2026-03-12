@@ -1,4 +1,7 @@
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 [DisallowMultipleComponent]
 [RequireComponent(typeof(SpriteRenderer))]
@@ -9,15 +12,27 @@ public class ModuleSpriteFitter : MonoBehaviour
 
     SpriteRenderer spriteRenderer;
 
-    void Awake()
+    void Start()
     {
         Apply();
     }
 
+#if UNITY_EDITOR
     void OnValidate()
     {
+        EditorApplication.delayCall += ApplyDelayed;
+    }
+#endif
+
+#if UNITY_EDITOR
+    void ApplyDelayed()
+    {
+        if (this == null)
+            return;
+
         Apply();
     }
+#endif
 
     public void Apply()
     {
