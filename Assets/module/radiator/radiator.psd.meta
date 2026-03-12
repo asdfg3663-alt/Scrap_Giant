@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: feb936c59010b014286dba7d4da9c754
+guid: 5dda7ef49b0e92a4896de9393d054261
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 2729703300883250330
-    second: power_plant_0
+      213: 4144634117886212000
+    second: radiator_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -48,10 +48,10 @@ TextureImporter:
   compressionQuality: 50
   spriteMode: 2
   spriteExtrude: 1
-  spriteMeshType: 0
+  spriteMeshType: 1
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
-  spritePixelsToUnits: 128
+  spritePixelsToUnits: 100
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
@@ -126,13 +126,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: power_plant_0
+      name: radiator_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 128
-        height: 128
+        x: 3
+        y: 39
+        width: 125
+        height: 89
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -141,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: a9c7b5780bad1e520800000000000000
-      internalID: 2729703300883250330
+      spriteID: 0a7729065c2b48930800000000000000
+      internalID: 4144634117886212000
       vertices: []
       indices: 
       edges: []
@@ -161,7 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      power_plant_0: 2729703300883250330
+      radiator_0: 4144634117886212000
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

@@ -49,7 +49,12 @@ public class ModuleHP : MonoBehaviour, IDamageable
 
         inst.hp -= damage;
         if (inst.hp > 0)
+        {
+            var currentShip = GetComponentInParent<ShipStats>();
+            if (currentShip != null && inst.maxHp > 0 && inst.hp < inst.maxHp * 0.5f)
+                currentShip.QueueRepair(inst);
             return;
+        }
 
         inst.hp = 0;
         Die(hitPoint, hitNormal);

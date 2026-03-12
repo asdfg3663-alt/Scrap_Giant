@@ -95,6 +95,8 @@ public class WeaponLaser : MonoBehaviour
             }
         }
 
+        inst.AddHeat(inst.GetDps() * Time.deltaTime);
+
         Vector2 dir = GetForwardDir();
         Vector2 origin = (Vector2)muzzle.position + dir * startOffset;
         Vector2 end = origin + dir * defaultRange;
@@ -141,7 +143,7 @@ public class WeaponLaser : MonoBehaviour
 
         float hitDistance = found ? Vector2.Distance(origin, end) : defaultRange;
         float damageMultiplier = GetDamageMultiplier(hitDistance);
-        float damage = Mathf.Max(0f, inst.GetWeaponDamage()) * damageMultiplier;
+        float damage = Mathf.Max(0f, inst.GetEffectiveWeaponDamage()) * damageMultiplier;
         if (found && best.collider != null && damage > 0f)
         {
             var target = best.collider.GetComponentInParent<IDamageable>();

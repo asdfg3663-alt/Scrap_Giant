@@ -152,6 +152,12 @@ public class PlayerHudRuntime : MonoBehaviour
         return entry != null ? Mathf.FloorToInt(entry.amount) : 0;
     }
 
+    public float GetResourceValue(string id)
+    {
+        var entry = FindResource(resources, id);
+        return entry != null ? Mathf.Max(0f, entry.amount) : 0f;
+    }
+
     public bool HasResource(string id, int amount)
     {
         return HasResource(id, (float)amount);

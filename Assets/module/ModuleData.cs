@@ -8,7 +8,8 @@ public enum ModuleType
     Reactor,
     Weapon,
     Radiator,
-    Scrap
+    Scrap,
+    Repair
 }
 
 public enum WeaponType
@@ -45,6 +46,13 @@ public class ModuleData : ScriptableObject
     public float thrust = 0f;
     public float mass = 1f;
     public float scoreMultiplier = 1f;
+
+    [Header("Thermal")]
+    public float maxHeat = 0f;
+    public float heatDissipationPerSec = 0f;
+
+    [Header("Repair")]
+    public float repairPerSecond = 0f;
 
     [Header("Weapon (MVP)")]
     public WeaponType weaponType = WeaponType.None;

@@ -36,6 +36,9 @@ public class ShipStats : MonoBehaviour
     public float totalThrust;
     public float totalMass;
     public float totalScore;
+    public float totalHeatDissipationPerSec;
+    public float totalRepairPerSecond;
+    public float repairScrapCostPerHp = 0.1f;
 
     [Header("Combat (MVP)")]
     public float totalDps;
@@ -48,6 +51,7 @@ public class ShipStats : MonoBehaviour
     float synthesisScrapProgress;
     bool fuelSynthesisActive;
     bool weaponBatteryLocked;
+    readonly System.Collections.Generic.List<ModuleInstance> repairQueue = new();
 
     void Awake()
     {
@@ -75,11 +79,15 @@ public class ShipStats : MonoBehaviour
 
     void Update()
     {
+        TickModuleHeat(Time.deltaTime);
+
+        powerGenPerSec = ComputeEffectivePowerGeneration();
+        netPowerPerSec = powerGenPerSec - powerUsePerSec;
         energyCurrent += netPowerPerSec * Time.deltaTime;
         energyCurrent = Mathf.Clamp(energyCurrent, 0f, energyMax);
         UpdateWeaponBatteryLock();
 
-        UpdateFuelSynthesis(Time.deltaTime);
+        ProcessAssemblyQueue(Time.deltaTime);
         RefreshHudFuel();
     }
 
@@ -117,6 +125,8 @@ public class ShipStats : MonoBehaviour
         totalThrust = 0f;
         totalMass = 0f;
         totalScore = 0f;
+        totalHeatDissipationPerSec = 0f;
+        totalRepairPerSecond = 0f;
         energyMax = 0f;
         fuelMax = 0f;
         fuelSynthesisPerSec = 0f;
@@ -138,6 +148,8 @@ public class ShipStats : MonoBehaviour
             totalThrust += m.GetThrust();
             totalMass += m.GetMass();
             totalScore += m.GetScoreValue();
+            totalHeatDissipationPerSec += m.GetHeatDissipationPerSec();
+            totalRepairPerSecond += m.GetRepairPerSecond();
             energyMax += m.GetMaxEnergy();
             fuelMax += m.GetMaxFuel();
             fuelSynthesisPerSec += m.GetFuelSynthesisPerSec();
@@ -172,6 +184,8 @@ public class ShipStats : MonoBehaviour
 
         if (fuelMax <= 0f)
             fuelSynthesisActive = false;
+
+        PruneRepairQueue();
     }
 
     public bool TryConsumeBattery(float amount)
@@ -202,6 +216,20 @@ public class ShipStats : MonoBehaviour
         bool consumed = TryConsumeBattery(amount);
         UpdateWeaponBatteryLock();
         return consumed;
+    }
+
+    public void QueueRepair(ModuleInstance module)
+    {
+        if (!isPlayerShip || module == null || module.data == null)
+            return;
+
+        if (module.maxHp <= 0 || module.hp >= module.maxHp)
+            return;
+
+        if (repairQueue.Contains(module))
+            return;
+
+        repairQueue.Add(module);
     }
 
     public bool HasFuelSystem()
@@ -273,6 +301,15 @@ public class ShipStats : MonoBehaviour
 
     public string GetFuelAssemblyPrimaryText()
     {
+        ModuleInstance repairTarget = GetNextRepairTarget();
+        if (repairTarget != null)
+        {
+            if (totalRepairPerSecond > 0f)
+                return $"Repairing {repairTarget.DisplayName}";
+
+            return $"Repair queued: {repairTarget.DisplayName}";
+        }
+
         if (!HasFuelSystem())
             return "Install a fuel tank";
 
@@ -290,6 +327,20 @@ public class ShipStats : MonoBehaviour
 
     public string GetFuelAssemblySecondaryText()
     {
+        ModuleInstance repairTarget = GetNextRepairTarget();
+        if (repairTarget != null)
+        {
+            var hud = PlayerHudRuntime.Instance;
+            if (totalRepairPerSecond <= 0f)
+                return "Install repair module";
+
+            if (hud == null || !hud.HasResource("scrap", repairScrapCostPerHp))
+                return "Need Scrap";
+
+            float repairHp = Mathf.Clamp(repairTarget.hp + repairTarget.repairProgress, 0f, repairTarget.maxHp);
+            return $"{repairHp:0.#} / {repairTarget.maxHp} HP";
+        }
+
         if (!HasFuelSystem())
             return string.Empty;
 
@@ -346,6 +397,123 @@ public class ShipStats : MonoBehaviour
         float fuelToAdd = Mathf.Min(missingFuel, scrapToSpend * 10f);
         fuelCurrent = Mathf.Clamp(fuelCurrent + fuelToAdd, 0f, fuelMax);
         synthesisScrapProgress = Mathf.Max(0f, synthesisScrapProgress - scrapToSpend);
+    }
+
+    void ProcessAssemblyQueue(float deltaTime)
+    {
+        if (TryProcessRepairQueue(deltaTime))
+            return;
+
+        UpdateFuelSynthesis(deltaTime);
+    }
+
+    bool TryProcessRepairQueue(float deltaTime)
+    {
+        if (!isPlayerShip || deltaTime <= 0f)
+            return false;
+
+        ModuleInstance target = GetNextRepairTarget();
+        if (target == null)
+            return false;
+
+        if (totalRepairPerSecond <= 0f)
+            return false;
+
+        var hud = PlayerHudRuntime.Instance;
+        if (hud == null)
+            return true;
+
+        float missingHp = Mathf.Max(0f, target.maxHp - (target.hp + target.repairProgress));
+        if (missingHp <= 0.001f)
+        {
+            repairQueue.Remove(target);
+            return GetNextRepairTarget() != null;
+        }
+
+        float repairAmount = Mathf.Min(missingHp, totalRepairPerSecond * deltaTime);
+        float availableScrap = hud.GetResourceValue("scrap");
+        float affordableRepair = repairScrapCostPerHp > 0f
+            ? availableScrap / repairScrapCostPerHp
+            : repairAmount;
+        repairAmount = Mathf.Min(repairAmount, affordableRepair);
+
+        if (repairAmount <= 0f)
+            return true;
+
+        if (!hud.TryConsumeResource("scrap", repairAmount * repairScrapCostPerHp))
+            return true;
+
+        target.repairProgress += repairAmount;
+        int wholeHp = Mathf.FloorToInt(target.repairProgress);
+        if (wholeHp > 0)
+        {
+            target.hp = Mathf.Clamp(target.hp + wholeHp, 0, target.maxHp);
+            target.repairProgress -= wholeHp;
+        }
+
+        if (target.hp >= target.maxHp)
+        {
+            target.hp = target.maxHp;
+            target.repairProgress = 0f;
+            repairQueue.Remove(target);
+        }
+
+        return true;
+    }
+
+    void TickModuleHeat(float deltaTime)
+    {
+        if (deltaTime <= 0f)
+            return;
+
+        if (modules == null || modules.Length == 0)
+            modules = GetComponentsInChildren<ModuleInstance>(true);
+
+        float coolingPerSecond = 1f + Mathf.Max(0f, totalHeatDissipationPerSec);
+        for (int i = 0; i < modules.Length; i++)
+        {
+            var module = modules[i];
+            if (module == null || module.data == null)
+                continue;
+
+            if (module.data.type == ModuleType.Reactor && module.GetPowerGenPerSec() > 0f)
+                module.AddHeat(module.GetPowerGenPerSec() * 2f * deltaTime);
+
+            module.CoolHeat(coolingPerSecond * deltaTime);
+        }
+    }
+
+    float ComputeEffectivePowerGeneration()
+    {
+        if (modules == null || modules.Length == 0)
+            modules = GetComponentsInChildren<ModuleInstance>(true);
+
+        float total = 0f;
+        for (int i = 0; i < modules.Length; i++)
+        {
+            var module = modules[i];
+            if (module == null || module.data == null)
+                continue;
+
+            total += module.GetEffectivePowerGenPerSec();
+        }
+
+        return total;
+    }
+
+    ModuleInstance GetNextRepairTarget()
+    {
+        PruneRepairQueue();
+        return repairQueue.Count > 0 ? repairQueue[0] : null;
+    }
+
+    void PruneRepairQueue()
+    {
+        repairQueue.RemoveAll(module =>
+            module == null ||
+            module.data == null ||
+            !module.transform.IsChildOf(transform) ||
+            module.hp >= module.maxHp);
     }
 
     void RefreshHudFuel()

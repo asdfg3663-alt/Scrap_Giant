@@ -10,6 +10,8 @@ public class ModuleInstance : MonoBehaviour
     public int hp;
     public int maxHp;
     public bool resetHpOnDataAssign = true;
+    public float currentHeat;
+    public float repairProgress;
 
     [Header("Upgrade")]
     [Min(0)] public int upgradeLevel = 0;
@@ -44,6 +46,8 @@ public class ModuleInstance : MonoBehaviour
             hp += maxHp - previousMax;
 
         hp = Mathf.Clamp(hp, 0, maxHp);
+        currentHeat = Mathf.Clamp(currentHeat, 0f, GetMaxHeat());
+        repairProgress = Mathf.Max(0f, repairProgress);
     }
 
     public void ApplyUpgrade(int amount = 1)
@@ -62,6 +66,7 @@ public class ModuleInstance : MonoBehaviour
     }
 
     public float GetPowerGenPerSec() { return data != null ? data.powerGenPerSec * TierMultiplier : 0f; }
+    public float GetEffectivePowerGenPerSec() { return GetPowerGenPerSec() * GetHeatEfficiencyMultiplierForPower(); }
     public float GetPowerUsePerSec() { return data != null ? data.powerUsePerSec * TierMultiplier : 0f; }
     public float GetMaxEnergy() { return data != null ? data.maxEnergy * TierMultiplier : 0f; }
     public float GetMaxFuel() { return data != null ? data.maxFuel * TierMultiplier : 0f; }
@@ -70,16 +75,61 @@ public class ModuleInstance : MonoBehaviour
     public float GetMass() { return data != null ? data.mass * TierMultiplier : 0f; }
     public float GetScoreValue() { return data != null ? GetMass() * Mathf.Max(0f, data.scoreMultiplier) : 0f; }
     public float GetWeaponDamage() { return data != null ? data.weaponDamage * TierMultiplier : 0f; }
+    public float GetEffectiveWeaponDamage() { return GetWeaponDamage() * GetHeatEfficiencyMultiplierForWeapon(); }
     public float GetWeaponFireRate() { return data != null ? data.weaponFireRate * TierMultiplier : 0f; }
     public float GetWeaponPowerPerShot() { return data != null ? data.weaponPowerPerShot * TierMultiplier : 0f; }
     public float GetWeaponHeatPerShot() { return data != null ? data.weaponHeatPerShot * TierMultiplier : 0f; }
     public float GetWeaponAmmoPerShot() { return data != null ? data.weaponAmmoPerShot * TierMultiplier : 0f; }
+    public float GetMaxHeat() { return data != null ? data.maxHeat * TierMultiplier : 0f; }
+    public float GetHeatDissipationPerSec() { return data != null ? data.heatDissipationPerSec * TierMultiplier : 0f; }
+    public float GetRepairPerSecond() { return data != null ? data.repairPerSecond * TierMultiplier : 0f; }
 
     public float GetDps()
     {
         if (data == null) return 0f;
         if (data.dps > 0f) return data.dps * TierMultiplier;
         return Mathf.Max(0f, GetWeaponDamage()) * Mathf.Max(0f, GetWeaponFireRate());
+    }
+
+    public float GetHeatRatio()
+    {
+        float maxHeat = GetMaxHeat();
+        if (maxHeat <= 0.001f)
+            return 0f;
+
+        return Mathf.Clamp01(currentHeat / maxHeat);
+    }
+
+    public void AddHeat(float amount)
+    {
+        if (amount <= 0f)
+            return;
+
+        currentHeat = Mathf.Clamp(currentHeat + amount, 0f, GetMaxHeat());
+    }
+
+    public void CoolHeat(float amount)
+    {
+        if (amount <= 0f)
+            return;
+
+        currentHeat = Mathf.Max(0f, currentHeat - amount);
+    }
+
+    float GetHeatEfficiencyMultiplierForWeapon()
+    {
+        if (data == null || data.weaponType != WeaponType.Laser || GetMaxHeat() <= 0f)
+            return 1f;
+
+        return Mathf.Lerp(1f, 0.5f, GetHeatRatio());
+    }
+
+    float GetHeatEfficiencyMultiplierForPower()
+    {
+        if (data == null || data.type != ModuleType.Reactor || GetMaxHeat() <= 0f)
+            return 1f;
+
+        return Mathf.Lerp(1f, 0.5f, GetHeatRatio());
     }
 
     public static string FormatDisplayName(string rawName, int tier)
