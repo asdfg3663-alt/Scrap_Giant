@@ -15,6 +15,7 @@ public class WorldSpawnDirector : MonoBehaviour
     public int maxFloatingScraps = 5;
     public int maxEnemyShips = 5;
     public float spawnCheckInterval = 1.25f;
+    public float enemyInitialSpawnDelay = 10f;
 
     [Header("Spawn Range")]
     public float minSpawnDistance = 10f;
@@ -27,7 +28,7 @@ public class WorldSpawnDirector : MonoBehaviour
 
     [Header("Enemy Combat")]
     public float enemyDesiredRange = 30f;
-    public float enemyAttackRange = 28f;
+    public float enemyAttackRange = 14f;
     public float enemyFireConeAngle = 24f;
     public float enemyMaxSpeed = 10f;
 
@@ -51,6 +52,7 @@ public class WorldSpawnDirector : MonoBehaviour
 
     ShipStats playerShip;
     float nextSpawnCheckTime;
+    float playerRegisteredTime;
 
     static readonly Vector2Int[] EngineSlots =
     {
@@ -97,6 +99,17 @@ public class WorldSpawnDirector : MonoBehaviour
         }
 
         instance.playerShip = ship;
+        instance.playerRegisteredTime = Time.time;
+    }
+
+    public static FloatingScrap GetNearestFloatingScrap(Vector3 origin)
+    {
+        return instance != null ? instance.FindNearest(instance.floatingScraps, origin) : null;
+    }
+
+    public static EnemyShipRuntime GetNearestEnemyShip(Vector3 origin)
+    {
+        return instance != null ? instance.FindNearest(instance.enemyShips, origin) : null;
     }
 
     void Awake()
@@ -139,6 +152,9 @@ public class WorldSpawnDirector : MonoBehaviour
 
     void EnsureEnemyShips()
     {
+        if (Time.time < playerRegisteredTime + Mathf.Max(0f, enemyInitialSpawnDelay))
+            return;
+
         int count = CountNearby(enemyShips);
         while (count < maxEnemyShips)
         {
@@ -372,6 +388,30 @@ public class WorldSpawnDirector : MonoBehaviour
 
         Vector2 delta = worldPosition - playerShip.transform.position;
         return delta.sqrMagnitude <= maxSpawnDistance * maxSpawnDistance;
+    }
+
+    T FindNearest<T>(List<T> items, Vector3 origin) where T : Component
+    {
+        PruneLists();
+
+        T nearest = null;
+        float bestDistanceSq = float.MaxValue;
+
+        for (int i = 0; i < items.Count; i++)
+        {
+            var item = items[i] as T;
+            if (item == null)
+                continue;
+
+            float distanceSq = (item.transform.position - origin).sqrMagnitude;
+            if (distanceSq >= bestDistanceSq)
+                continue;
+
+            bestDistanceSq = distanceSq;
+            nearest = item;
+        }
+
+        return nearest;
     }
 
     struct EnemyLoadout

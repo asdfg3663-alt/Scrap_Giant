@@ -10,6 +10,8 @@ public class PlayerHudRuntime : MonoBehaviour
     const string BestScorePrefsKey = "ScrapGiant.HUD.BestMassScore";
     const float ExpandedInventoryWidth = 280f;
     const float CollapsedInventoryWidth = 48f;
+    static readonly Color NavigatorScrapColor = new Color(0.7f, 0.74f, 0.78f, 1f);
+    static readonly Color NavigatorEnemyColor = new Color(0.96f, 0.26f, 0.22f, 1f);
 
     static PlayerHudRuntime instance;
     static Sprite solidSprite;
@@ -74,6 +76,7 @@ public class PlayerHudRuntime : MonoBehaviour
     RectTransform ammoListRoot;
     RectTransform inventoryListRoot;
     RectTransform inventoryPanel;
+    RectTransform navigatorRoot;
 
     GameObject inventoryBody;
     GameObject inventoryEmptyState;
@@ -86,6 +89,8 @@ public class PlayerHudRuntime : MonoBehaviour
     TMP_Text assemblySecondaryText;
     TMP_Text inventoryCountText;
     TMP_Text inventoryButtonText;
+    TMP_Text scrapNavigatorArrow;
+    TMP_Text enemyNavigatorArrow;
 
     float bestScore;
     int lastCurrentScore = int.MinValue;
@@ -95,6 +100,7 @@ public class PlayerHudRuntime : MonoBehaviour
     bool resourceUiDirty;
     bool ammoUiDirty;
     bool inventoryUiDirty;
+    float navigatorRadius = 72f;
 
     string assemblyPrimaryLabel = "Fuel synthesis ready";
     string assemblySecondaryLabel = string.Empty;
@@ -318,6 +324,7 @@ public class PlayerHudRuntime : MonoBehaviour
         }
 
         RefreshScore(force: false);
+        RefreshNavigator();
 
         if (resourceUiDirty) RefreshResourceRows();
         if (ammoUiDirty) RefreshAmmoRows();
@@ -377,6 +384,7 @@ public class PlayerHudRuntime : MonoBehaviour
 
         CreateTopHud();
         CreateInventoryPanel();
+        CreateNavigatorOverlay();
 
         hudBuilt = true;
     }
@@ -507,6 +515,15 @@ public class PlayerHudRuntime : MonoBehaviour
         ApplyInventoryState();
     }
 
+    void CreateNavigatorOverlay()
+    {
+        navigatorRoot = CreateRect("NavigatorOverlay", hudRoot);
+        Stretch(navigatorRoot, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+        scrapNavigatorArrow = CreateNavigatorArrow(navigatorRoot, "ScrapArrow", NavigatorScrapColor);
+        enemyNavigatorArrow = CreateNavigatorArrow(navigatorRoot, "EnemyArrow", NavigatorEnemyColor);
+    }
+
     void RefreshAll(bool force)
     {
         if (force)
@@ -521,6 +538,7 @@ public class PlayerHudRuntime : MonoBehaviour
         RefreshResourceRows();
         RefreshAmmoRows();
         RefreshInventoryRows();
+        RefreshNavigator();
     }
 
     void RefreshScore(bool force)
@@ -607,6 +625,76 @@ public class PlayerHudRuntime : MonoBehaviour
                 ? new Color(0.34f, 0.88f, 0.67f, 1f)
                 : new Color(0.2f, 0.34f, 0.29f, 1f);
         }
+    }
+
+    void RefreshNavigator()
+    {
+        if (navigatorRoot == null || trackedShip == null)
+        {
+            SetNavigatorVisible(scrapNavigatorArrow, false);
+            SetNavigatorVisible(enemyNavigatorArrow, false);
+            return;
+        }
+
+        var coreTransform = trackedShip.GetCoreTransform();
+        if (coreTransform == null)
+        {
+            SetNavigatorVisible(scrapNavigatorArrow, false);
+            SetNavigatorVisible(enemyNavigatorArrow, false);
+            return;
+        }
+
+        var cam = Camera.main;
+        if (cam == null)
+        {
+            SetNavigatorVisible(scrapNavigatorArrow, false);
+            SetNavigatorVisible(enemyNavigatorArrow, false);
+            return;
+        }
+
+        Vector3 playerScreenPos = cam.WorldToScreenPoint(coreTransform.position);
+        if (playerScreenPos.z <= 0f)
+        {
+            SetNavigatorVisible(scrapNavigatorArrow, false);
+            SetNavigatorVisible(enemyNavigatorArrow, false);
+            return;
+        }
+
+        UpdateNavigatorArrow(scrapNavigatorArrow, coreTransform.position, playerScreenPos, WorldSpawnDirector.GetNearestFloatingScrap(coreTransform.position));
+        UpdateNavigatorArrow(enemyNavigatorArrow, coreTransform.position, playerScreenPos, WorldSpawnDirector.GetNearestEnemyShip(coreTransform.position));
+    }
+
+    void UpdateNavigatorArrow(TMP_Text arrow, Vector3 originWorld, Vector3 originScreen, Component target)
+    {
+        if (arrow == null || target == null)
+        {
+            SetNavigatorVisible(arrow, false);
+            return;
+        }
+
+        Vector2 worldDelta = target.transform.position - originWorld;
+        if (worldDelta.sqrMagnitude <= 0.0001f)
+        {
+            SetNavigatorVisible(arrow, false);
+            return;
+        }
+
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(hudRoot, originScreen, null, out Vector2 localPoint))
+        {
+            SetNavigatorVisible(arrow, false);
+            return;
+        }
+
+        Vector2 direction = worldDelta.normalized;
+        arrow.rectTransform.localPosition = localPoint + direction * navigatorRadius;
+        arrow.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f);
+        SetNavigatorVisible(arrow, true);
+    }
+
+    void SetNavigatorVisible(TMP_Text arrow, bool visible)
+    {
+        if (arrow != null && arrow.gameObject.activeSelf != visible)
+            arrow.gameObject.SetActive(visible);
     }
 
     void SyncValueRows(List<ResourceEntry> source, RectTransform parent, List<ValueRow> pool)
@@ -822,6 +910,23 @@ public class PlayerHudRuntime : MonoBehaviour
         label.fontStyle = style;
         label.alignment = TextAlignmentOptions.Left;
         label.raycastTarget = false;
+        return label;
+    }
+
+    TMP_Text CreateNavigatorArrow(Transform parent, string name, Color color)
+    {
+        var rect = CreateRect(name, parent);
+        rect.sizeDelta = new Vector2(30f, 30f);
+
+        var label = rect.gameObject.AddComponent<TextMeshProUGUI>();
+        label.font = fontAsset;
+        label.fontSize = 34f;
+        label.color = color;
+        label.text = "▲";
+        label.alignment = TextAlignmentOptions.Center;
+        label.fontStyle = FontStyles.Bold;
+        label.raycastTarget = false;
+        label.gameObject.SetActive(false);
         return label;
     }
 

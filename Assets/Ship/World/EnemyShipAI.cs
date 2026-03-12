@@ -19,7 +19,7 @@ public class EnemyShipAI : MonoBehaviour
     public float orbitAngleOffset = 8f;
 
     [Header("Combat")]
-    public float attackRange = 24f;
+    public float attackRange = 14f;
     public float fireConeAngle = 14f;
 
     Rigidbody2D rb;

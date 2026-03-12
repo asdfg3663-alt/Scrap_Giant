@@ -217,6 +217,24 @@ public class ShipStats : MonoBehaviour
             fuelCurrent = 0f;
     }
 
+    public Transform GetCoreTransform()
+    {
+        if (modules == null || modules.Length == 0)
+            modules = GetComponentsInChildren<ModuleInstance>(true);
+
+        for (int i = 0; i < modules.Length; i++)
+        {
+            var module = modules[i];
+            if (module == null || module.data == null)
+                continue;
+
+            if (module.data.type == ModuleType.Core)
+                return module.transform;
+        }
+
+        return transform;
+    }
+
     public string GetFuelAssemblyPrimaryText()
     {
         if (!HasFuelSystem())

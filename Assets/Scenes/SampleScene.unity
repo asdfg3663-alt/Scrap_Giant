@@ -5935,13 +5935,14 @@ MonoBehaviour:
   maxFloatingScraps: 5
   maxEnemyShips: 5
   spawnCheckInterval: 1.25
+  enemyInitialSpawnDelay: 10
   minSpawnDistance: 10
   maxSpawnDistance: 100
   despawnAxisDistance: 100
   scrapMassFromPlayerMassMultiplier: 0.5
   scrapDriftImpulse: 1.25
   enemyDesiredRange: 30
-  enemyAttackRange: 28
+  enemyAttackRange: 14
   enemyFireConeAngle: 24
   enemyMaxSpeed: 10
   threatScoreScale: 0.18
