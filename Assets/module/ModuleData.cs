@@ -44,6 +44,7 @@ public class ModuleData : ScriptableObject
     [Header("Movement")]
     public float thrust = 0f;
     public float mass = 1f;
+    public float scoreMultiplier = 1f;
 
     [Header("Weapon (MVP)")]
     public WeaponType weaponType = WeaponType.None;

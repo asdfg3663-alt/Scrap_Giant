@@ -20,8 +20,8 @@ public class EnemyShipAI : MonoBehaviour
     public float maxSpeed = 12f;
     public float playerSpeedRatio = 0.12f;
     public float baseTurnTorque = 1.1f;
-    public float thrustTurnTorqueMultiplier = 0.08f;
-    public float turnTorqueScale = 0.2f;
+    public float thrustTurnTorqueMultiplier = 0.02f;
+    public float turnTorqueScale = 0.1f;
     public float aimTurnMultiplier = 1.15f;
     public float wanderForwardThrottle = 0.03f;
     public float idleBrake = 7f;
@@ -127,6 +127,13 @@ public class EnemyShipAI : MonoBehaviour
     {
         if (rb == null || stats == null)
             return;
+
+        if (stats.totalThrust <= 0.001f)
+        {
+            rb.linearVelocity = Vector2.MoveTowards(rb.linearVelocity, Vector2.zero, idleBrake * Time.fixedDeltaTime);
+            rb.angularVelocity = Mathf.MoveTowards(rb.angularVelocity, 0f, idleBrake * 20f * Time.fixedDeltaTime);
+            return;
+        }
 
         float speedCap = ComputeSpeedCap();
         Vector2 targetDir = steeringDirection.sqrMagnitude > 0.001f ? steeringDirection.normalized : (Vector2)transform.up;

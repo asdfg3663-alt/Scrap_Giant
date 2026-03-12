@@ -241,7 +241,7 @@ public class WorldSpawnDirector : MonoBehaviour
         if (playerShip == null || coreModulePrefab == null || engineModulePrefab == null || fuelTankModulePrefab == null || laserModulePrefab == null)
             return false;
 
-        float threat = EvaluateThreat(playerShip.totalMass);
+        float threat = EvaluateThreat(playerShip.totalScore);
         EnemyLoadout loadout = BuildLoadout(threat);
 
         Vector2 spawnPosition = GetRandomSpawnPosition();

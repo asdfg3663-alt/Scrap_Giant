@@ -22,6 +22,7 @@ public class ShipStats : MonoBehaviour
     [Header("Battery")]
     public float energyMax;
     public float energyCurrent;
+    [Range(0f, 1f)] public float weaponBatteryResumeThreshold = 0.5f;
 
     [Header("Fuel")]
     public float fuelMax;
@@ -34,6 +35,7 @@ public class ShipStats : MonoBehaviour
     [Header("Movement")]
     public float totalThrust;
     public float totalMass;
+    public float totalScore;
 
     [Header("Combat (MVP)")]
     public float totalDps;
@@ -45,6 +47,7 @@ public class ShipStats : MonoBehaviour
     bool rebuildQueued;
     float synthesisScrapProgress;
     bool fuelSynthesisActive;
+    bool weaponBatteryLocked;
 
     void Awake()
     {
@@ -74,6 +77,7 @@ public class ShipStats : MonoBehaviour
     {
         energyCurrent += netPowerPerSec * Time.deltaTime;
         energyCurrent = Mathf.Clamp(energyCurrent, 0f, energyMax);
+        UpdateWeaponBatteryLock();
 
         UpdateFuelSynthesis(Time.deltaTime);
         RefreshHudFuel();
@@ -112,6 +116,7 @@ public class ShipStats : MonoBehaviour
 
         totalThrust = 0f;
         totalMass = 0f;
+        totalScore = 0f;
         energyMax = 0f;
         fuelMax = 0f;
         fuelSynthesisPerSec = 0f;
@@ -132,6 +137,7 @@ public class ShipStats : MonoBehaviour
             powerGenPerSec += m.GetPowerGenPerSec();
             totalThrust += m.GetThrust();
             totalMass += m.GetMass();
+            totalScore += m.GetScoreValue();
             energyMax += m.GetMaxEnergy();
             fuelMax += m.GetMaxFuel();
             fuelSynthesisPerSec += m.GetFuelSynthesisPerSec();
@@ -181,6 +187,21 @@ public class ShipStats : MonoBehaviour
             energyCurrent = 0f;
 
         return true;
+    }
+
+    public bool CanFireWeaponsFromBattery()
+    {
+        return !weaponBatteryLocked;
+    }
+
+    public bool TryConsumeWeaponBattery(float amount)
+    {
+        if (weaponBatteryLocked)
+            return false;
+
+        bool consumed = TryConsumeBattery(amount);
+        UpdateWeaponBatteryLock();
+        return consumed;
     }
 
     public bool HasFuelSystem()
@@ -342,5 +363,25 @@ public class ShipStats : MonoBehaviour
             fuelCurrent,
             FuelColor,
             $"{Mathf.CeilToInt(fuelCurrent)} / {Mathf.CeilToInt(fuelMax)}");
+    }
+
+    void UpdateWeaponBatteryLock()
+    {
+        if (energyMax <= 0f)
+        {
+            weaponBatteryLocked = false;
+            return;
+        }
+
+        if (weaponBatteryLocked)
+        {
+            if (energyCurrent >= energyMax * Mathf.Clamp01(weaponBatteryResumeThreshold))
+                weaponBatteryLocked = false;
+
+            return;
+        }
+
+        if (energyCurrent <= 0.001f)
+            weaponBatteryLocked = true;
     }
 }

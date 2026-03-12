@@ -85,6 +85,15 @@ public class WeaponLaser : MonoBehaviour
                 return;
             }
         }
+        else
+        {
+            float frameCost = Mathf.Max(0f, inst.GetPowerUsePerSec()) * Time.deltaTime;
+            if (!ship.CanFireWeaponsFromBattery() || (frameCost > 0f && !ship.TryConsumeWeaponBattery(frameCost)))
+            {
+                SetBeamVisible(false);
+                return;
+            }
+        }
 
         Vector2 dir = GetForwardDir();
         Vector2 origin = (Vector2)muzzle.position + dir * startOffset;
@@ -121,6 +130,12 @@ public class WeaponLaser : MonoBehaviour
         {
             float shotCost = Mathf.Max(0f, inst.GetWeaponPowerPerShot());
             if (shotCost > 0f && !ship.TryConsumeBattery(shotCost))
+                return;
+        }
+        else
+        {
+            float shotCost = Mathf.Max(0f, inst.GetWeaponPowerPerShot());
+            if (!ship.CanFireWeaponsFromBattery() || (shotCost > 0f && !ship.TryConsumeWeaponBattery(shotCost)))
                 return;
         }
 

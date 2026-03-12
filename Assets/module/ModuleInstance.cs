@@ -32,13 +32,16 @@ public class ModuleInstance : MonoBehaviour
     {
         if (data == null) return;
 
-        int newMax = Mathf.Max(1, data.maxHP);
+        int previousMax = maxHp;
+        int newMax = GetMaxHp();
         bool maxChanged = maxHp != newMax;
 
         maxHp = newMax;
 
         if (forceReset || (resetHpOnDataAssign && (hp <= 0 || maxChanged)))
             hp = maxHp;
+        else if (maxChanged && previousMax > 0)
+            hp += maxHp - previousMax;
 
         hp = Mathf.Clamp(hp, 0, maxHp);
     }
@@ -51,7 +54,11 @@ public class ModuleInstance : MonoBehaviour
 
     public int GetMaxHp()
     {
-        return data != null ? Mathf.Max(1, data.maxHP) : Mathf.Max(1, maxHp);
+        if (data == null)
+            return Mathf.Max(1, maxHp);
+
+        int bonusPerTier = data.type == ModuleType.FuelTank ? 10 : 5;
+        return Mathf.Max(1, data.maxHP + Mathf.Max(0, upgradeLevel) * bonusPerTier);
     }
 
     public float GetPowerGenPerSec() { return data != null ? data.powerGenPerSec * TierMultiplier : 0f; }
@@ -61,6 +68,7 @@ public class ModuleInstance : MonoBehaviour
     public float GetFuelSynthesisPerSec() { return data != null ? data.fuelSynthesisPerSec * TierMultiplier : 0f; }
     public float GetThrust() { return data != null ? data.thrust * TierMultiplier : 0f; }
     public float GetMass() { return data != null ? data.mass * TierMultiplier : 0f; }
+    public float GetScoreValue() { return data != null ? GetMass() * Mathf.Max(0f, data.scoreMultiplier) : 0f; }
     public float GetWeaponDamage() { return data != null ? data.weaponDamage * TierMultiplier : 0f; }
     public float GetWeaponFireRate() { return data != null ? data.weaponFireRate * TierMultiplier : 0f; }
     public float GetWeaponPowerPerShot() { return data != null ? data.weaponPowerPerShot * TierMultiplier : 0f; }

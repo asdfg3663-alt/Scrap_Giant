@@ -7,7 +7,7 @@ using UnityEngine.UI;
 [DisallowMultipleComponent]
 public class PlayerHudRuntime : MonoBehaviour
 {
-    const string BestScorePrefsKey = "ScrapGiant.HUD.BestMassScore";
+    const string BestScorePrefsKey = "ScrapGiant.HUD.BestScore";
     const float ExpandedInventoryWidth = 280f;
     const float CollapsedInventoryWidth = 48f;
     static readonly Color NavigatorScrapColor = new Color(0.7f, 0.74f, 0.78f, 1f);
@@ -543,7 +543,7 @@ public class PlayerHudRuntime : MonoBehaviour
 
     void RefreshScore(bool force)
     {
-        int currentScore = trackedShip ? Mathf.RoundToInt(Mathf.Max(0f, trackedShip.totalMass)) : 0;
+        int currentScore = trackedShip ? Mathf.RoundToInt(Mathf.Max(0f, trackedShip.totalScore)) : 0;
         if (currentScore > bestScore)
         {
             bestScore = currentScore;

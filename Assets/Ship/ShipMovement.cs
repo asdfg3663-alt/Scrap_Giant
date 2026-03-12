@@ -19,8 +19,9 @@ public class ShipMovement : MonoBehaviour
     public float stopSnapSpeed = 0.05f;
 
     [Header("Manual Turning (RCS/Gyro)")]
-    public float thrustToManualTurnTorque = 1.0f;
+    public float thrustToManualTurnTorque = 0.15f;
     public float baseManualTurnTorque = 0.0f;
+    public float manualTurnTorqueScale = 0.5f;
     public float angularDamping = 0.0f;
     public float lowAngularStopStartRPM = 6f;
     public float lowAngularStopDamping = 6f;
@@ -30,7 +31,7 @@ public class ShipMovement : MonoBehaviour
     public float minModuleMassForCOM = 0.001f;
 
     [Header("Rotation Limit (RPM)")]
-    public float maxRPM = 60f;
+    public float maxRPM = 30f;
 
     ShipStats stats;
     Rigidbody2D rb;
@@ -123,7 +124,7 @@ public class ShipMovement : MonoBehaviour
         if (speed > maxSpeed)
             rb.linearVelocity = rb.linearVelocity.normalized * maxSpeed;
 
-        float manualTurnTorque = baseManualTurnTorque + effectiveTotalThrust * thrustToManualTurnTorque;
+        float manualTurnTorque = (baseManualTurnTorque + effectiveTotalThrust * thrustToManualTurnTorque) * manualTurnTorqueScale;
         if (Mathf.Abs(turnInput) > 0.0001f && manualTurnTorque > 0f)
         {
             rb.AddTorque(-turnInput * manualTurnTorque, ForceMode2D.Force);
