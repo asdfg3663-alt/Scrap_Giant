@@ -23,6 +23,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
     static TitleScreenRuntime instance;
     static Sprite solidSprite;
+    static Sprite roundedButtonSprite;
 
     readonly List<Button> languageButtons = new();
     readonly List<TMP_Text> languageButtonLabels = new();
@@ -71,7 +72,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
     RectTransform modalRoot;
     RectTransform previewPulse;
 
-    TMP_Text titleLabel;
+    TMP_Text highScoreLabel;
     TMP_Text playButtonLabel;
     TMP_Text playSaveLabel;
     TMP_Text optionsButtonLabel;
@@ -113,6 +114,8 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
     int currentHowToPageIndex;
     float howToPreviewPhase;
+    AudioSource audioSource;
+    AudioClip buttonClickClip;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Bootstrap()
@@ -140,6 +143,10 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         DontDestroyOnLoad(gameObject);
         GameRuntimeState.SetGameplayBlocked(true);
         Time.timeScale = 0f;
+        audioSource = gameObject.AddComponent<AudioSource>();
+        audioSource.playOnAwake = false;
+        audioSource.spatialBlend = 0f;
+        buttonClickClip = CreateButtonClickClip();
         EnsureEventSystem();
         BuildUi();
         PrepareBackgroundVideo();
@@ -198,11 +205,8 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         Stretch(dimRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         CreateImage(dimRect, new Color(0.02f, 0.04f, 0.07f, 0.38f));
 
-        titleLabel = CreateText(root, "Scrap Giant", 64f, Color.white, FontStyles.Bold, TextAlignmentOptions.Center);
-        SetAnchored(titleLabel.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -96f), new Vector2(920f, 72f));
-
-        TMP_Text subtitle = CreateText(root, "Modular wreckage survival", 22f, new Color(0.78f, 0.86f, 0.92f, 1f), FontStyles.Normal, TextAlignmentOptions.Center);
-        SetAnchored(subtitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -156f), new Vector2(760f, 36f));
+        highScoreLabel = CreateText(root, string.Empty, 33f, new Color(0.94f, 0.22f, 0.2f, 1f), FontStyles.Bold, TextAlignmentOptions.Center);
+        SetAnchored(highScoreLabel.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -242f), new Vector2(900f, 54f));
 
         RectTransform buttonBar = CreateRect("ButtonBar", root);
         SetAnchored(buttonBar, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 88f), new Vector2(980f, 112f));
@@ -249,19 +253,19 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         modalDimmer.SetActive(false);
 
         modalRoot = CreateRect("ModalRoot", root);
-        SetAnchored(modalRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -12f), new Vector2(980f, 560f));
+        SetAnchored(modalRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -12f), new Vector2(1040f, 620f));
 
         optionsPanel = BuildModalPanel("OptionsPanel", out optionsTitleLabel);
-        BuildOptionsPanel(optionsPanel.transform);
+        BuildOptionsPanel(GetPanelBody(optionsPanel.transform));
 
         howToPanel = BuildModalPanel("HowToPanel", out howToTitleLabel);
-        BuildHowToPanel(howToPanel.transform);
+        BuildHowToPanel(GetPanelBody(howToPanel.transform));
 
         shopPanel = BuildModalPanel("ShopPanel", out shopTitleLabel);
-        BuildShopPanel(shopPanel.transform);
+        BuildShopPanel(GetPanelBody(shopPanel.transform));
 
         creditsPanel = BuildModalPanel("CreditsPanel", out creditsTitleLabel);
-        BuildCreditsPanel(creditsPanel.transform);
+        BuildCreditsPanel(GetPanelBody(creditsPanel.transform));
 
         HidePanels();
         RefreshLocalizedText();
@@ -327,6 +331,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         Stretch(body, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(28f, 28f), new Vector2(-28f, -90f));
         VerticalLayoutGroup bodyLayout = body.gameObject.AddComponent<VerticalLayoutGroup>();
         bodyLayout.spacing = 16f;
+        bodyLayout.padding = new RectOffset(0, 0, 10, 0);
         bodyLayout.childAlignment = TextAnchor.UpperLeft;
         bodyLayout.childControlWidth = true;
         bodyLayout.childControlHeight = false;
@@ -338,60 +343,76 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
     void BuildOptionsPanel(Transform parent)
     {
-        RectTransform languageBlock = CreateBlock(parent, 170f);
+        RectTransform languageBlock = CreateBlock(parent, 164f);
         languageSectionLabel = CreateSectionLabel(languageBlock, "Language");
         languageModeLabel = CreateBodyText(languageBlock, string.Empty, 16f);
-        languageModeLabel.rectTransform.anchoredPosition += new Vector2(0f, -28f);
+        languageModeLabel.enableWordWrapping = true;
+        languageModeLabel.alignment = TextAlignmentOptions.Left;
+        SetAnchored(languageModeLabel.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(18f, -48f), new Vector2(-36f, 24f));
 
         RectTransform langRow = CreateRect("LanguageRow", languageBlock);
-        SetAnchored(langRow, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(0f, 56f));
-        HorizontalLayoutGroup langLayout = langRow.gameObject.AddComponent<HorizontalLayoutGroup>();
-        langLayout.spacing = 10f;
-        langLayout.childAlignment = TextAnchor.MiddleLeft;
-        langLayout.childControlWidth = false;
-        langLayout.childControlHeight = false;
-        langLayout.childForceExpandWidth = false;
-        langLayout.childForceExpandHeight = false;
+        langRow.anchorMin = new Vector2(0f, 0f);
+        langRow.anchorMax = new Vector2(1f, 0f);
+        langRow.pivot = new Vector2(0.5f, 0f);
+        langRow.anchoredPosition = new Vector2(0f, 20f);
+        langRow.sizeDelta = new Vector2(-36f, 84f);
+        GridLayoutGroup langLayout = langRow.gameObject.AddComponent<GridLayoutGroup>();
+        langLayout.cellSize = new Vector2(170f, 38f);
+        langLayout.spacing = new Vector2(10f, 8f);
+        langLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        langLayout.constraintCount = 3;
+        langLayout.childAlignment = TextAnchor.UpperLeft;
 
         IReadOnlyList<GameLanguage> languages = LocalizationManager.GetSupportedLanguages();
         for (int i = 0; i < languages.Count; i++)
         {
             GameLanguage lang = languages[i];
             Button button = CreateMenuButton(langRow, out TMP_Text buttonLabel, () => SetLanguage(lang));
-            button.GetComponent<RectTransform>().sizeDelta = new Vector2(150f, 44f);
+            button.GetComponent<RectTransform>().sizeDelta = new Vector2(170f, 38f);
             languageButtons.Add(button);
             languageButtonLabels.Add(buttonLabel);
         }
 
-        RectTransform audioBlock = CreateBlock(parent, 230f);
-        masterVolumeLabel = CreateSectionLabel(audioBlock, "Master Volume");
-        masterSlider = CreateSlider(audioBlock, new Vector2(0f, -54f), value => GameOptions.MasterVolume = value);
+        RectTransform audioBlock = CreateBlock(parent, 196f);
+        masterVolumeLabel = CreateBodyText(audioBlock, "Master Volume", 18f);
+        RectTransform masterRow = CreateOptionRow(audioBlock, "MasterVolumeRow", 30f);
+        masterVolumeLabel.rectTransform.SetParent(masterRow, false);
+        Stretch(masterVolumeLabel.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, -14f), new Vector2(280f, 14f));
+        masterVolumeLabel.alignment = TextAlignmentOptions.Left;
+        masterSlider = CreateSlider(masterRow, new Vector2(210f, 0f), value => GameOptions.MasterVolume = value);
 
         bgmVolumeLabel = CreateBodyText(audioBlock, "BGM Volume", 16f);
-        bgmVolumeLabel.rectTransform.anchoredPosition = new Vector2(0f, -106f);
-        bgmSlider = CreateSlider(audioBlock, new Vector2(0f, -138f), value => GameOptions.BgmVolume = value);
+        RectTransform bgmRow = CreateOptionRow(audioBlock, "BgmVolumeRow", 82f);
+        bgmVolumeLabel.rectTransform.SetParent(bgmRow, false);
+        Stretch(bgmVolumeLabel.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, -14f), new Vector2(170f, 14f));
+        bgmVolumeLabel.alignment = TextAlignmentOptions.Left;
+        bgmSlider = CreateSlider(bgmRow, new Vector2(210f, 0f), value => GameOptions.BgmVolume = value);
 
         sfxVolumeLabel = CreateBodyText(audioBlock, "SFX Volume", 16f);
-        sfxVolumeLabel.rectTransform.anchoredPosition = new Vector2(0f, -190f);
-        sfxSlider = CreateSlider(audioBlock, new Vector2(0f, -222f), value => GameOptions.SfxVolume = value);
+        RectTransform sfxRow = CreateOptionRow(audioBlock, "SfxVolumeRow", 134f);
+        sfxVolumeLabel.rectTransform.SetParent(sfxRow, false);
+        Stretch(sfxVolumeLabel.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, -14f), new Vector2(170f, 14f));
+        sfxVolumeLabel.alignment = TextAlignmentOptions.Left;
+        sfxSlider = CreateSlider(sfxRow, new Vector2(210f, 0f), value => GameOptions.SfxVolume = value);
 
-        RectTransform displayBlock = CreateBlock(parent, 160f);
+        RectTransform displayBlock = CreateBlock(parent, 100f);
         fullscreenLabel = CreateSectionLabel(displayBlock, "Display");
         fullscreenButton = CreateMenuButton(displayBlock, out fullscreenValueLabel, ToggleFullscreen);
         RectTransform fullscreenRect = fullscreenButton.GetComponent<RectTransform>();
         fullscreenRect.anchorMin = new Vector2(0f, 0f);
         fullscreenRect.anchorMax = new Vector2(0f, 0f);
         fullscreenRect.pivot = new Vector2(0f, 0f);
-        fullscreenRect.anchoredPosition = new Vector2(0f, 26f);
-        fullscreenRect.sizeDelta = new Vector2(280f, 46f);
+        fullscreenRect.anchoredPosition = new Vector2(18f, 18f);
+        fullscreenRect.sizeDelta = new Vector2(310f, 48f);
 
         deleteSaveButton = CreateMenuButton(displayBlock, out deleteSaveButtonLabel, DeleteSaveFile);
         RectTransform deleteRect = deleteSaveButton.GetComponent<RectTransform>();
         deleteRect.anchorMin = new Vector2(1f, 0f);
         deleteRect.anchorMax = new Vector2(1f, 0f);
         deleteRect.pivot = new Vector2(1f, 0f);
-        deleteRect.anchoredPosition = new Vector2(0f, 26f);
-        deleteRect.sizeDelta = new Vector2(240f, 46f);
+        deleteRect.anchoredPosition = new Vector2(-18f, 18f);
+        deleteRect.sizeDelta = new Vector2(240f, 48f);
+        ApplyButtonPalette(deleteSaveButton, new Color(0.43f, 0.08f, 0.08f, 0.98f), new Color(0.58f, 0.12f, 0.12f, 1f), new Color(0.72f, 0.18f, 0.18f, 1f));
     }
 
     void BuildHowToPanel(Transform parent)
@@ -462,24 +483,61 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         return block;
     }
 
+    Transform GetPanelBody(Transform panelRoot)
+    {
+        Transform body = panelRoot.Find("Body");
+        return body != null ? body : panelRoot;
+    }
+
+    RectTransform CreateOptionRow(Transform parent, string name, float topOffset)
+    {
+        RectTransform row = CreateRect(name, parent);
+        row.anchorMin = new Vector2(0f, 1f);
+        row.anchorMax = new Vector2(1f, 1f);
+        row.pivot = new Vector2(0.5f, 1f);
+        row.anchoredPosition = new Vector2(0f, -topOffset);
+        row.sizeDelta = new Vector2(-36f, 48f);
+        return row;
+    }
+
+    void ApplyButtonPalette(Button button, Color normal, Color highlighted, Color pressed)
+    {
+        Image image = button != null ? button.GetComponent<Image>() : null;
+        if (image == null)
+            return;
+
+        image.color = normal;
+
+        ColorBlock colors = button.colors;
+        colors.normalColor = normal;
+        colors.highlightedColor = highlighted;
+        colors.pressedColor = pressed;
+        colors.selectedColor = highlighted;
+        button.colors = colors;
+    }
+
     TMP_Text CreateSectionLabel(Transform parent, string text)
     {
         TMP_Text label = CreateText(parent, text, 20f, Color.white, FontStyles.Bold, TextAlignmentOptions.TopLeft);
-        SetAnchored(label.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(18f, -18f), new Vector2(-36f, 28f));
+        Stretch(label.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -46f), new Vector2(-18f, -18f));
         return label;
     }
 
     TMP_Text CreateBodyText(Transform parent, string text, float size)
     {
         TMP_Text label = CreateText(parent, text, size, new Color(0.82f, 0.9f, 0.95f, 1f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
-        SetAnchored(label.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(18f, -18f), new Vector2(-36f, 24f));
+        Stretch(label.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -42f), new Vector2(-18f, -18f));
         return label;
     }
 
     Slider CreateSlider(Transform parent, Vector2 anchoredPosition, UnityEngine.Events.UnityAction<float> onChanged)
     {
         RectTransform root = CreateRect("Slider", parent);
-        SetAnchored(root, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), anchoredPosition, new Vector2(-36f, 24f));
+        root.anchorMin = new Vector2(0f, 0.5f);
+        root.anchorMax = new Vector2(1f, 0.5f);
+        root.pivot = new Vector2(0f, 0.5f);
+        root.anchoredPosition = anchoredPosition;
+        root.sizeDelta = new Vector2(-308f, 24f);
 
         Slider slider = root.gameObject.AddComponent<Slider>();
         slider.minValue = 0f;
@@ -516,8 +574,13 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
     {
         RectTransform buttonRect = CreateRect("Button", parent);
         buttonRect.sizeDelta = new Vector2(176f, 58f);
-        Image image = CreateImage(buttonRect, new Color(0.08f, 0.16f, 0.2f, 0.94f));
+        Image image = CreateRoundedButtonImage(buttonRect, new Color(0.08f, 0.16f, 0.2f, 0.94f));
         image.raycastTarget = true;
+
+        Outline outline = buttonRect.gameObject.AddComponent<Outline>();
+        outline.effectColor = new Color(0.78f, 0.92f, 0.98f, 0.26f);
+        outline.effectDistance = new Vector2(2f, -2f);
+        outline.useGraphicAlpha = true;
 
         Button button = buttonRect.gameObject.AddComponent<Button>();
         ColorBlock colors = button.colors;
@@ -527,7 +590,11 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         colors.selectedColor = colors.highlightedColor;
         button.colors = colors;
         button.targetGraphic = image;
-        button.onClick.AddListener(onClick);
+        button.onClick.AddListener(() =>
+        {
+            PlayButtonClick();
+            onClick?.Invoke();
+        });
 
         label = CreateText(buttonRect, "Button", 20f, Color.white, FontStyles.Bold, TextAlignmentOptions.Center);
         Stretch(label.rectTransform, Vector2.zero, Vector2.one, new Vector2(8f, 6f), new Vector2(-8f, -6f));
@@ -551,7 +618,6 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
     void RefreshLocalizedText()
     {
-        titleLabel.text = LocalizationManager.Get("title.name", "SCRAP GIANT");
         playButtonLabel.text = LocalizationManager.Get("title.play", "Play");
         optionsButtonLabel.text = LocalizationManager.Get("title.options", "Options");
         howToButtonLabel.text = LocalizationManager.Get("title.how_to_play", "How To Play");
@@ -612,11 +678,15 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         if (!GameSaveSystem.HasSaveFile())
         {
             playSaveLabel.gameObject.SetActive(false);
-            return;
+        }
+        else
+        {
+            playSaveLabel.gameObject.SetActive(true);
+            playSaveLabel.text = LocalizationManager.Format("title.save_score", "Saved score {0}", Mathf.RoundToInt(GameSaveSystem.GetSavedScore()));
         }
 
-        playSaveLabel.gameObject.SetActive(true);
-        playSaveLabel.text = LocalizationManager.Format("title.save_score", "Saved score {0}", Mathf.RoundToInt(GameSaveSystem.GetSavedScore()));
+        if (highScoreLabel != null)
+            highScoreLabel.text = LocalizationManager.Format("title.best_score", "Best score {0}", PlayerHudRuntime.GetRecordedBestScore());
     }
 
     void UpdateLanguageButtonStates()
@@ -765,6 +835,16 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         return image;
     }
 
+    Image CreateRoundedButtonImage(RectTransform parent, Color color)
+    {
+        Image image = parent.gameObject.AddComponent<Image>();
+        image.sprite = GetRoundedButtonSprite();
+        image.type = Image.Type.Sliced;
+        image.color = color;
+        image.raycastTarget = false;
+        return image;
+    }
+
     static void Stretch(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax)
     {
         rect.anchorMin = anchorMin;
@@ -795,5 +875,69 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         solidSprite = Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f));
         solidSprite.name = "TitleSolidSprite";
         return solidSprite;
+    }
+
+    static Sprite GetRoundedButtonSprite()
+    {
+        if (roundedButtonSprite != null)
+            return roundedButtonSprite;
+
+        const int width = 64;
+        const int height = 32;
+        const int radius = 10;
+
+        Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        texture.wrapMode = TextureWrapMode.Clamp;
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int nearestX = Mathf.Clamp(x, radius, width - radius - 1);
+                int nearestY = Mathf.Clamp(y, radius, height - radius - 1);
+                float dx = x - nearestX;
+                float dy = y - nearestY;
+                float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                bool inside = dist <= radius;
+                texture.SetPixel(x, y, inside ? Color.white : Color.clear);
+            }
+        }
+
+        texture.Apply();
+        roundedButtonSprite = Sprite.Create(
+            texture,
+            new Rect(0f, 0f, width, height),
+            new Vector2(0.5f, 0.5f),
+            100f,
+            0u,
+            SpriteMeshType.FullRect,
+            new Vector4(radius, radius, radius, radius));
+        roundedButtonSprite.name = "TitleRoundedButtonSprite";
+        return roundedButtonSprite;
+    }
+
+    void PlayButtonClick()
+    {
+        if (audioSource != null && buttonClickClip != null)
+            audioSource.PlayOneShot(buttonClickClip, GameOptions.SfxVolume);
+    }
+
+    static AudioClip CreateButtonClickClip()
+    {
+        const int sampleRate = 22050;
+        const float duration = 0.06f;
+        int sampleCount = Mathf.CeilToInt(sampleRate * duration);
+        float[] samples = new float[sampleCount];
+
+        for (int i = 0; i < sampleCount; i++)
+        {
+            float t = i / (float)sampleRate;
+            float envelope = 1f - (i / (float)sampleCount);
+            samples[i] = Mathf.Sin(t * 2f * Mathf.PI * 880f) * envelope * 0.12f;
+        }
+
+        AudioClip clip = AudioClip.Create("TitleButtonClick", sampleCount, 1, sampleRate, false);
+        clip.SetData(samples, 0);
+        return clip;
     }
 }

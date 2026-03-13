@@ -68,6 +68,9 @@ public class ModuleHP : MonoBehaviour, IDamageable
         var currentShip = GetComponentInParent<ShipStats>();
         bool isPlayerOwned = currentShip != null && currentShip.isPlayerShip;
 
+        if (isPlayerOwned && inst != null && inst.data != null && inst.data.type == ModuleType.Core)
+            GameOverRuntime.TriggerPlayerGameOver();
+
         if (!isPlayerOwned && inst != null)
             WorldResourceUtility.AwardScrapFromMass(inst.GetMass());
 

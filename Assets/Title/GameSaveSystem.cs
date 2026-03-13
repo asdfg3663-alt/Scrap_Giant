@@ -49,6 +49,14 @@ public static class GameSaveSystem
     public static void MarkSessionStarted()
     {
         sessionStarted = true;
+        PlayerHudRuntime.ResetSessionBestScore();
+    }
+
+    public static void EndSession(bool deleteSave = true)
+    {
+        sessionStarted = false;
+        if (deleteSave)
+            DeleteSave();
     }
 
     public static bool HasSaveFile()
@@ -107,7 +115,10 @@ public static class GameSaveSystem
 
         bool loaded = ApplyToCurrentScene(playerShip, data);
         if (loaded)
+        {
             sessionStarted = true;
+            PlayerHudRuntime.SetSessionBestScore(data.score);
+        }
 
         return loaded;
     }
@@ -258,6 +269,7 @@ public static class GameSaveSystem
         playerShip.energyCurrent = Mathf.Clamp(data.energyCurrent, 0f, playerShip.energyMax);
         playerShip.fuelCurrent = Mathf.Clamp(data.fuelCurrent, 0f, playerShip.fuelMax);
         playerShip.RefreshHudNow();
+        PlayerHudRuntime.SetSessionBestScore(playerShip.totalScore);
 
         PlayerHudRuntime hud = PlayerHudRuntime.Instance;
         if (hud != null)

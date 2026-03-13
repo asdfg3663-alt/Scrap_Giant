@@ -16,6 +16,7 @@ public class PlayerHudRuntime : MonoBehaviour
 
     static PlayerHudRuntime instance;
     static Sprite solidSprite;
+    static float sessionBestScore;
 
     [Serializable]
     public class ResourceEntry
@@ -125,10 +126,15 @@ public class PlayerHudRuntime : MonoBehaviour
     {
         instance = null;
         solidSprite = null;
+        sessionBestScore = 0f;
     }
 
     public static PlayerHudRuntime Instance => instance;
     public ShipStats TrackedShip => trackedShip;
+    public static int GetRecordedBestScore() => Mathf.RoundToInt(PlayerPrefs.GetFloat(BestScorePrefsKey, 0f));
+    public static int GetSessionBestScore() => Mathf.RoundToInt(sessionBestScore);
+    public static void ResetSessionBestScore() => sessionBestScore = 0f;
+    public static void SetSessionBestScore(float value) => sessionBestScore = Mathf.Max(0f, value);
 
     public static void EnsureForPlayer(ShipStats ship)
     {
@@ -587,6 +593,9 @@ public class PlayerHudRuntime : MonoBehaviour
             PlayerPrefs.Save();
         }
 
+        if (currentScore > sessionBestScore)
+            sessionBestScore = currentScore;
+
         int bestRounded = Mathf.RoundToInt(bestScore);
         if (!force && currentScore == lastCurrentScore && bestRounded == lastBestScore) return;
 
@@ -739,6 +748,20 @@ public class PlayerHudRuntime : MonoBehaviour
         var ammoEntry = FindResource(ammoEntries, "ammo");
         if (ammoEntry != null)
             ammoEntry.label = LocalizationManager.Get("resource.ammo", "Ammo");
+
+        if (!assemblyActive)
+        {
+            if (trackedShip != null)
+            {
+                assemblyPrimaryLabel = trackedShip.GetFuelAssemblyPrimaryText();
+                assemblySecondaryLabel = trackedShip.GetFuelAssemblySecondaryText();
+            }
+            else
+            {
+                assemblyPrimaryLabel = LocalizationManager.Get("assembly.fuel_ready", "Fuel synthesis ready");
+                assemblySecondaryLabel = string.Empty;
+            }
+        }
 
         resourceUiDirty = true;
         ammoUiDirty = true;
