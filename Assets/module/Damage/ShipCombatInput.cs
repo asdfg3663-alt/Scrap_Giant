@@ -40,6 +40,16 @@ public class ShipCombatInput : MonoBehaviour
 
     void Update()
     {
+        if (GameRuntimeState.GameplayBlocked)
+        {
+            if (ship != null && ActivePlayerShip == ship)
+                ActivePlayerShip = null;
+
+            FireHeld = false;
+            FireDown = false;
+            return;
+        }
+
         if (ship == null) ship = GetComponentInParent<ShipStats>();
 
         // ✅ 플레이어쉽이 아니면 전역 입력을 절대 올리지 않음

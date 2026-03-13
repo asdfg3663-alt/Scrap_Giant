@@ -88,6 +88,12 @@ public class EnemyShipAI : MonoBehaviour
 
     void Update()
     {
+        if (GameRuntimeState.GameplayBlocked)
+        {
+            wantsToFire = false;
+            return;
+        }
+
         player = WorldSpawnDirector.PlayerTransform;
         wantsToFire = false;
         playerStats = null;
@@ -125,6 +131,16 @@ public class EnemyShipAI : MonoBehaviour
 
     void FixedUpdate()
     {
+        if (GameRuntimeState.GameplayBlocked)
+        {
+            if (rb != null)
+            {
+                rb.linearVelocity = Vector2.zero;
+                rb.angularVelocity = 0f;
+            }
+            return;
+        }
+
         if (rb == null || stats == null)
             return;
 

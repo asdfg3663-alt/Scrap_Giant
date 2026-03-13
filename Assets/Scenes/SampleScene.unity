@@ -152,8 +152,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 17f3055e831a4f144baa20b9583af036, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShipMovement
+  baseMaxSpeed: 8
+  maxSpeedFromAccelMultiplier: 6
+  accelMultiplier: 1
+  syncRigidbodyMassWithShipStats: 1
+  minRigidbodyMass: 0.01
+  brakeForceOverride: 1
   reverseMultiplier: 0.5
-  rotationSpeed: 180
+  stopSnapSpeed: 0.05
+  thrustToManualTurnTorque: 0.15
+  baseManualTurnTorque: 0
+  manualTurnTorqueScale: 0.5
+  angularDamping: 0
+  lowAngularStopStartRPM: 6
+  lowAngularStopDamping: 6
+  useModuleCenterOfMass: 1
+  minModuleMassForCOM: 0.001
+  maxRPM: 30
 --- !u!50 &10065786
 Rigidbody2D:
   serializedVersion: 5
@@ -218,8 +233,20 @@ MonoBehaviour:
   netPowerPerSec: 0
   energyMax: 0
   energyCurrent: 0
+  weaponBatteryResumeThreshold: 0.5
+  fuelMax: 0
+  fuelCurrent: 0
+  fuelSynthesisPerSec: 0
+  fuelConsumptionMultiplier: 0.5
+  lowFuelSynthesisThreshold: 0.2
+  emptyFuelThrustMultiplier: 0.1
+  minimumEmergencyThrust: 1
   totalThrust: 0
   totalMass: 0
+  totalScore: 0
+  totalHeatDissipationPerSec: 0
+  totalRepairPerSecond: 0
+  repairScrapCostPerHp: 0.1
   totalDps: 0
   weaponPowerPerSecPotential: 0
   weaponHeatPerSecPotential: 0
@@ -770,6 +797,9 @@ MonoBehaviour:
   autoStack: {fileID: 0}
   screenOffset: {x: 50, y: 30}
   clampToScreen: 1
+  upgradeReadyColor: {r: 0.9, g: 0.95, b: 0.55, a: 1}
+  upgradeLockedColor: {r: 0.62, g: 0.66, b: 0.72, a: 1}
+  upgradeProgressColor: {r: 0.47, g: 0.95, b: 0.78, a: 1}
 --- !u!225 &361567280
 CanvasGroup:
   m_ObjectHideFlags: 0
@@ -5847,6 +5877,9 @@ MonoBehaviour:
   hp: 30
   maxHp: 30
   resetHpOnDataAssign: 1
+  currentHeat: 0
+  repairProgress: 0
+  upgradeLevel: 0
 --- !u!114 &485038386
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5935,25 +5968,29 @@ MonoBehaviour:
   powerPlantModulePrefab: {fileID: 7443228181453321000, guid: 3a0d8076997c0aa4887a7bccb0ec2b7f, type: 3}
   repairModulePrefab: {fileID: 7443228181453321000, guid: af1898e0e0430e949829da20ecb2f2c9, type: 3}
   radiatorModulePrefab: {fileID: 5628837094240442396, guid: a0a6c079d7374074f9dbb77782b5db54, type: 3}
-  maxFloatingScraps: 5
+  startingScrap: 300
+  startingAmmo: 100
+  fuelPerScrap: 30
+  initialFuelFillRatio: 1
+  maxFloatingScraps: 10
   maxEnemyShips: 5
-  spawnCheckInterval: 1.25
+  spawnCheckInterval: 3
   enemyInitialSpawnDelay: 10
-  minSpawnDistance: 30
+  minSpawnDistance: 50
   maxSpawnDistance: 100
-  despawnAxisDistance: 100
-  scrapMassFromPlayerMassMultiplier: 1
+  despawnAxisDistance: 150
+  scrapMassFromPlayerMassMultiplier: 2
   scrapDriftImpulse: 1.25
   enemyDesiredRange: 30
   enemyAttackRange: 20
-  enemyFireConeAngle: 24
+  enemyFireConeAngle: 20
   enemyMaxSpeed: 10
   enemyOutlineColor: {r: 1, g: 0.2, b: 0.18, a: 0.95}
   enemyOutlinePixelSize: 7
   enemySaturationMultiplier: 0.08
-  threatScoreScale: 0.18
+  threatScoreScale: 0.1
   threatLogBase: 2
-  baseThreat: 1
+  baseThreat: 0.3
   extraEngineThreatStep: 1.35
   extraFuelTankThreatStep: 1.7
   extraLaserThreatStep: 1.1

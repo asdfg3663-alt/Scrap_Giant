@@ -123,6 +123,7 @@ public class WorldSpawnDirector : MonoBehaviour
     public static int GetStartingAmmo() => ResolveInstance() != null ? Mathf.Max(0, instance.startingAmmo) : DefaultStartingAmmo;
     public static float GetFuelPerScrap() => ResolveInstance() != null ? Mathf.Max(0.01f, instance.fuelPerScrap) : DefaultFuelPerScrap;
     public static float GetInitialFuelFillRatio() => ResolveInstance() != null ? Mathf.Clamp01(instance.initialFuelFillRatio) : DefaultInitialFuelFillRatio;
+    public static GameObject GetModulePrefabByType(ModuleType type) => ResolveInstance() != null ? instance.GetPrefabByType(type) : null;
 
     public static void RegisterPlayer(ShipStats ship)
     {
@@ -130,7 +131,7 @@ public class WorldSpawnDirector : MonoBehaviour
             return;
 
         if (instance == null)
-            instance = FindObjectOfType<WorldSpawnDirector>();
+            instance = FindFirstObjectByType<WorldSpawnDirector>();
 
         if (instance == null)
         {
@@ -156,9 +157,24 @@ public class WorldSpawnDirector : MonoBehaviour
     static WorldSpawnDirector ResolveInstance()
     {
         if (instance == null)
-            instance = FindObjectOfType<WorldSpawnDirector>();
+            instance = FindFirstObjectByType<WorldSpawnDirector>();
 
         return instance;
+    }
+
+    GameObject GetPrefabByType(ModuleType type)
+    {
+        return type switch
+        {
+            ModuleType.Core => coreModulePrefab,
+            ModuleType.Engine => engineModulePrefab,
+            ModuleType.FuelTank => fuelTankModulePrefab,
+            ModuleType.Reactor => powerPlantModulePrefab,
+            ModuleType.Weapon => laserModulePrefab,
+            ModuleType.Radiator => radiatorModulePrefab,
+            ModuleType.Repair => repairModulePrefab,
+            _ => null
+        };
     }
 
     public static void NeutralizeDetachedModule(Transform moduleRoot)

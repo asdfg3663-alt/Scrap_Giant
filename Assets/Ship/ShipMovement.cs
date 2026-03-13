@@ -48,6 +48,9 @@ public class ShipMovement : MonoBehaviour
 
     void FixedUpdate()
     {
+        if (GameRuntimeState.GameplayBlocked)
+            return;
+
         if (stats == null || !stats.isPlayerShip)
             return;
 

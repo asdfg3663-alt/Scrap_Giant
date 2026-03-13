@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: PowerPlant_T1
   m_EditorClassIdentifier: Assembly-CSharp::ModuleData
   displayName: Thermoelectric Generator
+  localizationKey: module.thermoelectric_generator
   type: 3
   tier: 1
   maxHP: 10

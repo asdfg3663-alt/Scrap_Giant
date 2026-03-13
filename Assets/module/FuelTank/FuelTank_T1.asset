@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: FuelTank_T1
   m_EditorClassIdentifier: Assembly-CSharp::ModuleData
   displayName: Fuel Tank
+  localizationKey: module.fuel_tank
   type: 2
   tier: 1
   maxHP: 24

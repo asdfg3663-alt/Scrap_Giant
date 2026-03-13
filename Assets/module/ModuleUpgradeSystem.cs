@@ -119,34 +119,36 @@ public class ModuleUpgradeSystem : MonoBehaviour
 
         if (module == null || module.data == null)
         {
-            reason = "No module selected";
+            reason = LocalizationManager.Get("upgrade.reason.no_selection", "No module selected");
             return false;
         }
 
         var ship = module.GetComponentInParent<ShipStats>();
         if (ship == null || !ship.isPlayerShip)
         {
-            reason = "PlayerShip only";
+            reason = LocalizationManager.Get("upgrade.reason.player_only", "Player ship only");
             return false;
         }
 
         if (activeUpgrade != null)
         {
-            reason = activeUpgrade.module == module ? "Already upgrading" : "Another module is upgrading";
+            reason = activeUpgrade.module == module
+                ? LocalizationManager.Get("upgrade.reason.already_upgrading", "Already upgrading")
+                : LocalizationManager.Get("upgrade.reason.another_upgrading", "Another module is upgrading");
             return false;
         }
 
         var hud = PlayerHudRuntime.Instance;
         if (hud == null)
         {
-            reason = "HUD unavailable";
+            reason = LocalizationManager.Get("upgrade.reason.hud_unavailable", "HUD unavailable");
             return false;
         }
 
         int cost = CalculateScrapCost(module);
         if (!hud.HasResource("scrap", cost))
         {
-            reason = $"Need {cost} Scrap";
+            reason = LocalizationManager.Format("upgrade.reason.need_scrap", "Need {0} Scrap", cost);
             return false;
         }
 
@@ -225,7 +227,9 @@ public class ModuleUpgradeSystem : MonoBehaviour
         if (activeUpgrade == null || activeUpgrade.module == null)
         {
             var ship = hud.TrackedShip;
-            string primary = ship != null ? ship.GetFuelAssemblyPrimaryText() : "Fuel synthesis ready";
+            string primary = ship != null
+                ? ship.GetFuelAssemblyPrimaryText()
+                : LocalizationManager.Get("assembly.fuel_ready", "Fuel synthesis ready");
             string secondary = ship != null ? ship.GetFuelAssemblySecondaryText() : string.Empty;
             hud.SetAssemblyState(false, primary, secondary, null);
             return;
@@ -235,7 +239,7 @@ public class ModuleUpgradeSystem : MonoBehaviour
         hud.SetAssemblyState(
             true,
             activeUpgrade.module.DisplayName,
-            $"{progress01 * 100f:0}% complete",
+            LocalizationManager.Format("assembly.complete_percent", "{0:0}% complete", progress01 * 100f),
             GetModuleSprite(activeUpgrade.module));
     }
 

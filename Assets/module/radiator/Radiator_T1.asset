@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Radiator_T1
   m_EditorClassIdentifier: Assembly-CSharp::ModuleData
   displayName: Radiator
+  localizationKey: module.radiator
   type: 5
   tier: 1
   maxHP: 5

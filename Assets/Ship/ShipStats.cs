@@ -188,6 +188,11 @@ public class ShipStats : MonoBehaviour
         PruneRepairQueue();
     }
 
+    public void RefreshHudNow()
+    {
+        RefreshHudFuel();
+    }
+
     public bool TryConsumeBattery(float amount)
     {
         if (amount <= 0f)
@@ -329,24 +334,24 @@ public class ShipStats : MonoBehaviour
         if (repairTarget != null)
         {
             if (totalRepairPerSecond > 0f)
-                return $"Repairing {repairTarget.DisplayName}";
+                return LocalizationManager.Format("assembly.repairing", "Repairing {0}", repairTarget.DisplayName);
 
-            return $"Repair queued: {repairTarget.DisplayName}";
+            return LocalizationManager.Format("assembly.repair_queued", "Repair queued: {0}", repairTarget.DisplayName);
         }
 
         if (!HasFuelSystem())
-            return "Install a fuel tank";
+            return LocalizationManager.Get("assembly.install_fuel_tank", "Install a fuel tank");
 
         if (fuelSynthesisActive && fuelCurrent < fuelMax)
         {
             var hud = PlayerHudRuntime.Instance;
             if (hud == null || !hud.HasResource("scrap", 1f))
-                return "Low fuel: need Scrap";
+                return LocalizationManager.Get("assembly.low_fuel_need_scrap", "Low fuel: need Scrap");
 
-            return "Fuel synthesis active";
+            return LocalizationManager.Get("assembly.fuel_active", "Fuel synthesis active");
         }
 
-        return "Fuel synthesis ready";
+        return LocalizationManager.Get("assembly.fuel_ready", "Fuel synthesis ready");
     }
 
     public string GetFuelAssemblySecondaryText()
@@ -356,13 +361,13 @@ public class ShipStats : MonoBehaviour
         {
             var hud = PlayerHudRuntime.Instance;
             if (totalRepairPerSecond <= 0f)
-                return "Install repair module";
+                return LocalizationManager.Get("assembly.install_repair_module", "Install repair module");
 
             if (hud == null || !hud.HasResource("scrap", repairScrapCostPerHp))
-                return "Need Scrap";
+                return LocalizationManager.Get("assembly.need_scrap", "Need Scrap");
 
             float repairHp = Mathf.Clamp(repairTarget.hp + repairTarget.repairProgress, 0f, repairTarget.maxHp);
-            return $"{repairHp:0.#} / {repairTarget.maxHp} HP";
+            return LocalizationManager.Format("info.hp", "HP: {0} / {1}", repairHp.ToString("0.#"), repairTarget.maxHp);
         }
 
         if (!HasFuelSystem())
@@ -373,9 +378,9 @@ public class ShipStats : MonoBehaviour
             var hud = PlayerHudRuntime.Instance;
             float fuelPerScrap = WorldSpawnDirector.GetFuelPerScrap();
             if (hud == null || !hud.HasResource("scrap", 1f))
-                return $"1 Scrap -> {fuelPerScrap:0.#} Fuel";
+                return LocalizationManager.Format("assembly.scrap_to_fuel", "1 Scrap -> {0} Fuel", fuelPerScrap.ToString("0.#"));
 
-            return $"{fuelSynthesisPerSec:0.#} fuel/sec";
+            return LocalizationManager.Format("assembly.fuel_rate", "{0} fuel/sec", fuelSynthesisPerSec.ToString("0.#"));
         }
 
         return string.Empty;
@@ -553,7 +558,7 @@ public class ShipStats : MonoBehaviour
 
         hud.SetResourceDisplay(
             "fuel",
-            "Fuel",
+            LocalizationManager.Get("resource.fuel", "Fuel"),
             fuelCurrent,
             FuelColor,
             $"{Mathf.CeilToInt(fuelCurrent)} / {Mathf.CeilToInt(fuelMax)}");

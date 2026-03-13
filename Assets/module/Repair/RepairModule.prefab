@@ -190,6 +190,8 @@ MonoBehaviour:
   hp: 10
   maxHp: 10
   resetHpOnDataAssign: 1
+  currentHeat: 0
+  repairProgress: 0
   upgradeLevel: 0
 --- !u!114 &7443228181453321006
 MonoBehaviour:

@@ -24,6 +24,6 @@ public static class WorldResourceUtility
         if (hud == null)
             return;
 
-        hud.AddResource("scrap", "Scrap", amount, ScrapColor);
+        hud.AddResource("scrap", LocalizationManager.Get("resource.scrap", "Scrap"), amount, ScrapColor);
     }
 }

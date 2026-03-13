@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Laser_T1
   m_EditorClassIdentifier: Assembly-CSharp::ModuleData
   displayName: Laser
+  localizationKey: module.laser
   type: 4
   tier: 1
   maxHP: 10

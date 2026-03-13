@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Repair_T1
   m_EditorClassIdentifier: Assembly-CSharp::ModuleData
   displayName: Repair Drone Bay
+  localizationKey: module.repair_drone_bay
   type: 7
   tier: 1
   maxHP: 10

@@ -9,6 +9,13 @@ public class ModuleSelection : MonoBehaviour
 
     void Update()
     {
+        if (GameRuntimeState.GameplayBlocked)
+        {
+            Selected = null;
+            SelectedScrap = null;
+            return;
+        }
+
         // 마우스 클릭 (New Input System)
         if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
         {

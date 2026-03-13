@@ -50,6 +50,8 @@ public class ModuleInfoUI : MonoBehaviour
         if (autoStack == null) autoStack = GetComponentInChildren<AutoStackTMP>(true);
 
         ResolveTemplates();
+        ApplyLocalizedFont(nameTemplate);
+        ApplyLocalizedFont(lineTemplate);
 
         SafeDisableTemplate(nameTemplate);
         SafeDisableTemplate(lineTemplate);
@@ -118,17 +120,18 @@ public class ModuleInfoUI : MonoBehaviour
 
         BeginLines();
 
-        if (module.CurrentTier > 0) AddLine($"Tier: {module.CurrentTier}");
-        AddLine($"HP: {module.hp} / {module.GetMaxHp()}");
+        if (module.CurrentTier > 0)
+            AddLine(LocalizationManager.Format("info.tier", "Tier: {0}", module.CurrentTier));
+        AddLine(LocalizationManager.Format("info.hp", "HP: {0} / {1}", module.hp, module.GetMaxHp()));
 
         float powerGen = module.GetPowerGenPerSec();
         float powerUse = module.GetPowerUsePerSec();
         if (powerGen > 0f || powerUse > 0f)
-            AddLine($"Power: +{powerGen:0.##}/s  -{powerUse:0.##}/s");
+            AddLine(LocalizationManager.Format("info.power", "Power: +{0}/s  -{1}/s", powerGen.ToString("0.##"), powerUse.ToString("0.##")));
 
         var ship = module.GetComponentInParent<ShipStats>();
         if (ship != null && ship.energyMax > 0f)
-            AddLine($"Battery: {ship.energyCurrent:0.##} / {ship.energyMax:0.##}");
+            AddLine(LocalizationManager.Format("info.battery", "Battery: {0} / {1}", ship.energyCurrent.ToString("0.##"), ship.energyMax.ToString("0.##")));
 
         float mass = module.GetMass();
         float thrust = module.GetThrust();
@@ -136,11 +139,11 @@ public class ModuleInfoUI : MonoBehaviour
         float fuelCap = module.GetMaxFuel();
         float fuelSynth = module.GetFuelSynthesisPerSec();
 
-        if (mass > 0f) AddLine($"Mass: {mass:0.##}");
-        if (thrust > 0f) AddLine($"Thrust: {thrust:0.##}");
-        if (energyCap > 0f) AddLine($"Energy Cap: {energyCap:0.##}");
-        if (fuelCap > 0f) AddLine($"Fuel Cap: {fuelCap:0.##}");
-        if (fuelSynth > 0f) AddLine($"Fuel Synth: {fuelSynth:0.##}/s");
+        if (mass > 0f) AddLine(LocalizationManager.Format("info.mass", "Mass: {0}", mass.ToString("0.##")));
+        if (thrust > 0f) AddLine(LocalizationManager.Format("info.thrust", "Thrust: {0}", thrust.ToString("0.##")));
+        if (energyCap > 0f) AddLine(LocalizationManager.Format("info.energy_cap", "Energy Cap: {0}", energyCap.ToString("0.##")));
+        if (fuelCap > 0f) AddLine(LocalizationManager.Format("info.fuel_cap", "Fuel Cap: {0}", fuelCap.ToString("0.##")));
+        if (fuelSynth > 0f) AddLine(LocalizationManager.Format("info.fuel_synth", "Fuel Synth: {0}/s", fuelSynth.ToString("0.##")));
 
         bool hasWeapon =
             data.weaponType != WeaponType.None ||
@@ -154,7 +157,7 @@ public class ModuleInfoUI : MonoBehaviour
         if (hasWeapon)
         {
             float dps = module.GetDps();
-            if (dps > 0f) AddLine($"DPS: {dps:0.##}");
+            if (dps > 0f) AddLine(LocalizationManager.Format("info.dps", "DPS: {0}", dps.ToString("0.##")));
         }
 
         EndLines();
@@ -169,8 +172,8 @@ public class ModuleInfoUI : MonoBehaviour
         nameLine.gameObject.SetActive(true);
 
         BeginLines();
-        AddLine($"HP: {scrap.CurrentHP} / {scrap.MaxHP}");
-        AddLine($"Mass: {scrap.Mass:0.##}");
+        AddLine(LocalizationManager.Format("info.hp", "HP: {0} / {1}", scrap.CurrentHP, scrap.MaxHP));
+        AddLine(LocalizationManager.Format("info.mass", "Mass: {0}", scrap.Mass.ToString("0.##")));
         EndLines();
 
         ForceHideUpgradeHint();
@@ -191,11 +194,11 @@ public class ModuleInfoUI : MonoBehaviour
         {
             float progress = info.progress01;
 
-            upgradeActionLine.text = "<mark=#214B3D padding=\"22,22,7,7\">UPGRADING</mark>";
+            upgradeActionLine.text = $"<mark=#214B3D padding=\"22,22,7,7\">{LocalizationManager.Get("action.upgrading", "UPGRADING")}</mark>";
             upgradeActionLine.color = upgradeProgressColor;
             upgradeActionLine.raycastTarget = true;
             upgradeButton.interactable = true;
-            upgradeHoverMessage = $"{module.DisplayName} {progress * 100f:0}%";
+            upgradeHoverMessage = LocalizationManager.Format("hint.upgrade_progress", "{0} {1:0}%", module.DisplayName, progress * 100f);
             RefreshUpgradeHintVisibility();
             upgradeActionLine.gameObject.SetActive(true);
             return;
@@ -203,11 +206,11 @@ public class ModuleInfoUI : MonoBehaviour
 
         if (upgradeSystem.CanStartUpgrade(module, out string reason))
         {
-            upgradeActionLine.text = "<mark=#5A6218 padding=\"22,22,7,7\">UPGRADE</mark>";
+            upgradeActionLine.text = $"<mark=#5A6218 padding=\"22,22,7,7\">{LocalizationManager.Get("action.upgrade", "UPGRADE")}</mark>";
             upgradeActionLine.color = upgradeReadyColor;
             upgradeActionLine.raycastTarget = true;
             upgradeButton.interactable = true;
-            upgradeHoverMessage = $"{info.scrapCost} Scrap / {info.duration:0.#}s";
+            upgradeHoverMessage = LocalizationManager.Format("hint.upgrade_cost", "{0} Scrap / {1:0.#}s", info.scrapCost, info.duration);
             RefreshUpgradeHintVisibility();
             upgradeActionLine.gameObject.SetActive(true);
             return;
@@ -230,6 +233,7 @@ public class ModuleInfoUI : MonoBehaviour
         nameLine = go.GetComponent<TMP_Text>();
         nameLine.text = "";
         nameLine.raycastTarget = false;
+        ApplyLocalizedFont(nameLine);
     }
 
     void EnsureUpgradeActionLine()
@@ -256,6 +260,7 @@ public class ModuleInfoUI : MonoBehaviour
         upgradeActionLine.rectTransform.sizeDelta = new Vector2(220f, 30f);
         upgradeActionLine.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
         ConfigureDockedElement(upgradeActionLine.rectTransform, new Vector2(0f, 0f));
+        ApplyLocalizedFont(upgradeActionLine);
 
         upgradeButton = go.GetComponent<Button>();
         if (upgradeButton == null) upgradeButton = go.AddComponent<Button>();
@@ -288,6 +293,7 @@ public class ModuleInfoUI : MonoBehaviour
         upgradeHintLine.raycastTarget = false;
         upgradeHintLine.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
         ConfigureDockedElement(upgradeHintLine.rectTransform, new Vector2(0f, 36f));
+        ApplyLocalizedFont(upgradeHintLine);
     }
 
     void BeginLines()
@@ -318,6 +324,7 @@ public class ModuleInfoUI : MonoBehaviour
         var line = go.GetComponent<TMP_Text>();
         line.text = "";
         line.raycastTarget = false;
+        ApplyLocalizedFont(line);
         pool.Add(line);
         useCount++;
         return line;
@@ -474,5 +481,10 @@ public class ModuleInfoUI : MonoBehaviour
         template.raycastTarget = false;
         if (template.gameObject.activeSelf)
             template.gameObject.SetActive(false);
+    }
+
+    void ApplyLocalizedFont(TMP_Text text)
+    {
+        LocalizationFontManager.ApplyFont(text);
     }
 }

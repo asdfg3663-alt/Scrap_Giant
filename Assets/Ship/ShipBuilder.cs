@@ -104,6 +104,9 @@ public class ShipBuilder : MonoBehaviour
 
     void Update()
     {
+        if (GameRuntimeState.GameplayBlocked)
+            return;
+
         pointerWorldNow = MouseWorld();
 
         HandlePointer();

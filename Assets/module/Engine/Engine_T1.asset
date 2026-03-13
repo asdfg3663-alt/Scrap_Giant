@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Engine_T1
   m_EditorClassIdentifier: Assembly-CSharp::ModuleData
   displayName: Engine
+  localizationKey: module.engine
   type: 1
   tier: 1
   maxHP: 10

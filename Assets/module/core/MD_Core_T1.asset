@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: MD_Core_T1
   m_EditorClassIdentifier: Assembly-CSharp::ModuleData
   displayName: core
+  localizationKey: module.core
   type: 0
   tier: 1
   maxHP: 30

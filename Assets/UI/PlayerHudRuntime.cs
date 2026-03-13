@@ -83,13 +83,17 @@ public class PlayerHudRuntime : MonoBehaviour
     GameObject inventoryEmptyState;
 
     Image assemblyPreviewImage;
+    TMP_Text statusTitleText;
+    TMP_Text bestTitleText;
     TMP_Text bestValueText;
     TMP_Text currentScoreText;
     TMP_Text assemblyTitleText;
     TMP_Text assemblyPrimaryText;
     TMP_Text assemblySecondaryText;
+    TMP_Text inventoryTitleText;
     TMP_Text inventoryCountText;
     TMP_Text inventoryButtonText;
+    TMP_Text inventoryEmptyText;
     TMP_Text scrapNavigatorArrow;
     TMP_Text enemyNavigatorArrow;
     TMP_Text neutralModuleNavigatorArrow;
@@ -145,12 +149,19 @@ public class PlayerHudRuntime : MonoBehaviour
         if (ship == null) return;
 
         trackedShip = ship;
+        RefreshLocalizedText();
         RefreshScore(force: true);
     }
 
     public int GetResourceAmount(string id)
     {
         var entry = FindResource(resources, id);
+        return entry != null ? Mathf.FloorToInt(entry.amount) : 0;
+    }
+
+    public int GetAmmoAmount(string id)
+    {
+        var entry = FindResource(ammoEntries, id);
         return entry != null ? Mathf.FloorToInt(entry.amount) : 0;
     }
 
@@ -239,7 +250,7 @@ public class PlayerHudRuntime : MonoBehaviour
 
         var entry = FindResource(ammoEntries, id);
         if (entry == null)
-            ammoEntries.Add(new ResourceEntry(id, string.IsNullOrWhiteSpace(label) ? "Ammo" : label, amount, color));
+            ammoEntries.Add(new ResourceEntry(id, string.IsNullOrWhiteSpace(label) ? LocalizationManager.Get("resource.ammo", "Ammo") : label, amount, color));
         else
         {
             entry.label = string.IsNullOrWhiteSpace(label) ? entry.label : label;
@@ -253,7 +264,9 @@ public class PlayerHudRuntime : MonoBehaviour
     public void SetAssemblyState(bool active, string primary, string secondary, Sprite sprite = null)
     {
         assemblyActive = active;
-        assemblyPrimaryLabel = string.IsNullOrWhiteSpace(primary) ? "Fuel synthesis ready" : primary;
+        assemblyPrimaryLabel = string.IsNullOrWhiteSpace(primary)
+            ? LocalizationManager.Get("assembly.fuel_ready", "Fuel synthesis ready")
+            : primary;
         assemblySecondaryLabel = string.IsNullOrWhiteSpace(secondary) ? string.Empty : secondary;
         assemblySprite = sprite;
 
@@ -319,6 +332,16 @@ public class PlayerHudRuntime : MonoBehaviour
         RefreshAll(force: true);
     }
 
+    void OnEnable()
+    {
+        LocalizationManager.LanguageChanged += HandleLanguageChanged;
+    }
+
+    void OnDisable()
+    {
+        LocalizationManager.LanguageChanged -= HandleLanguageChanged;
+    }
+
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.I))
@@ -368,16 +391,16 @@ public class PlayerHudRuntime : MonoBehaviour
         int startingAmmo = WorldSpawnDirector.GetStartingAmmo();
 
         if (resources.Count == 0)
-            resources.Add(new ResourceEntry("scrap", "Scrap", startingScrap, new Color(0.97f, 0.63f, 0.22f, 1f)));
+            resources.Add(new ResourceEntry("scrap", LocalizationManager.Get("resource.scrap", "Scrap"), startingScrap, new Color(0.97f, 0.63f, 0.22f, 1f)));
 
         if (FindResource(resources, "fuel") == null)
-            resources.Add(new ResourceEntry("fuel", "Fuel", 0f, new Color(0.38f, 0.85f, 0.95f, 1f), "0 / 0"));
+            resources.Add(new ResourceEntry("fuel", LocalizationManager.Get("resource.fuel", "Fuel"), 0f, new Color(0.38f, 0.85f, 0.95f, 1f), "0 / 0"));
 
         if (ammoEntries.Count == 0)
-            ammoEntries.Add(new ResourceEntry("ammo", "Ammo", startingAmmo, new Color(0.96f, 0.32f, 0.24f, 1f)));
+            ammoEntries.Add(new ResourceEntry("ammo", LocalizationManager.Get("resource.ammo", "Ammo"), startingAmmo, new Color(0.96f, 0.32f, 0.24f, 1f)));
 
         assemblyActive = false;
-        assemblyPrimaryLabel = "Fuel synthesis ready";
+        assemblyPrimaryLabel = LocalizationManager.Get("assembly.fuel_ready", "Fuel synthesis ready");
         assemblySecondaryLabel = string.Empty;
         assemblySprite = null;
 
@@ -398,6 +421,7 @@ public class PlayerHudRuntime : MonoBehaviour
         CreateNavigatorOverlay();
 
         hudBuilt = true;
+        LocalizationFontManager.RefreshActiveTexts();
     }
 
     void CreateTopHud()
@@ -425,7 +449,7 @@ public class PlayerHudRuntime : MonoBehaviour
 
     void BuildResourcePanel(RectTransform panel)
     {
-        CreateLabel(panel, "STATUS", 15f, new Color(0.68f, 0.84f, 0.86f, 1f), TextAlignmentOptions.TopLeft, new Vector2(18f, -10f), new Vector2(0f, 1f), FontStyles.Bold);
+        statusTitleText = CreateLabel(panel, LocalizationManager.Get("ui.status", "STATUS"), 15f, new Color(0.68f, 0.84f, 0.86f, 1f), TextAlignmentOptions.TopLeft, new Vector2(18f, -10f), new Vector2(0f, 1f), FontStyles.Bold);
 
         resourceListRoot = CreateRect("Resources", panel);
         SetAnchored(resourceListRoot, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(18f, -6f), new Vector2(170f, 52f));
@@ -450,9 +474,9 @@ public class PlayerHudRuntime : MonoBehaviour
 
     void BuildScorePanel(RectTransform panel)
     {
-        CreateLabel(panel, "BEST", 15f, new Color(0.94f, 0.97f, 0.84f, 1f), TextAlignmentOptions.Top, new Vector2(0f, -8f), new Vector2(0.5f, 1f), FontStyles.Bold);
+        bestTitleText = CreateLabel(panel, LocalizationManager.Get("ui.best", "BEST"), 15f, new Color(0.94f, 0.97f, 0.84f, 1f), TextAlignmentOptions.Top, new Vector2(0f, -8f), new Vector2(0.5f, 1f), FontStyles.Bold);
         bestValueText = CreateLabel(panel, "0", 34f, Color.white, TextAlignmentOptions.Center, new Vector2(0f, -2f), new Vector2(0.5f, 0.5f), FontStyles.Bold);
-        currentScoreText = CreateLabel(panel, "Current 0", 13f, new Color(0.76f, 0.85f, 0.89f, 1f), TextAlignmentOptions.Bottom, new Vector2(0f, 10f), new Vector2(0.5f, 0f), FontStyles.Normal);
+        currentScoreText = CreateLabel(panel, LocalizationManager.Format("ui.current_score", "Current {0}", 0), 13f, new Color(0.76f, 0.85f, 0.89f, 1f), TextAlignmentOptions.Bottom, new Vector2(0f, 10f), new Vector2(0.5f, 0f), FontStyles.Normal);
     }
 
     void BuildAssemblyPanel(RectTransform panel)
@@ -467,8 +491,8 @@ public class PlayerHudRuntime : MonoBehaviour
         assemblyPreviewImage.type = Image.Type.Simple;
         assemblyPreviewImage.preserveAspect = true;
 
-        assemblyTitleText = CreateLabel(panel, "ASSEMBLY", 15f, new Color(0.72f, 0.94f, 0.88f, 1f), TextAlignmentOptions.TopLeft, new Vector2(86f, -10f), new Vector2(0f, 1f), FontStyles.Bold);
-        assemblyPrimaryText = CreateLabel(panel, "Fuel synthesis ready", 16f, Color.white, TextAlignmentOptions.TopLeft, new Vector2(86f, -30f), new Vector2(0f, 1f), FontStyles.Bold);
+        assemblyTitleText = CreateLabel(panel, LocalizationManager.Get("ui.assembly", "ASSEMBLY"), 15f, new Color(0.72f, 0.94f, 0.88f, 1f), TextAlignmentOptions.TopLeft, new Vector2(86f, -10f), new Vector2(0f, 1f), FontStyles.Bold);
+        assemblyPrimaryText = CreateLabel(panel, LocalizationManager.Get("assembly.fuel_ready", "Fuel synthesis ready"), 16f, Color.white, TextAlignmentOptions.TopLeft, new Vector2(86f, -30f), new Vector2(0f, 1f), FontStyles.Bold);
         assemblySecondaryText = CreateLabel(panel, string.Empty, 13f, new Color(0.74f, 0.86f, 0.9f, 1f), TextAlignmentOptions.TopLeft, new Vector2(86f, -52f), new Vector2(0f, 1f), FontStyles.Normal);
 
         assemblyPrimaryText.textWrappingMode = TextWrappingModes.NoWrap;
@@ -502,8 +526,8 @@ public class PlayerHudRuntime : MonoBehaviour
         button.onClick.AddListener(ToggleInventory);
         inventoryButtonText = CreateLabel(buttonRoot, "<", 24f, Color.white, TextAlignmentOptions.Center, Vector2.zero, new Vector2(0.5f, 0.5f), FontStyles.Bold);
 
-        CreateLabel(inventoryPanel, "INVENTORY", 18f, new Color(0.79f, 0.89f, 0.93f, 1f), TextAlignmentOptions.TopLeft, new Vector2(18f, -14f), new Vector2(0f, 1f), FontStyles.Bold);
-        inventoryCountText = CreateLabel(inventoryPanel, "0 parts", 13f, new Color(0.58f, 0.76f, 0.82f, 1f), TextAlignmentOptions.TopRight, new Vector2(-18f, -18f), new Vector2(1f, 1f), FontStyles.Normal);
+        inventoryTitleText = CreateLabel(inventoryPanel, LocalizationManager.Get("ui.inventory", "INVENTORY"), 18f, new Color(0.79f, 0.89f, 0.93f, 1f), TextAlignmentOptions.TopLeft, new Vector2(18f, -14f), new Vector2(0f, 1f), FontStyles.Bold);
+        inventoryCountText = CreateLabel(inventoryPanel, LocalizationManager.Format("ui.inventory_parts", "{0} parts", 0), 13f, new Color(0.58f, 0.76f, 0.82f, 1f), TextAlignmentOptions.TopRight, new Vector2(-18f, -18f), new Vector2(1f, 1f), FontStyles.Normal);
 
         inventoryBody = CreateRect("Body", inventoryPanel).gameObject;
         var bodyRect = inventoryBody.GetComponent<RectTransform>();
@@ -520,8 +544,8 @@ public class PlayerHudRuntime : MonoBehaviour
         layout.childForceExpandHeight = false;
 
         inventoryEmptyState = CreateRect("EmptyState", bodyRect).gameObject;
-        var emptyText = CreateLabel(inventoryEmptyState.transform, "Stored modules will appear here.", 15f, new Color(0.56f, 0.68f, 0.74f, 1f), TextAlignmentOptions.Center, Vector2.zero, new Vector2(0.5f, 0.5f), FontStyles.Italic);
-        Stretch(emptyText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
+        inventoryEmptyText = CreateLabel(inventoryEmptyState.transform, LocalizationManager.Get("ui.inventory_empty", "Stored modules will appear here."), 15f, new Color(0.56f, 0.68f, 0.74f, 1f), TextAlignmentOptions.Center, Vector2.zero, new Vector2(0.5f, 0.5f), FontStyles.Italic);
+        Stretch(inventoryEmptyText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
 
         ApplyInventoryState();
     }
@@ -570,7 +594,7 @@ public class PlayerHudRuntime : MonoBehaviour
         lastBestScore = bestRounded;
 
         if (bestValueText != null) bestValueText.text = bestRounded.ToString();
-        if (currentScoreText != null) currentScoreText.text = $"Current {currentScore}";
+        if (currentScoreText != null) currentScoreText.text = LocalizationManager.Format("ui.current_score", "Current {0}", currentScore);
     }
 
     void RefreshResourceRows()
@@ -610,7 +634,7 @@ public class PlayerHudRuntime : MonoBehaviour
 
         bool hasItems = inventoryEntries.Count > 0;
         if (inventoryEmptyState != null) inventoryEmptyState.SetActive(!hasItems);
-        if (inventoryCountText != null) inventoryCountText.text = $"{inventoryEntries.Count} parts";
+        if (inventoryCountText != null) inventoryCountText.text = LocalizationManager.Format("ui.inventory_parts", "{0} parts", inventoryEntries.Count);
 
         inventoryUiDirty = false;
     }
@@ -620,7 +644,9 @@ public class PlayerHudRuntime : MonoBehaviour
         if (assemblyTitleText == null || assemblyPrimaryText == null || assemblySecondaryText == null || assemblyPreviewImage == null)
             return;
 
-        assemblyTitleText.text = assemblyActive ? "UPGRADING" : "ASSEMBLY";
+        assemblyTitleText.text = assemblyActive
+            ? LocalizationManager.Get("ui.upgrading", "UPGRADING")
+            : LocalizationManager.Get("ui.assembly", "ASSEMBLY");
         assemblyPrimaryText.text = assemblyPrimaryLabel;
         assemblySecondaryText.text = assemblySecondaryLabel;
         assemblySecondaryText.gameObject.SetActive(!string.IsNullOrWhiteSpace(assemblySecondaryLabel));
@@ -679,6 +705,46 @@ public class PlayerHudRuntime : MonoBehaviour
         UpdateNavigatorArrow(scrapNavigatorArrow, coreTransform.position, playerScreenPos, WorldSpawnDirector.GetNearestFloatingScrap(coreTransform.position));
         UpdateNavigatorArrow(enemyNavigatorArrow, coreTransform.position, playerScreenPos, WorldSpawnDirector.GetNearestEnemyShip(coreTransform.position));
         UpdateNavigatorArrow(neutralModuleNavigatorArrow, coreTransform.position, playerScreenPos, NeutralModuleSpawnDirector.GetNearestNeutralModule(coreTransform.position));
+    }
+
+    void HandleLanguageChanged(GameLanguage _)
+    {
+        LocalizationFontManager.RefreshActiveTexts();
+        RefreshLocalizedText();
+        RefreshAll(force: true);
+    }
+
+    void RefreshLocalizedText()
+    {
+        if (statusTitleText != null)
+            statusTitleText.text = LocalizationManager.Get("ui.status", "STATUS");
+
+        if (bestTitleText != null)
+            bestTitleText.text = LocalizationManager.Get("ui.best", "BEST");
+
+        if (inventoryTitleText != null)
+            inventoryTitleText.text = LocalizationManager.Get("ui.inventory", "INVENTORY");
+
+        if (inventoryEmptyText != null)
+            inventoryEmptyText.text = LocalizationManager.Get("ui.inventory_empty", "Stored modules will appear here.");
+
+        var scrapEntry = FindResource(resources, "scrap");
+        if (scrapEntry != null)
+            scrapEntry.label = LocalizationManager.Get("resource.scrap", "Scrap");
+
+        var fuelEntry = FindResource(resources, "fuel");
+        if (fuelEntry != null)
+            fuelEntry.label = LocalizationManager.Get("resource.fuel", "Fuel");
+
+        var ammoEntry = FindResource(ammoEntries, "ammo");
+        if (ammoEntry != null)
+            ammoEntry.label = LocalizationManager.Get("resource.ammo", "Ammo");
+
+        resourceUiDirty = true;
+        ammoUiDirty = true;
+        inventoryUiDirty = true;
+        RefreshScore(force: true);
+        RefreshAssemblyPanel();
     }
 
     void UpdateNavigatorArrow(TMP_Text arrow, Vector3 originWorld, Vector3 originScreen, Component target)
@@ -871,6 +937,10 @@ public class PlayerHudRuntime : MonoBehaviour
 
     TMP_FontAsset ResolveFontAsset()
     {
+        TMP_FontAsset localizedFont = LocalizationFontManager.GetUiFontAsset();
+        if (localizedFont != null)
+            return localizedFont;
+
         if (TMP_Settings.instance != null && TMP_Settings.defaultFontAsset != null)
             return TMP_Settings.defaultFontAsset;
 

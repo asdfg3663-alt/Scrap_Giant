@@ -41,7 +41,7 @@ public class NeutralModuleSpawnDirector : MonoBehaviour
     public static void EnsureForWorld(WorldSpawnDirector worldDirector)
     {
         if (instance == null)
-            instance = FindObjectOfType<NeutralModuleSpawnDirector>();
+            instance = FindFirstObjectByType<NeutralModuleSpawnDirector>();
 
         if (instance == null)
         {
@@ -80,7 +80,7 @@ public class NeutralModuleSpawnDirector : MonoBehaviour
             return;
 
         if (prefabPool.Count == 0)
-            SyncPrefabPool(FindObjectOfType<WorldSpawnDirector>());
+            SyncPrefabPool(FindFirstObjectByType<WorldSpawnDirector>());
 
         if (prefabPool.Count == 0 || Random.value > spawnChancePerRoll)
             return;

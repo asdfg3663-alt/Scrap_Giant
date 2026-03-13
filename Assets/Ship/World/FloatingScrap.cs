@@ -15,7 +15,7 @@ public class FloatingScrap : MonoBehaviour, IDamageable
     public float Mass => mass;
     public int CurrentHP => currentHP;
     public int MaxHP => Mathf.Max(1, Mathf.CeilToInt(mass));
-    public string DisplayName => "Floating Scrap";
+    public string DisplayName => LocalizationManager.Get("world.floating_scrap", "Floating Scrap");
 
     void Awake()
     {

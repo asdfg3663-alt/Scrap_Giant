@@ -17,7 +17,7 @@ public class ModuleInstance : MonoBehaviour
     [Min(0)] public int upgradeLevel = 0;
 
     public int CurrentTier => data != null ? Mathf.Max(1, data.tier + upgradeLevel) : Mathf.Max(1, upgradeLevel);
-    public string DisplayName => FormatDisplayName(data != null ? data.displayName : "Module", CurrentTier);
+    public string DisplayName => GetLocalizedDisplayName();
     public float TierMultiplier => Mathf.Pow(2f, Mathf.Max(0, upgradeLevel));
 
     void Awake()
@@ -130,6 +130,12 @@ public class ModuleInstance : MonoBehaviour
             return 1f;
 
         return Mathf.Lerp(1f, 0.5f, GetHeatRatio());
+    }
+
+    string GetLocalizedDisplayName()
+    {
+        string fallback = FormatDisplayName(data != null ? data.displayName : "Module", CurrentTier);
+        return LocalizationManager.GetModuleText(data != null ? data.localizationKey : string.Empty, fallback);
     }
 
     public static string FormatDisplayName(string rawName, int tier)

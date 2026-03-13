@@ -25,6 +25,7 @@ public class ModuleData : ScriptableObject
 {
     [Header("Identity")]
     public string displayName = "Module";
+    public string localizationKey = string.Empty;
     public ModuleType type = ModuleType.Core;
     public int tier = 1;
 

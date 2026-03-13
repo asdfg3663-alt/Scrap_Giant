@@ -47,6 +47,12 @@ public class WeaponLaser : MonoBehaviour
 
     void Update()
     {
+        if (GameRuntimeState.GameplayBlocked)
+        {
+            SetBeamVisible(false);
+            return;
+        }
+
         var ship = GetComponentInParent<ShipStats>();
         if (ship == null)
         {
