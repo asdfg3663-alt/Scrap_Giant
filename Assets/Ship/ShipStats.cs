@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 public class ShipStats : MonoBehaviour
 {
@@ -54,6 +55,13 @@ public class ShipStats : MonoBehaviour
     bool hasInitializedFuelReserve;
     bool weaponBatteryLocked;
     readonly System.Collections.Generic.List<ModuleInstance> repairQueue = new();
+    readonly Vector2Int[] connectionDirs =
+    {
+        Vector2Int.up,
+        Vector2Int.down,
+        Vector2Int.left,
+        Vector2Int.right
+    };
 
     void Awake()
     {
@@ -235,6 +243,31 @@ public class ShipStats : MonoBehaviour
             return;
 
         repairQueue.Add(module);
+    }
+
+    public void HandleOwnedModuleDestroyed(ModuleInstance destroyedModule, Transform destroyedTransform, Vector2 hitPoint, Vector2 hitNormal)
+    {
+        if (!isPlayerShip || destroyedTransform == null)
+            return;
+
+        ModuleAttachment destroyedAttachment = destroyedTransform.GetComponent<ModuleAttachment>();
+        if (destroyedAttachment != null)
+        {
+            destroyedAttachment.shipRoot = null;
+            destroyedAttachment.gridPos = default;
+            destroyedAttachment.rot90 = 0;
+        }
+
+        DisableModuleForRemoval(destroyedTransform);
+        destroyedTransform.SetParent(null, true);
+        AudioRuntime.PlayPlayerModuleBreak();
+
+        if (destroyedModule != null && destroyedModule.data != null && destroyedModule.data.type != ModuleType.Core)
+            DetachDisconnectedModules(destroyedModule, hitPoint, hitNormal);
+
+        rebuildQueued = false;
+        Rebuild();
+        RefreshHudFuel();
     }
 
     public bool HasFuelSystem()
@@ -582,5 +615,122 @@ public class ShipStats : MonoBehaviour
 
         if (energyCurrent <= 0.001f)
             weaponBatteryLocked = true;
+    }
+
+    void DisableModuleForRemoval(Transform moduleTransform)
+    {
+        var colliders = moduleTransform.GetComponentsInChildren<Collider2D>(true);
+        for (int i = 0; i < colliders.Length; i++)
+            if (colliders[i] != null)
+                colliders[i].enabled = false;
+
+        var renderers = moduleTransform.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+            if (renderers[i] != null)
+                renderers[i].enabled = false;
+    }
+
+    void DetachDisconnectedModules(ModuleInstance destroyedModule, Vector2 hitPoint, Vector2 hitNormal)
+    {
+        ModuleInstance[] currentModules = GetComponentsInChildren<ModuleInstance>(true);
+        Dictionary<Vector2Int, ModuleInstance> byGrid = new();
+        ModuleInstance coreModule = null;
+
+        for (int i = 0; i < currentModules.Length; i++)
+        {
+            ModuleInstance module = currentModules[i];
+            if (module == null || module == destroyedModule || module.data == null)
+                continue;
+
+            ModuleAttachment attachment = module.GetComponent<ModuleAttachment>();
+            if (attachment == null || attachment.shipRoot != transform)
+                continue;
+
+            if (!byGrid.ContainsKey(attachment.gridPos))
+                byGrid.Add(attachment.gridPos, module);
+
+            if (module.data.type == ModuleType.Core && coreModule == null)
+                coreModule = module;
+        }
+
+        if (coreModule == null)
+            return;
+
+        ModuleAttachment coreAttachment = coreModule.GetComponent<ModuleAttachment>();
+        if (coreAttachment == null)
+            return;
+
+        HashSet<Vector2Int> connected = new();
+        Queue<Vector2Int> frontier = new();
+        frontier.Enqueue(coreAttachment.gridPos);
+        connected.Add(coreAttachment.gridPos);
+
+        while (frontier.Count > 0)
+        {
+            Vector2Int grid = frontier.Dequeue();
+            for (int i = 0; i < connectionDirs.Length; i++)
+            {
+                Vector2Int next = grid + connectionDirs[i];
+                if (connected.Contains(next) || !byGrid.ContainsKey(next))
+                    continue;
+
+                connected.Add(next);
+                frontier.Enqueue(next);
+            }
+        }
+
+        for (int i = 0; i < currentModules.Length; i++)
+        {
+            ModuleInstance module = currentModules[i];
+            if (module == null || module == destroyedModule || module == coreModule || module.data == null)
+                continue;
+
+            ModuleAttachment attachment = module.GetComponent<ModuleAttachment>();
+            if (attachment == null || attachment.shipRoot != transform)
+                continue;
+
+            if (connected.Contains(attachment.gridPos))
+                continue;
+
+            ScatterDetachedModule(module.transform, hitPoint, hitNormal);
+        }
+    }
+
+    void ScatterDetachedModule(Transform moduleTransform, Vector2 hitPoint, Vector2 hitNormal)
+    {
+        moduleTransform.SetParent(null, true);
+
+        ModuleAttachment attachment = moduleTransform.GetComponent<ModuleAttachment>();
+        if (attachment != null)
+        {
+            attachment.shipRoot = null;
+            attachment.gridPos = default;
+            attachment.rot90 = 0;
+        }
+
+        WorldSpawnDirector.NeutralizeDetachedModule(moduleTransform);
+
+        Rigidbody2D rb = moduleTransform.GetComponent<Rigidbody2D>();
+        if (rb != null)
+        {
+            rb.bodyType = RigidbodyType2D.Dynamic;
+            rb.simulated = true;
+            rb.constraints = RigidbodyConstraints2D.None;
+
+            Vector2 dir = ((Vector2)moduleTransform.position - hitPoint).normalized;
+            if (dir.sqrMagnitude < 0.001f)
+                dir = hitNormal.sqrMagnitude > 0.001f ? hitNormal.normalized : Random.insideUnitCircle.normalized;
+
+            rb.linearVelocity *= 0.2f;
+            rb.angularVelocity *= 0.2f;
+            rb.AddForce(dir * 0.9f, ForceMode2D.Impulse);
+            rb.AddTorque(Random.Range(-0.35f, 0.35f), ForceMode2D.Impulse);
+        }
+
+        WorldDistanceDespawn despawn = moduleTransform.GetComponent<WorldDistanceDespawn>();
+        if (despawn == null)
+            despawn = moduleTransform.gameObject.AddComponent<WorldDistanceDespawn>();
+
+        despawn.axisLimit = WorldSpawnDirector.CurrentDespawnAxisLimit;
     }
 }

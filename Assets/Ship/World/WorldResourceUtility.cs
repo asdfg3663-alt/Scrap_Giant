@@ -15,7 +15,22 @@ public static class WorldResourceUtility
         AwardScrap(RollScrapAmount(sourceMass));
     }
 
+    public static void AwardScrapFromMass(float sourceMass, Vector3 worldPosition)
+    {
+        AwardScrap(RollScrapAmount(sourceMass), worldPosition);
+    }
+
     public static void AwardScrap(int amount)
+    {
+        AwardScrap(amount, default, false);
+    }
+
+    public static void AwardScrap(int amount, Vector3 worldPosition)
+    {
+        AwardScrap(amount, worldPosition, true);
+    }
+
+    static void AwardScrap(int amount, Vector3 worldPosition, bool hasWorldPosition)
     {
         if (amount <= 0)
             return;
@@ -25,5 +40,10 @@ public static class WorldResourceUtility
             return;
 
         hud.AddResource("scrap", LocalizationManager.Get("resource.scrap", "Scrap"), amount, ScrapColor);
+
+        if (hasWorldPosition)
+            WorldFeedbackRuntime.ShowScrapGain(worldPosition, amount);
+
+        AudioRuntime.PlayScrapPickup();
     }
 }

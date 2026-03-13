@@ -154,6 +154,7 @@ public class ShipBuilder : MonoBehaviour
                 {
                     isDragging = true;
                     BeginDragPreview(draggingTf);
+                    AudioRuntime.BeginModuleDrag();
 
                     if (wasAttachedAtDragStart)
                     {
@@ -246,6 +247,8 @@ public class ShipBuilder : MonoBehaviour
             NeutralModuleSpawnDirector.Unregister(moduleInstance);
 
         RestoreShipBodyStates(shipBodies);
+        AudioRuntime.EndModuleDrag();
+        AudioRuntime.PlayModuleAttach();
 
 
 
@@ -325,6 +328,7 @@ public class ShipBuilder : MonoBehaviour
 
         SetModulePhysics(moduleTf, attachedToShip: false);
         Physics2D.SyncTransforms();
+        AudioRuntime.EndModuleDrag();
     }
 
     RigidbodyState2D[] CaptureShipBodyStates()

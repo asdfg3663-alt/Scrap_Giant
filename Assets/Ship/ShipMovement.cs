@@ -49,10 +49,16 @@ public class ShipMovement : MonoBehaviour
     void FixedUpdate()
     {
         if (GameRuntimeState.GameplayBlocked)
+        {
+            AudioRuntime.SetEngineLoopActive(false);
             return;
+        }
 
         if (stats == null || !stats.isPlayerShip)
+        {
+            AudioRuntime.SetEngineLoopActive(false);
             return;
+        }
 
         float thrustInput = Input.GetAxisRaw("Vertical");
         float turnInput = Input.GetAxisRaw("Horizontal");
@@ -73,10 +79,12 @@ public class ShipMovement : MonoBehaviour
 
         Vector2 sumForce = Vector2.zero;
         float sumTorque = 0f;
+        bool engineLoopActive = false;
 
         if (thrustInput > 0f && effectiveTotalThrust > 0f)
         {
             stats.ConsumeFuelForThrust(Time.fixedDeltaTime);
+            engineLoopActive = true;
 
             if (modules != null)
             {
@@ -147,6 +155,8 @@ public class ShipMovement : MonoBehaviour
         float maxAngularDegPerSec = Mathf.Max(0f, maxRPM) * 360f / 60f;
         if (maxAngularDegPerSec > 0f)
             rb.angularVelocity = Mathf.Clamp(rb.angularVelocity, -maxAngularDegPerSec, maxAngularDegPerSec);
+
+        AudioRuntime.SetEngineLoopActive(engineLoopActive);
     }
 
     Vector2 ComputeModuleCOM(ModuleInstance[] modules)

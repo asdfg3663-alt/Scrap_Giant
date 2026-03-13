@@ -78,9 +78,23 @@ public sealed class GameOverRuntime : MonoBehaviour
     {
         if (messageLabel != null) messageLabel.gameObject.SetActive(false);
         if (scoreLabel != null) scoreLabel.gameObject.SetActive(false);
+        GameSaveSystem.EndSession(deleteSave: true);
         Time.timeScale = 1f;
         GameRuntimeState.SetGameplayBlocked(false);
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        SceneManager.sceneLoaded += HandleReturnSceneLoaded;
+        SceneManager.LoadScene("SampleScene", LoadSceneMode.Single);
+    }
+
+    void HandleReturnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        SceneManager.sceneLoaded -= HandleReturnSceneLoaded;
+
+        if (!scene.IsValid() || scene.name != "SampleScene")
+            return;
+
+        Time.timeScale = 1f;
+        GameRuntimeState.SetGameplayBlocked(false);
+        TitleScreenRuntime.EnsureVisible();
     }
 
     void EnsureUi()

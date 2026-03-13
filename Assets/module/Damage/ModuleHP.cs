@@ -71,8 +71,11 @@ public class ModuleHP : MonoBehaviour, IDamageable
         if (isPlayerOwned && inst != null && inst.data != null && inst.data.type == ModuleType.Core)
             GameOverRuntime.TriggerPlayerGameOver();
 
+        if (isPlayerOwned)
+            currentShip?.HandleOwnedModuleDestroyed(inst, transform, hitPoint, hitNormal);
+
         if (!isPlayerOwned && inst != null)
-            WorldResourceUtility.AwardScrapFromMass(inst.GetMass());
+            WorldResourceUtility.AwardScrapFromMass(inst.GetMass(), transform.position);
 
         if (!isPlayerOwned && inst != null && inst.data != null && inst.data.type == ModuleType.Core)
         {

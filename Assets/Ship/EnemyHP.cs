@@ -31,7 +31,7 @@ public class EnemyHP : MonoBehaviour, IDamageable
         if (explosionVfxPrefab)
             Instantiate(explosionVfxPrefab, hitPoint, Quaternion.identity);
 
-        WorldResourceUtility.AwardScrap(Mathf.Max(1, maxHP));
+        WorldResourceUtility.AwardScrap(Mathf.Max(1, maxHP), transform.position);
         Destroy(gameObject);
     }
 }

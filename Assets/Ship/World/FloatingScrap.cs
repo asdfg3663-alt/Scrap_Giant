@@ -61,7 +61,7 @@ public class FloatingScrap : MonoBehaviour, IDamageable
 
     void Die()
     {
-        WorldResourceUtility.AwardScrapFromMass(mass);
+        WorldResourceUtility.AwardScrapFromMass(mass, transform.position);
         Destroy(gameObject);
     }
 }

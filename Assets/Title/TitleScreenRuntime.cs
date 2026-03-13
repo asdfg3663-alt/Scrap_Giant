@@ -83,6 +83,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
     TMP_Text optionsTitleLabel;
     TMP_Text languageSectionLabel;
     TMP_Text languageModeLabel;
+    TMP_Text audioSectionLabel;
     TMP_Text masterVolumeLabel;
     TMP_Text bgmVolumeLabel;
     TMP_Text sfxVolumeLabel;
@@ -119,6 +120,11 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Bootstrap()
+    {
+        EnsureVisible();
+    }
+
+    public static void EnsureVisible()
     {
         if (instance != null || GameSaveSystem.HasStartedSession)
             return;
@@ -343,18 +349,19 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
     void BuildOptionsPanel(Transform parent)
     {
-        RectTransform languageBlock = CreateBlock(parent, 164f);
+        RectTransform languageBlock = CreateBlock(parent, 176f);
+        AddBlockAccent(languageBlock);
         languageSectionLabel = CreateSectionLabel(languageBlock, "Language");
         languageModeLabel = CreateBodyText(languageBlock, string.Empty, 16f);
         languageModeLabel.enableWordWrapping = true;
         languageModeLabel.alignment = TextAlignmentOptions.Left;
-        SetAnchored(languageModeLabel.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(18f, -48f), new Vector2(-36f, 24f));
+        SetAnchored(languageModeLabel.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(18f, -32f), new Vector2(-36f, 24f));
 
         RectTransform langRow = CreateRect("LanguageRow", languageBlock);
         langRow.anchorMin = new Vector2(0f, 0f);
         langRow.anchorMax = new Vector2(1f, 0f);
         langRow.pivot = new Vector2(0.5f, 0f);
-        langRow.anchoredPosition = new Vector2(0f, 20f);
+        langRow.anchoredPosition = new Vector2(0f, 32f);
         langRow.sizeDelta = new Vector2(-36f, 84f);
         GridLayoutGroup langLayout = langRow.gameObject.AddComponent<GridLayoutGroup>();
         langLayout.cellSize = new Vector2(170f, 38f);
@@ -374,28 +381,31 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         }
 
         RectTransform audioBlock = CreateBlock(parent, 196f);
+        AddBlockAccent(audioBlock);
+        audioSectionLabel = CreateSectionLabel(audioBlock, "Audio");
         masterVolumeLabel = CreateBodyText(audioBlock, "Master Volume", 18f);
-        RectTransform masterRow = CreateOptionRow(audioBlock, "MasterVolumeRow", 30f);
+        RectTransform masterRow = CreateOptionRow(audioBlock, "MasterVolumeRow", 56f);
         masterVolumeLabel.rectTransform.SetParent(masterRow, false);
-        Stretch(masterVolumeLabel.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, -14f), new Vector2(280f, 14f));
+        PlaceOptionLabel(masterVolumeLabel.rectTransform, 48f, 220f);
         masterVolumeLabel.alignment = TextAlignmentOptions.Left;
-        masterSlider = CreateSlider(masterRow, new Vector2(210f, 0f), value => GameOptions.MasterVolume = value);
+        masterSlider = CreateSlider(masterRow, 300f, value => GameOptions.MasterVolume = value);
 
         bgmVolumeLabel = CreateBodyText(audioBlock, "BGM Volume", 16f);
-        RectTransform bgmRow = CreateOptionRow(audioBlock, "BgmVolumeRow", 82f);
+        RectTransform bgmRow = CreateOptionRow(audioBlock, "BgmVolumeRow", 108f);
         bgmVolumeLabel.rectTransform.SetParent(bgmRow, false);
-        Stretch(bgmVolumeLabel.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, -14f), new Vector2(170f, 14f));
+        PlaceOptionLabel(bgmVolumeLabel.rectTransform, 48f, 220f);
         bgmVolumeLabel.alignment = TextAlignmentOptions.Left;
-        bgmSlider = CreateSlider(bgmRow, new Vector2(210f, 0f), value => GameOptions.BgmVolume = value);
+        bgmSlider = CreateSlider(bgmRow, 300f, value => GameOptions.BgmVolume = value);
 
         sfxVolumeLabel = CreateBodyText(audioBlock, "SFX Volume", 16f);
-        RectTransform sfxRow = CreateOptionRow(audioBlock, "SfxVolumeRow", 134f);
+        RectTransform sfxRow = CreateOptionRow(audioBlock, "SfxVolumeRow", 160f);
         sfxVolumeLabel.rectTransform.SetParent(sfxRow, false);
-        Stretch(sfxVolumeLabel.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, -14f), new Vector2(170f, 14f));
+        PlaceOptionLabel(sfxVolumeLabel.rectTransform, 48f, 220f);
         sfxVolumeLabel.alignment = TextAlignmentOptions.Left;
-        sfxSlider = CreateSlider(sfxRow, new Vector2(210f, 0f), value => GameOptions.SfxVolume = value);
+        sfxSlider = CreateSlider(sfxRow, 300f, value => GameOptions.SfxVolume = value);
 
         RectTransform displayBlock = CreateBlock(parent, 100f);
+        AddBlockAccent(displayBlock);
         fullscreenLabel = CreateSectionLabel(displayBlock, "Display");
         fullscreenButton = CreateMenuButton(displayBlock, out fullscreenValueLabel, ToggleFullscreen);
         RectTransform fullscreenRect = fullscreenButton.GetComponent<RectTransform>();
@@ -417,10 +427,10 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
     void BuildHowToPanel(Transform parent)
     {
-        RectTransform previewBlock = CreateBlock(parent, 250f);
+        RectTransform previewBlock = CreateBlock(parent, 270f);
 
         RectTransform previewFrame = CreateRect("PreviewFrame", previewBlock);
-        SetAnchored(previewFrame, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -10f), new Vector2(250f, 210f));
+        SetAnchored(previewFrame, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(18f, -18f), new Vector2(250f, 220f));
         CreateImage(previewFrame, new Color(0.07f, 0.13f, 0.16f, 0.92f));
 
         previewPulse = CreateRect("PreviewPulse", previewFrame);
@@ -428,14 +438,14 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         CreateImage(previewPulse, howToPages[0].previewColor);
 
         RectTransform textBlock = CreateRect("TextBlock", previewBlock);
-        SetAnchored(textBlock, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(280f, -10f), new Vector2(-280f, -10f));
+        Stretch(textBlock, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(292f, 18f), new Vector2(-18f, -18f));
 
         howToPreviewTitleLabel = CreateText(textBlock, "How To Play", 26f, Color.white, FontStyles.Bold, TextAlignmentOptions.TopLeft);
-        Stretch(howToPreviewTitleLabel.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, -42f));
+        Stretch(howToPreviewTitleLabel.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, -46f));
 
         howToPreviewBodyLabel = CreateText(textBlock, string.Empty, 18f, new Color(0.82f, 0.9f, 0.95f, 1f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
         howToPreviewBodyLabel.enableWordWrapping = true;
-        Stretch(howToPreviewBodyLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(0f, -56f));
+        Stretch(howToPreviewBodyLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0f, 8f), new Vector2(0f, -62f));
 
         RectTransform tabRow = CreateRect("HowToTabs", parent);
         tabRow.sizeDelta = new Vector2(0f, 58f);
@@ -483,6 +493,18 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         return block;
     }
 
+    void AddBlockAccent(RectTransform block)
+    {
+        RectTransform accent = CreateRect("Accent", block);
+        accent.SetAsFirstSibling();
+        accent.anchorMin = new Vector2(0f, 1f);
+        accent.anchorMax = new Vector2(1f, 1f);
+        accent.pivot = new Vector2(0.5f, 1f);
+        accent.anchoredPosition = Vector2.zero;
+        accent.sizeDelta = new Vector2(0f, 18f);
+        CreateImage(accent, new Color(0.09f, 0.21f, 0.27f, 0.92f));
+    }
+
     Transform GetPanelBody(Transform panelRoot)
     {
         Transform body = panelRoot.Find("Body");
@@ -498,6 +520,15 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         row.anchoredPosition = new Vector2(0f, -topOffset);
         row.sizeDelta = new Vector2(-36f, 48f);
         return row;
+    }
+
+    void PlaceOptionLabel(RectTransform rect, float x, float width)
+    {
+        rect.anchorMin = new Vector2(0f, 0.5f);
+        rect.anchorMax = new Vector2(0f, 0.5f);
+        rect.pivot = new Vector2(0f, 0.5f);
+        rect.anchoredPosition = new Vector2(x, 0f);
+        rect.sizeDelta = new Vector2(width, 28f);
     }
 
     void ApplyButtonPalette(Button button, Color normal, Color highlighted, Color pressed)
@@ -530,14 +561,19 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         return label;
     }
 
-    Slider CreateSlider(Transform parent, Vector2 anchoredPosition, UnityEngine.Events.UnityAction<float> onChanged)
+    Slider CreateSlider(Transform parent, float leftOffset, UnityEngine.Events.UnityAction<float> onChanged)
     {
         RectTransform root = CreateRect("Slider", parent);
         root.anchorMin = new Vector2(0f, 0.5f);
         root.anchorMax = new Vector2(1f, 0.5f);
         root.pivot = new Vector2(0f, 0.5f);
-        root.anchoredPosition = anchoredPosition;
-        root.sizeDelta = new Vector2(-308f, 24f);
+        root.anchoredPosition = new Vector2(leftOffset, 0f);
+        root.sizeDelta = new Vector2(-(leftOffset + 36f), 24f);
+
+        // The slider needs a graphic on its root/background to reliably receive pointer events.
+        Image rootHitImage = root.gameObject.AddComponent<Image>();
+        rootHitImage.color = new Color(1f, 1f, 1f, 0.001f);
+        rootHitImage.raycastTarget = true;
 
         Slider slider = root.gameObject.AddComponent<Slider>();
         slider.minValue = 0f;
@@ -548,7 +584,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         RectTransform background = CreateRect("Background", root);
         Stretch(background, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         Image backgroundImage = CreateImage(background, new Color(0.14f, 0.22f, 0.26f, 1f));
-        backgroundImage.raycastTarget = false;
+        backgroundImage.raycastTarget = true;
 
         RectTransform fillArea = CreateRect("FillArea", root);
         Stretch(fillArea, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(8f, 5f), new Vector2(-8f, -5f));
@@ -562,8 +598,9 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         RectTransform handle = CreateRect("Handle", handleArea);
         handle.sizeDelta = new Vector2(18f, 32f);
         Image handleImage = CreateImage(handle, Color.white);
+        handleImage.raycastTarget = true;
 
-        slider.targetGraphic = handleImage;
+        slider.targetGraphic = backgroundImage;
         slider.fillRect = fill;
         slider.handleRect = handle;
         slider.onValueChanged.AddListener(onChanged);
@@ -626,6 +663,8 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
         optionsTitleLabel.text = LocalizationManager.Get("title.options", "Options");
         languageSectionLabel.text = LocalizationManager.Get("title.options.language", "Language");
+        if (audioSectionLabel != null)
+            audioSectionLabel.text = LocalizationManager.Get("title.options.audio", "Audio");
         masterVolumeLabel.text = LocalizationManager.Get("title.options.master_volume", "Master Volume");
         bgmVolumeLabel.text = LocalizationManager.Get("title.options.bgm_volume", "BGM Volume");
         sfxVolumeLabel.text = LocalizationManager.Get("title.options.sfx_volume", "SFX Volume");

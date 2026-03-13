@@ -129,6 +129,8 @@ public class WeaponLaser : MonoBehaviour
             end = best.point;
 
         UpdateBeam(origin, end);
+        if (ship.isPlayerShip)
+            AudioRuntime.RequestLaserLoop();
 
         cooldown -= Time.deltaTime;
         if (cooldown > 0f)
