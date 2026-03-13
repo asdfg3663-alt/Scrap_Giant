@@ -128,10 +128,10 @@ public class EnemyShipAI : MonoBehaviour
         if (rb == null || stats == null)
             return;
 
-        if (stats.totalThrust <= 0.001f)
+        if (!stats.HasOperationalModuleType(ModuleType.Engine))
         {
-            rb.linearVelocity = Vector2.MoveTowards(rb.linearVelocity, Vector2.zero, idleBrake * Time.fixedDeltaTime);
-            rb.angularVelocity = Mathf.MoveTowards(rb.angularVelocity, 0f, idleBrake * 20f * Time.fixedDeltaTime);
+            rb.linearVelocity = Vector2.zero;
+            rb.angularVelocity = 0f;
             return;
         }
 

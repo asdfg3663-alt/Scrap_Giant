@@ -5932,6 +5932,9 @@ MonoBehaviour:
   engineModulePrefab: {fileID: 5628837094240442396, guid: 283a4e87cc406cf46a05e4211c207c47, type: 3}
   fuelTankModulePrefab: {fileID: 7443228181453321000, guid: 6b8e7d91c8a94c57a5f2d9b8e4c31761, type: 3}
   laserModulePrefab: {fileID: 1687058770715388412, guid: 2910086d369e1834f8a6b663f0c1f584, type: 3}
+  powerPlantModulePrefab: {fileID: 7443228181453321000, guid: 3a0d8076997c0aa4887a7bccb0ec2b7f, type: 3}
+  repairModulePrefab: {fileID: 7443228181453321000, guid: af1898e0e0430e949829da20ecb2f2c9, type: 3}
+  radiatorModulePrefab: {fileID: 5628837094240442396, guid: a0a6c079d7374074f9dbb77782b5db54, type: 3}
   maxFloatingScraps: 5
   maxEnemyShips: 5
   spawnCheckInterval: 1.25

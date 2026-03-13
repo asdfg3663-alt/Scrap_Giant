@@ -3,7 +3,8 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class EnemyShipRuntime : MonoBehaviour
 {
-    public float detachImpulse = 3.5f;
+    public float detachLinearImpulse = 1.1f;
+    public float detachAngularImpulse = 0.4f;
 
     ModuleInstance coreModule;
     bool coreDestroyed;
@@ -60,8 +61,10 @@ public class EnemyShipRuntime : MonoBehaviour
             if (dir.sqrMagnitude < 0.001f)
                 dir = Random.insideUnitCircle.normalized;
 
-            rb.AddForce(dir * detachImpulse, ForceMode2D.Impulse);
-            rb.AddTorque(Random.Range(-detachImpulse, detachImpulse), ForceMode2D.Impulse);
+            rb.linearVelocity *= 0.2f;
+            rb.angularVelocity *= 0.2f;
+            rb.AddForce(dir * detachLinearImpulse, ForceMode2D.Impulse);
+            rb.AddTorque(Random.Range(-detachAngularImpulse, detachAngularImpulse), ForceMode2D.Impulse);
         }
 
         var despawn = moduleTransform.GetComponent<WorldDistanceDespawn>();

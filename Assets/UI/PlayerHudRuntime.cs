@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -12,6 +12,7 @@ public class PlayerHudRuntime : MonoBehaviour
     const float CollapsedInventoryWidth = 48f;
     static readonly Color NavigatorScrapColor = new Color(0.7f, 0.74f, 0.78f, 1f);
     static readonly Color NavigatorEnemyColor = new Color(0.96f, 0.26f, 0.22f, 1f);
+    static readonly Color NavigatorNeutralModuleColor = new Color(0.34f, 0.65f, 0.98f, 1f);
 
     static PlayerHudRuntime instance;
     static Sprite solidSprite;
@@ -91,6 +92,7 @@ public class PlayerHudRuntime : MonoBehaviour
     TMP_Text inventoryButtonText;
     TMP_Text scrapNavigatorArrow;
     TMP_Text enemyNavigatorArrow;
+    TMP_Text neutralModuleNavigatorArrow;
 
     float bestScore;
     int lastCurrentScore = int.MinValue;
@@ -362,14 +364,17 @@ public class PlayerHudRuntime : MonoBehaviour
 
     void InitializeDefaults()
     {
+        float startingScrap = WorldSpawnDirector.GetStartingScrap();
+        int startingAmmo = WorldSpawnDirector.GetStartingAmmo();
+
         if (resources.Count == 0)
-            resources.Add(new ResourceEntry("scrap", "Scrap", 240f, new Color(0.97f, 0.63f, 0.22f, 1f)));
+            resources.Add(new ResourceEntry("scrap", "Scrap", startingScrap, new Color(0.97f, 0.63f, 0.22f, 1f)));
 
         if (FindResource(resources, "fuel") == null)
             resources.Add(new ResourceEntry("fuel", "Fuel", 0f, new Color(0.38f, 0.85f, 0.95f, 1f), "0 / 0"));
 
         if (ammoEntries.Count == 0)
-            ammoEntries.Add(new ResourceEntry("ammo", "Ammo", 120, new Color(0.96f, 0.32f, 0.24f, 1f)));
+            ammoEntries.Add(new ResourceEntry("ammo", "Ammo", startingAmmo, new Color(0.96f, 0.32f, 0.24f, 1f)));
 
         assemblyActive = false;
         assemblyPrimaryLabel = "Fuel synthesis ready";
@@ -528,6 +533,7 @@ public class PlayerHudRuntime : MonoBehaviour
 
         scrapNavigatorArrow = CreateNavigatorArrow(navigatorRoot, "ScrapArrow", NavigatorScrapColor);
         enemyNavigatorArrow = CreateNavigatorArrow(navigatorRoot, "EnemyArrow", NavigatorEnemyColor);
+        neutralModuleNavigatorArrow = CreateNavigatorArrow(navigatorRoot, "NeutralModuleArrow", NavigatorNeutralModuleColor);
     }
 
     void RefreshAll(bool force)
@@ -639,6 +645,7 @@ public class PlayerHudRuntime : MonoBehaviour
         {
             SetNavigatorVisible(scrapNavigatorArrow, false);
             SetNavigatorVisible(enemyNavigatorArrow, false);
+            SetNavigatorVisible(neutralModuleNavigatorArrow, false);
             return;
         }
 
@@ -647,6 +654,7 @@ public class PlayerHudRuntime : MonoBehaviour
         {
             SetNavigatorVisible(scrapNavigatorArrow, false);
             SetNavigatorVisible(enemyNavigatorArrow, false);
+            SetNavigatorVisible(neutralModuleNavigatorArrow, false);
             return;
         }
 
@@ -655,6 +663,7 @@ public class PlayerHudRuntime : MonoBehaviour
         {
             SetNavigatorVisible(scrapNavigatorArrow, false);
             SetNavigatorVisible(enemyNavigatorArrow, false);
+            SetNavigatorVisible(neutralModuleNavigatorArrow, false);
             return;
         }
 
@@ -663,11 +672,13 @@ public class PlayerHudRuntime : MonoBehaviour
         {
             SetNavigatorVisible(scrapNavigatorArrow, false);
             SetNavigatorVisible(enemyNavigatorArrow, false);
+            SetNavigatorVisible(neutralModuleNavigatorArrow, false);
             return;
         }
 
         UpdateNavigatorArrow(scrapNavigatorArrow, coreTransform.position, playerScreenPos, WorldSpawnDirector.GetNearestFloatingScrap(coreTransform.position));
         UpdateNavigatorArrow(enemyNavigatorArrow, coreTransform.position, playerScreenPos, WorldSpawnDirector.GetNearestEnemyShip(coreTransform.position));
+        UpdateNavigatorArrow(neutralModuleNavigatorArrow, coreTransform.position, playerScreenPos, NeutralModuleSpawnDirector.GetNearestNeutralModule(coreTransform.position));
     }
 
     void UpdateNavigatorArrow(TMP_Text arrow, Vector3 originWorld, Vector3 originScreen, Component target)
@@ -967,3 +978,4 @@ public class PlayerHudRuntime : MonoBehaviour
         return solidSprite;
     }
 }
+

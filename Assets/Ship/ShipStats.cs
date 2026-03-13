@@ -28,6 +28,7 @@ public class ShipStats : MonoBehaviour
     public float fuelMax;
     public float fuelCurrent;
     public float fuelSynthesisPerSec;
+    public float fuelConsumptionMultiplier = 0.5f;
     public float lowFuelSynthesisThreshold = 0.2f;
     public float emptyFuelThrustMultiplier = 0.1f;
     public float minimumEmergencyThrust = 1f;
@@ -50,6 +51,7 @@ public class ShipStats : MonoBehaviour
     bool rebuildQueued;
     float synthesisScrapProgress;
     bool fuelSynthesisActive;
+    bool hasInitializedFuelReserve;
     bool weaponBatteryLocked;
     readonly System.Collections.Generic.List<ModuleInstance> repairQueue = new();
 
@@ -65,9 +67,6 @@ public class ShipStats : MonoBehaviour
 
         if (energyCurrent <= 0f)
             energyCurrent = energyMax;
-
-        if (fuelCurrent <= 0f && fuelMax > 0f)
-            fuelCurrent = fuelMax;
 
         if (isPlayerShip)
         {
@@ -172,14 +171,15 @@ public class ShipStats : MonoBehaviour
         currentHP = maxHP;
         energyCurrent = Mathf.Clamp(energyCurrent, 0f, energyMax);
 
-        float addedFuelCapacity = Mathf.Max(0f, fuelMax - previousFuelMax);
-        if (addedFuelCapacity > 0f)
-            previousFuelCurrent += addedFuelCapacity;
-
-        if (previousFuelMax <= 0f && fuelMax > 0f && previousFuelCurrent <= 0f)
-            previousFuelCurrent = fuelMax;
-
-        fuelCurrent = Mathf.Clamp(previousFuelCurrent, 0f, fuelMax);
+        if (!hasInitializedFuelReserve && fuelMax > 0f)
+        {
+            fuelCurrent = fuelMax * WorldSpawnDirector.GetInitialFuelFillRatio();
+            hasInitializedFuelReserve = true;
+        }
+        else
+        {
+            fuelCurrent = Mathf.Clamp(previousFuelCurrent, 0f, fuelMax);
+        }
         synthesisScrapProgress = Mathf.Clamp(synthesisScrapProgress, 0f, 1f);
 
         if (fuelMax <= 0f)
@@ -261,7 +261,7 @@ public class ShipStats : MonoBehaviour
         if (deltaTime <= 0f || totalThrust <= 0f || fuelCurrent <= 0f)
             return;
 
-        fuelCurrent -= totalThrust * deltaTime;
+        fuelCurrent -= totalThrust * Mathf.Max(0f, fuelConsumptionMultiplier) * deltaTime;
         if (fuelCurrent < 0f)
             fuelCurrent = 0f;
     }
@@ -282,6 +282,30 @@ public class ShipStats : MonoBehaviour
         }
 
         return transform;
+    }
+
+    public bool HasOperationalModuleType(ModuleType moduleType)
+    {
+        modules = GetComponentsInChildren<ModuleInstance>(true);
+        for (int i = 0; i < modules.Length; i++)
+        {
+            var module = modules[i];
+            if (module == null || module.data == null)
+                continue;
+
+            if (module.data.type != moduleType)
+                continue;
+
+            if (!module.gameObject.activeInHierarchy)
+                continue;
+
+            if (module.hp <= 0)
+                continue;
+
+            return true;
+        }
+
+        return false;
     }
 
     public int GetInstalledModuleCount()
@@ -347,8 +371,9 @@ public class ShipStats : MonoBehaviour
         if (fuelSynthesisActive && fuelCurrent < fuelMax)
         {
             var hud = PlayerHudRuntime.Instance;
+            float fuelPerScrap = WorldSpawnDirector.GetFuelPerScrap();
             if (hud == null || !hud.HasResource("scrap", 1f))
-                return "1 Scrap -> 10 Fuel";
+                return $"1 Scrap -> {fuelPerScrap:0.#} Fuel";
 
             return $"{fuelSynthesisPerSec:0.#} fuel/sec";
         }
@@ -378,7 +403,8 @@ public class ShipStats : MonoBehaviour
         if (hud == null)
             return;
 
-        synthesisScrapProgress += (fuelSynthesisPerSec * deltaTime) / 10f;
+        float fuelPerScrap = WorldSpawnDirector.GetFuelPerScrap();
+        synthesisScrapProgress += (fuelSynthesisPerSec * deltaTime) / fuelPerScrap;
 
         float missingFuel = fuelMax - fuelCurrent;
         if (missingFuel <= 0f)
@@ -394,7 +420,7 @@ public class ShipStats : MonoBehaviour
         if (!hud.TryConsumeResource("scrap", scrapToSpend))
             return;
 
-        float fuelToAdd = Mathf.Min(missingFuel, scrapToSpend * 10f);
+        float fuelToAdd = Mathf.Min(missingFuel, scrapToSpend * fuelPerScrap);
         fuelCurrent = Mathf.Clamp(fuelCurrent + fuelToAdd, 0f, fuelMax);
         synthesisScrapProgress = Mathf.Max(0f, synthesisScrapProgress - scrapToSpend);
     }

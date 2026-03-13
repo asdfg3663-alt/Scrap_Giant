@@ -238,6 +238,10 @@ public class ShipBuilder : MonoBehaviour
         att.gridPos = grid;
         att.rot90 = rot90;
 
+        var moduleInstance = moduleTf.GetComponent<ModuleInstance>();
+        if (moduleInstance != null)
+            NeutralModuleSpawnDirector.Unregister(moduleInstance);
+
         RestoreShipBodyStates(shipBodies);
 
 

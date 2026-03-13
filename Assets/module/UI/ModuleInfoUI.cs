@@ -32,9 +32,9 @@ public class ModuleInfoUI : MonoBehaviour
     TMP_Text upgradeActionLine;
     Button upgradeButton;
     EventTrigger upgradeTrigger;
+    RectTransform upgradeDockRoot;
     string upgradeHoverMessage;
     bool isUpgradeHovered;
-    bool upgradeButtonDockedToFooter;
 
     readonly List<TMP_Text> pool = new();
     int useCount;
@@ -181,7 +181,8 @@ public class ModuleInfoUI : MonoBehaviour
     void UpdateUpgradeAction(ModuleInstance module)
     {
         EnsureUpgradeActionLine();
-        upgradeActionLine.transform.SetAsLastSibling();
+        if (upgradeActionLine == null)
+            return;
 
         var upgradeSystem = ModuleUpgradeSystem.Instance;
         var info = upgradeSystem.GetUpgradeInfo(module);
@@ -212,13 +213,9 @@ public class ModuleInfoUI : MonoBehaviour
             return;
         }
 
-        upgradeActionLine.text = "<mark=#444A54 padding=\"22,22,7,7\">UPGRADE</mark>";
-        upgradeActionLine.color = upgradeLockedColor;
-        upgradeActionLine.raycastTarget = true;
-        upgradeButton.interactable = true;
         upgradeHoverMessage = reason;
-        RefreshUpgradeHintVisibility();
-        upgradeActionLine.gameObject.SetActive(true);
+        ForceHideUpgradeHint();
+        upgradeActionLine.gameObject.SetActive(false);
     }
 
     void EnsureNameLine()
@@ -239,10 +236,13 @@ public class ModuleInfoUI : MonoBehaviour
     {
         if (upgradeActionLine != null || lineTemplate == null) return;
 
-        Transform parent = lineTemplate.transform.parent != null ? lineTemplate.transform.parent : transform;
-        EnsureUpgradeHintLine(parent);
+        RectTransform dock = EnsureUpgradeDockRoot();
+        if (dock == null)
+            return;
 
-        var go = Instantiate(lineTemplate.gameObject, parent);
+        EnsureUpgradeHintLine(dock);
+
+        var go = Instantiate(lineTemplate.gameObject, dock);
         go.name = "UpgradeActionLine";
         go.SetActive(true);
 
@@ -255,6 +255,7 @@ public class ModuleInfoUI : MonoBehaviour
         upgradeActionLine.raycastTarget = true;
         upgradeActionLine.rectTransform.sizeDelta = new Vector2(220f, 30f);
         upgradeActionLine.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+        ConfigureDockedElement(upgradeActionLine.rectTransform, new Vector2(0f, 0f));
 
         upgradeButton = go.GetComponent<Button>();
         if (upgradeButton == null) upgradeButton = go.AddComponent<Button>();
@@ -286,6 +287,7 @@ public class ModuleInfoUI : MonoBehaviour
         upgradeHintLine.rectTransform.sizeDelta = new Vector2(320f, 24f);
         upgradeHintLine.raycastTarget = false;
         upgradeHintLine.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+        ConfigureDockedElement(upgradeHintLine.rectTransform, new Vector2(0f, 36f));
     }
 
     void BeginLines()
@@ -341,62 +343,16 @@ public class ModuleInfoUI : MonoBehaviour
 
     void LayoutUpgradeControls()
     {
-        if (nameLine == null || upgradeActionLine == null) return;
-
-        var parent = upgradeActionLine.rectTransform.parent as RectTransform;
-        if (parent == null) return;
-
-        Vector3[] nameCorners = new Vector3[4];
-        nameLine.rectTransform.GetWorldCorners(nameCorners);
-
-        RectTransform actionRect = upgradeActionLine.rectTransform;
-        float gap = 14f;
-        float actionWidth = actionRect.rect.width;
-        float actionHeight = actionRect.rect.height;
-        float halfWidth = actionWidth * 0.5f;
-        float halfHeight = actionHeight * 0.5f;
-        float leftLimit = (-parent.rect.width * 0.5f) + halfWidth + 16f;
-        float rightLimit = (parent.rect.width * 0.5f) - halfWidth - 16f;
-        float bottomLimit = (-parent.rect.height * 0.5f) + halfHeight + 12f;
-        float topLimit = (parent.rect.height * 0.5f) - halfHeight - 12f;
-
-        Vector3 topRight = nameCorners[2];
-        Vector3 desiredWorld = topRight + new Vector3(gap + actionWidth * 0.5f, -2f, 0f);
-        Vector3 local = parent.InverseTransformPoint(desiredWorld);
-
-        bool fitsOnRight = local.x <= rightLimit;
-
-        if (fitsOnRight)
-        {
-            upgradeButtonDockedToFooter = false;
-            local.x = Mathf.Clamp(local.x, leftLimit, rightLimit);
-            local.y = Mathf.Clamp(local.y, bottomLimit, topLimit);
-        }
-        else
-        {
-            upgradeButtonDockedToFooter = true;
-            local.x = leftLimit;
-            local.y = bottomLimit;
-        }
-
-        actionRect.localPosition = new Vector3(local.x, local.y, 0f);
-
-        if (upgradeHintLine == null || !upgradeHintLine.gameObject.activeSelf)
+        if (upgradeDockRoot == null)
             return;
 
-        RectTransform hintRect = upgradeHintLine.rectTransform;
-        float hintHalfWidth = hintRect.rect.width * 0.5f;
-        float hintHalfHeight = hintRect.rect.height * 0.5f;
-        Vector3[] actionCorners = new Vector3[4];
-        actionRect.GetWorldCorners(actionCorners);
-        Vector3 hintAnchor = upgradeButtonDockedToFooter ? actionCorners[1] : actionCorners[0];
-        Vector3 hintWorld = upgradeButtonDockedToFooter
-            ? hintAnchor + new Vector3(hintHalfWidth, 6f + hintHalfHeight, 0f)
-            : hintAnchor + new Vector3(hintHalfWidth, -6f, 0f);
-        Vector3 hintLocal = parent.InverseTransformPoint(hintWorld);
-        hintLocal.x = Mathf.Clamp(hintLocal.x, (-parent.rect.width * 0.5f) + hintHalfWidth + 12f, (parent.rect.width * 0.5f) - hintHalfWidth - 12f);
-        hintLocal.y = Mathf.Clamp(hintLocal.y, (-parent.rect.height * 0.5f) + hintHalfHeight + 12f, (parent.rect.height * 0.5f) - hintHalfHeight - 12f);
-        hintRect.localPosition = new Vector3(hintLocal.x, hintLocal.y, 0f);
+        ConfigureDockedElement(upgradeDockRoot, new Vector2(0f, 52f));
+
+        if (upgradeActionLine != null)
+            ConfigureDockedElement(upgradeActionLine.rectTransform, new Vector2(0f, 0f));
+
+        if (upgradeHintLine != null)
+            ConfigureDockedElement(upgradeHintLine.rectTransform, new Vector2(0f, 36f));
     }
 
     void ShowUpgradeHint()
@@ -479,6 +435,36 @@ public class ModuleInfoUI : MonoBehaviour
 
         useCount = 0;
         EndLines();
+    }
+
+    RectTransform EnsureUpgradeDockRoot()
+    {
+        if (upgradeDockRoot != null)
+            return upgradeDockRoot;
+
+        Canvas rootCanvas = GetComponentInParent<Canvas>();
+        if (rootCanvas == null)
+            return null;
+
+        var go = new GameObject("UpgradeDockRoot", typeof(RectTransform));
+        upgradeDockRoot = go.GetComponent<RectTransform>();
+        upgradeDockRoot.SetParent(rootCanvas.transform, false);
+        ConfigureDockedElement(upgradeDockRoot, new Vector2(0f, 52f));
+        upgradeDockRoot.sizeDelta = new Vector2(360f, 70f);
+        upgradeDockRoot.SetAsLastSibling();
+        return upgradeDockRoot;
+    }
+
+    void ConfigureDockedElement(RectTransform target, Vector2 anchoredPosition)
+    {
+        if (target == null)
+            return;
+
+        target.anchorMin = new Vector2(0.5f, 0f);
+        target.anchorMax = new Vector2(0.5f, 0f);
+        target.pivot = new Vector2(0.5f, 0f);
+        target.anchoredPosition = anchoredPosition;
+        target.localScale = Vector3.one;
     }
 
     void SafeDisableTemplate(TMP_Text template)

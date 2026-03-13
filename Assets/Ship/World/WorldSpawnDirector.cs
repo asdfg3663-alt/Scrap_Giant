@@ -4,12 +4,26 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class WorldSpawnDirector : MonoBehaviour
 {
+    const float DefaultStartingScrap = 240f;
+    const int DefaultStartingAmmo = 120;
+    const float DefaultFuelPerScrap = 10f;
+    const float DefaultInitialFuelFillRatio = 1f;
+
     [Header("Prefab Refs")]
     public GameObject scrapVisualPrefab;
     public GameObject coreModulePrefab;
     public GameObject engineModulePrefab;
     public GameObject fuelTankModulePrefab;
     public GameObject laserModulePrefab;
+    public GameObject powerPlantModulePrefab;
+    public GameObject repairModulePrefab;
+    public GameObject radiatorModulePrefab;
+
+    [Header("Resource Economy")]
+    public float startingScrap = DefaultStartingScrap;
+    public int startingAmmo = DefaultStartingAmmo;
+    public float fuelPerScrap = DefaultFuelPerScrap;
+    [Range(0f, 1f)] public float initialFuelFillRatio = DefaultInitialFuelFillRatio;
 
     [Header("Population")]
     public int maxFloatingScraps = 5;
@@ -85,8 +99,30 @@ public class WorldSpawnDirector : MonoBehaviour
         new Vector2Int(2, 1)
     };
 
+    static readonly Vector2Int[] SpecialSlots =
+    {
+        new Vector2Int(-2, 0),
+        new Vector2Int(2, 0),
+        new Vector2Int(-2, 1),
+        new Vector2Int(2, 1),
+        new Vector2Int(-2, -1),
+        new Vector2Int(2, -1),
+        new Vector2Int(-1, 2),
+        new Vector2Int(1, 2),
+        new Vector2Int(0, 3),
+        new Vector2Int(-3, 0),
+        new Vector2Int(3, 0),
+        new Vector2Int(-1, -2),
+        new Vector2Int(1, -2),
+        new Vector2Int(0, -3)
+    };
+
     public static Transform PlayerTransform => instance != null && instance.playerShip != null ? instance.playerShip.transform : null;
     public static float CurrentDespawnAxisLimit => instance != null ? instance.despawnAxisDistance : 100f;
+    public static float GetStartingScrap() => ResolveInstance() != null ? Mathf.Max(0f, instance.startingScrap) : DefaultStartingScrap;
+    public static int GetStartingAmmo() => ResolveInstance() != null ? Mathf.Max(0, instance.startingAmmo) : DefaultStartingAmmo;
+    public static float GetFuelPerScrap() => ResolveInstance() != null ? Mathf.Max(0.01f, instance.fuelPerScrap) : DefaultFuelPerScrap;
+    public static float GetInitialFuelFillRatio() => ResolveInstance() != null ? Mathf.Clamp01(instance.initialFuelFillRatio) : DefaultInitialFuelFillRatio;
 
     public static void RegisterPlayer(ShipStats ship)
     {
@@ -104,6 +140,7 @@ public class WorldSpawnDirector : MonoBehaviour
 
         instance.playerShip = ship;
         instance.playerRegisteredTime = Time.time;
+        NeutralModuleSpawnDirector.EnsureForWorld(instance);
     }
 
     public static FloatingScrap GetNearestFloatingScrap(Vector3 origin)
@@ -114,6 +151,14 @@ public class WorldSpawnDirector : MonoBehaviour
     public static EnemyShipRuntime GetNearestEnemyShip(Vector3 origin)
     {
         return instance != null ? instance.FindNearest(instance.enemyShips, origin) : null;
+    }
+
+    static WorldSpawnDirector ResolveInstance()
+    {
+        if (instance == null)
+            instance = FindObjectOfType<WorldSpawnDirector>();
+
+        return instance;
     }
 
     public static void NeutralizeDetachedModule(Transform moduleRoot)
@@ -274,15 +319,27 @@ public class WorldSpawnDirector : MonoBehaviour
         }
 
         int weaponUpgradeLevel = Mathf.Clamp(loadout.weaponUpgradeLevel, 0, maxLaserUpgradeLevel);
+        var occupied = new HashSet<Vector2Int> { Vector2Int.zero };
 
         for (int i = 0; i < loadout.engineCount && i < EngineSlots.Length; i++)
+        {
             AttachModule(root.transform, engineModulePrefab, EngineSlots[i], 0);
+            occupied.Add(EngineSlots[i]);
+        }
 
         for (int i = 0; i < loadout.fuelTankCount && i < FuelTankSlots.Length; i++)
+        {
             AttachModule(root.transform, fuelTankModulePrefab, FuelTankSlots[i], 0);
+            occupied.Add(FuelTankSlots[i]);
+        }
 
         for (int i = 0; i < loadout.laserCount && i < LaserSlots.Length; i++)
+        {
             AttachModule(root.transform, laserModulePrefab, LaserSlots[i], weaponUpgradeLevel);
+            occupied.Add(LaserSlots[i]);
+        }
+
+        AddSpecialModules(root.transform, occupied, loadout);
 
         IgnoreShipInternalCollisions(root.transform);
         ApplyEnemyVisualStyle(root.transform);
@@ -371,14 +428,67 @@ public class WorldSpawnDirector : MonoBehaviour
         int extraFuelTanks = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1f) / Mathf.Max(0.01f, extraFuelTankThreatStep)), 0, maxExtraFuelTanks);
         int extraLasers = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1f) / Mathf.Max(0.01f, extraLaserThreatStep)), 0, maxExtraLasers);
         int weaponUpgradeLevel = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1f) / Mathf.Max(0.01f, weaponTierThreatStep)), 0, maxLaserUpgradeLevel);
+        int reactorBudget = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1.25f) / 2.5f), 0, 2);
+        int repairBudget = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 2f) / 3.25f), 0, 1);
+        int radiatorBudget = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1f) / 2f), 0, 2);
 
         return new EnemyLoadout
         {
             engineCount = Mathf.Min(EngineSlots.Length, 1 + extraEngines + Mathf.Max(0, extraLasers / 2)),
             fuelTankCount = Mathf.Min(FuelTankSlots.Length, 1 + extraFuelTanks),
             laserCount = Mathf.Min(LaserSlots.Length, 1 + extraLasers),
-            weaponUpgradeLevel = weaponUpgradeLevel
+            weaponUpgradeLevel = weaponUpgradeLevel,
+            powerPlantCount = powerPlantModulePrefab != null ? Random.Range(0, reactorBudget + 1) : 0,
+            repairCount = repairModulePrefab != null ? Random.Range(0, repairBudget + 1) : 0,
+            radiatorCount = radiatorModulePrefab != null ? Random.Range(0, radiatorBudget + 1) : 0
         };
+    }
+
+    void AddSpecialModules(Transform shipRoot, HashSet<Vector2Int> occupied, EnemyLoadout loadout)
+    {
+        if (shipRoot == null)
+            return;
+
+        var availableSlots = new List<Vector2Int>(SpecialSlots.Length);
+        for (int i = 0; i < SpecialSlots.Length; i++)
+        {
+            if (!occupied.Contains(SpecialSlots[i]))
+                availableSlots.Add(SpecialSlots[i]);
+        }
+
+        ShuffleSlots(availableSlots);
+        int slotIndex = 0;
+
+        slotIndex = AddSpecialModuleGroup(shipRoot, powerPlantModulePrefab, loadout.powerPlantCount, availableSlots, occupied, slotIndex);
+        slotIndex = AddSpecialModuleGroup(shipRoot, repairModulePrefab, loadout.repairCount, availableSlots, occupied, slotIndex);
+        AddSpecialModuleGroup(shipRoot, radiatorModulePrefab, loadout.radiatorCount, availableSlots, occupied, slotIndex);
+    }
+
+    int AddSpecialModuleGroup(Transform shipRoot, GameObject prefab, int count, List<Vector2Int> availableSlots, HashSet<Vector2Int> occupied, int slotIndex)
+    {
+        if (prefab == null || count <= 0)
+            return slotIndex;
+
+        for (int i = 0; i < count && slotIndex < availableSlots.Count; i++, slotIndex++)
+        {
+            Vector2Int gridPos = availableSlots[slotIndex];
+            if (occupied.Contains(gridPos))
+                continue;
+
+            AttachModule(shipRoot, prefab, gridPos, 0);
+            occupied.Add(gridPos);
+        }
+
+        return slotIndex;
+    }
+
+    static void ShuffleSlots(List<Vector2Int> slots)
+    {
+        for (int i = slots.Count - 1; i > 0; i--)
+        {
+            int swapIndex = Random.Range(0, i + 1);
+            (slots[i], slots[swapIndex]) = (slots[swapIndex], slots[i]);
+        }
     }
 
     Vector2 GetRandomSpawnPosition()
@@ -557,5 +667,8 @@ public class WorldSpawnDirector : MonoBehaviour
         public int fuelTankCount;
         public int laserCount;
         public int weaponUpgradeLevel;
+        public int powerPlantCount;
+        public int repairCount;
+        public int radiatorCount;
     }
 }
