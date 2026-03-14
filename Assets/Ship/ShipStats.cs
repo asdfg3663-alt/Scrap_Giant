@@ -171,7 +171,7 @@ public class ShipStats : MonoBehaviour
             float dps = m.GetDps();
             totalDps += dps;
             weaponPowerPerSecPotential += Mathf.Max(0f, m.GetWeaponPowerPerShot()) * Mathf.Max(0f, m.GetWeaponFireRate());
-            weaponHeatPerSecPotential += Mathf.Max(0f, m.GetWeaponHeatPerShot()) * Mathf.Max(0f, m.GetWeaponFireRate());
+            weaponHeatPerSecPotential += Mathf.Max(0f, m.GetWeaponHeatPerSecondPotential());
             weaponAmmoPerSecPotential += Mathf.Max(0f, m.GetWeaponAmmoPerShot()) * Mathf.Max(0f, m.GetWeaponFireRate());
         }
 
@@ -548,8 +548,9 @@ public class ShipStats : MonoBehaviour
             if (module == null || module.data == null)
                 continue;
 
-            if (module.data.type == ModuleType.Reactor && module.GetPowerGenPerSec() > 0f)
-                module.AddHeat(module.GetPowerGenPerSec() * 2f * deltaTime);
+            float passiveHeat = module.GetPassiveHeatPerSecond();
+            if (passiveHeat > 0f)
+                module.AddHeat(passiveHeat * deltaTime);
 
             module.CoolHeat(coolingPerSecond * deltaTime);
         }

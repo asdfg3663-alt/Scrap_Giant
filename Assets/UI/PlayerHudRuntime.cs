@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 [DisallowMultipleComponent]
 public class PlayerHudRuntime : MonoBehaviour
@@ -44,13 +45,21 @@ public class PlayerHudRuntime : MonoBehaviour
         public string label;
         public int amount;
         public Color color;
+        public GameObject prefab;
+        public Sprite iconSprite;
+        public int upgradeLevel;
+        public ModuleType moduleType;
 
-        public InventoryEntry(string id, string label, int amount, Color color)
+        public InventoryEntry(string id, string label, int amount, Color color, GameObject prefab = null, Sprite iconSprite = null, int upgradeLevel = 0, ModuleType moduleType = ModuleType.Scrap)
         {
             this.id = id;
             this.label = label;
             this.amount = amount;
             this.color = color;
+            this.prefab = prefab;
+            this.iconSprite = iconSprite;
+            this.upgradeLevel = upgradeLevel;
+            this.moduleType = moduleType;
         }
     }
 
@@ -65,9 +74,11 @@ public class PlayerHudRuntime : MonoBehaviour
     struct InventoryRow
     {
         public GameObject root;
+        public Image background;
         public Image icon;
         public TMP_Text label;
         public TMP_Text value;
+        public InventoryEntryDragHandle dragHandle;
     }
 
     ShipStats trackedShip;
@@ -95,9 +106,14 @@ public class PlayerHudRuntime : MonoBehaviour
     TMP_Text inventoryCountText;
     TMP_Text inventoryButtonText;
     TMP_Text inventoryEmptyText;
+    TMP_Text inventoryDetailText;
     TMP_Text scrapNavigatorArrow;
     TMP_Text enemyNavigatorArrow;
     TMP_Text neutralModuleNavigatorArrow;
+
+    [SerializeField] int inventoryCapacity = 2;
+    int nextInventoryEntrySerial = 1;
+    string selectedInventoryEntryId;
 
     float bestScore;
     int lastCurrentScore = int.MinValue;
@@ -120,6 +136,7 @@ public class PlayerHudRuntime : MonoBehaviour
     readonly List<ValueRow> resourceRows = new();
     readonly List<ValueRow> ammoRows = new();
     readonly List<InventoryRow> inventoryRows = new();
+    readonly HashSet<int> storingModuleInstanceIds = new();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics()
@@ -135,6 +152,7 @@ public class PlayerHudRuntime : MonoBehaviour
     public static int GetSessionBestScore() => Mathf.RoundToInt(sessionBestScore);
     public static void ResetSessionBestScore() => sessionBestScore = 0f;
     public static void SetSessionBestScore(float value) => sessionBestScore = Mathf.Max(0f, value);
+    public int InventoryCapacity => Mathf.Max(0, inventoryCapacity);
 
     public static void EnsureForPlayer(ShipStats ship)
     {
@@ -310,6 +328,109 @@ public class PlayerHudRuntime : MonoBehaviour
 
         entry.amount = Mathf.Max(0, entry.amount - amount);
         inventoryEntries.RemoveAll(x => x.amount <= 0);
+        inventoryUiDirty = true;
+    }
+
+    public bool CanAcceptInventoryModules(int amount = 1)
+    {
+        return GetStoredInventoryModuleCount() + Mathf.Max(0, amount) <= InventoryCapacity;
+    }
+
+    public bool IsScreenPointOverInventory(Vector2 screenPoint)
+    {
+        if (!inventoryExpanded || inventoryBody == null || !inventoryBody.activeInHierarchy)
+            return false;
+
+        return inventoryPanel != null && RectTransformUtility.RectangleContainsScreenPoint(inventoryPanel, screenPoint, null);
+    }
+
+    public bool AddStoredModulePrefab(GameObject prefab, int amount = 1, int upgradeLevel = 0)
+    {
+        if (prefab == null || amount <= 0 || !CanAcceptInventoryModules(amount))
+            return false;
+
+        ModuleInstance module = prefab.GetComponent<ModuleInstance>();
+        ModuleData data = module != null ? module.data : null;
+        string label = GetInventoryLabel(prefab, data);
+        Color color = GetInventoryColor(data);
+        Sprite icon = ResolveModuleSprite(prefab.transform);
+        ModuleType moduleType = data != null ? data.type : ModuleType.Scrap;
+
+        for (int i = 0; i < amount; i++)
+        {
+            string id = BuildInventoryId(prefab, data, upgradeLevel);
+            InventoryEntry entry = new InventoryEntry(id, label, 1, color, prefab, icon, upgradeLevel, moduleType);
+            inventoryEntries.Add(entry);
+            selectedInventoryEntryId = entry.id;
+        }
+
+        inventoryUiDirty = true;
+        return true;
+    }
+
+    public bool TryStoreDetachedModule(Transform moduleTransform, Vector2 screenPoint)
+    {
+        if (moduleTransform == null || !IsScreenPointOverInventory(screenPoint) || !CanAcceptInventoryModules())
+            return false;
+
+        int moduleInstanceId = moduleTransform.gameObject.GetInstanceID();
+        if (storingModuleInstanceIds.Contains(moduleInstanceId))
+            return true;
+
+        ModuleInstance module = moduleTransform.GetComponent<ModuleInstance>();
+        if (module == null || module.data == null)
+            return false;
+
+        GameObject prefab = ResolveInventoryPrefab(module);
+        if (prefab == null)
+            return false;
+
+        storingModuleInstanceIds.Add(moduleInstanceId);
+        if (!AddStoredModulePrefab(prefab, 1, module.upgradeLevel))
+        {
+            storingModuleInstanceIds.Remove(moduleInstanceId);
+            return false;
+        }
+
+        NeutralModuleSpawnDirector.Unregister(module);
+        Destroy(moduleTransform.gameObject);
+        inventoryUiDirty = true;
+        return true;
+    }
+
+    public bool TryBeginStoredModuleDrag(string entryId, Vector2 screenPoint)
+    {
+        InventoryEntry entry = FindInventory(entryId);
+        if (entry == null || entry.prefab == null)
+            return false;
+
+        ShipBuilder builder = trackedShip != null
+            ? trackedShip.GetComponent<ShipBuilder>()
+            : FindFirstObjectByType<ShipBuilder>();
+        if (builder == null)
+            return false;
+
+        if (!builder.BeginInventoryDrag(entry.prefab, entry.upgradeLevel, screenPoint))
+            return false;
+
+        inventoryEntries.Remove(entry);
+        inventoryUiDirty = true;
+        return true;
+    }
+
+    public void ClearStoredModules()
+    {
+        inventoryEntries.Clear();
+        nextInventoryEntrySerial = 1;
+        selectedInventoryEntryId = string.Empty;
+        storingModuleInstanceIds.Clear();
+        inventoryUiDirty = true;
+    }
+
+    public void SelectInventoryEntry(string entryId)
+    {
+        selectedInventoryEntryId = entryId ?? string.Empty;
+        RefreshInventoryDetail();
         inventoryUiDirty = true;
     }
 
@@ -540,17 +661,26 @@ public class PlayerHudRuntime : MonoBehaviour
         Stretch(bodyRect, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(18f, 18f), new Vector2(-18f, -46f));
 
         inventoryListRoot = CreateRect("Items", bodyRect);
-        Stretch(inventoryListRoot, new Vector2(0f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
-        var layout = inventoryListRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = 8f;
+        Stretch(inventoryListRoot, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(12f, 108f), new Vector2(-12f, -62f));
+        var layout = inventoryListRoot.gameObject.AddComponent<GridLayoutGroup>();
+        layout.cellSize = new Vector2(104f, 104f);
+        layout.spacing = new Vector2(12f, 12f);
+        layout.startAxis = GridLayoutGroup.Axis.Horizontal;
+        layout.startCorner = GridLayoutGroup.Corner.UpperLeft;
         layout.childAlignment = TextAnchor.UpperLeft;
-        layout.childControlHeight = false;
-        layout.childControlWidth = true;
-        layout.childForceExpandWidth = true;
-        layout.childForceExpandHeight = false;
+        layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        layout.constraintCount = 2;
+
+        var detailRoot = CreateRect("InventoryDetail", bodyRect);
+        SetAnchored(detailRoot, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 8f), new Vector2(232f, 86f));
+        CreateBackPlate(detailRoot, new Color(0.05f, 0.09f, 0.12f, 0.92f));
+        inventoryDetailText = CreateLabel(detailRoot, LocalizationManager.Get("ui.inventory_empty", "Drag modules here."), 13f, new Color(0.76f, 0.84f, 0.9f, 1f), TextAlignmentOptions.TopLeft, new Vector2(12f, -10f), new Vector2(0f, 1f), FontStyles.Normal);
+        inventoryDetailText.enableWordWrapping = true;
+        inventoryDetailText.overflowMode = TextOverflowModes.Ellipsis;
+        inventoryDetailText.rectTransform.sizeDelta = new Vector2(208f, 64f);
 
         inventoryEmptyState = CreateRect("EmptyState", bodyRect).gameObject;
-        inventoryEmptyText = CreateLabel(inventoryEmptyState.transform, LocalizationManager.Get("ui.inventory_empty", "Stored modules will appear here."), 15f, new Color(0.56f, 0.68f, 0.74f, 1f), TextAlignmentOptions.Center, Vector2.zero, new Vector2(0.5f, 0.5f), FontStyles.Italic);
+        inventoryEmptyText = CreateLabel(inventoryEmptyState.transform, LocalizationManager.Get("ui.inventory_empty", "Drag modules here."), 15f, new Color(0.56f, 0.68f, 0.74f, 1f), TextAlignmentOptions.Center, Vector2.zero, new Vector2(0.5f, 0.5f), FontStyles.Italic);
         Stretch(inventoryEmptyText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
 
         ApplyInventoryState();
@@ -626,24 +756,39 @@ public class PlayerHudRuntime : MonoBehaviour
     {
         if (inventoryListRoot == null) return;
 
-        while (inventoryRows.Count < inventoryEntries.Count)
+        if (!string.IsNullOrEmpty(selectedInventoryEntryId) && FindInventory(selectedInventoryEntryId) == null)
+            selectedInventoryEntryId = string.Empty;
+
+        while (inventoryRows.Count < InventoryCapacity)
             inventoryRows.Add(CreateInventoryRow(inventoryListRoot));
 
         for (int i = 0; i < inventoryRows.Count; i++)
         {
-            bool active = i < inventoryEntries.Count;
-            inventoryRows[i].root.SetActive(active);
-            if (!active) continue;
+            inventoryRows[i].root.SetActive(true);
 
-            var entry = inventoryEntries[i];
-            inventoryRows[i].icon.color = entry.color;
-            inventoryRows[i].label.text = entry.label;
-            inventoryRows[i].value.text = $"x{entry.amount}";
+            bool hasEntry = i < inventoryEntries.Count;
+            InventoryEntry entry = hasEntry ? inventoryEntries[i] : null;
+            bool isSelected = hasEntry && string.Equals(entry.id, selectedInventoryEntryId, StringComparison.OrdinalIgnoreCase);
+
+            inventoryRows[i].background.color = hasEntry
+                ? (isSelected ? new Color(0.16f, 0.26f, 0.34f, 1f) : new Color(0.1f, 0.16f, 0.2f, 0.96f))
+                : new Color(0.05f, 0.08f, 0.11f, 0.8f);
+            inventoryRows[i].icon.sprite = hasEntry && entry.iconSprite != null ? entry.iconSprite : GetSolidSprite();
+            inventoryRows[i].icon.type = hasEntry && entry.iconSprite != null ? Image.Type.Simple : Image.Type.Sliced;
+            inventoryRows[i].icon.preserveAspect = hasEntry && entry.iconSprite != null;
+            inventoryRows[i].icon.color = hasEntry
+                ? (entry.iconSprite != null ? Color.white : entry.color)
+                : new Color(0.22f, 0.3f, 0.35f, 0.55f);
+            inventoryRows[i].label.text = hasEntry ? entry.label : string.Empty;
+            inventoryRows[i].label.gameObject.SetActive(false);
+            inventoryRows[i].value.text = hasEntry && entry.amount > 1 ? $"x{entry.amount}" : string.Empty;
+            inventoryRows[i].dragHandle.Configure(this, hasEntry ? entry.id : string.Empty);
         }
 
         bool hasItems = inventoryEntries.Count > 0;
         if (inventoryEmptyState != null) inventoryEmptyState.SetActive(!hasItems);
-        if (inventoryCountText != null) inventoryCountText.text = LocalizationManager.Format("ui.inventory_parts", "{0} parts", inventoryEntries.Count);
+        if (inventoryCountText != null) inventoryCountText.text = $"{GetStoredInventoryModuleCount()} / {InventoryCapacity}";
+        RefreshInventoryDetail();
 
         inventoryUiDirty = false;
     }
@@ -672,6 +817,46 @@ public class PlayerHudRuntime : MonoBehaviour
                 ? new Color(0.34f, 0.88f, 0.67f, 1f)
                 : new Color(0.2f, 0.34f, 0.29f, 1f);
         }
+    }
+
+    void RefreshInventoryDetail()
+    {
+        if (inventoryDetailText == null)
+            return;
+
+        InventoryEntry entry = FindInventory(selectedInventoryEntryId);
+        if (entry == null || entry.prefab == null)
+        {
+            inventoryDetailText.text = LocalizationManager.Get("ui.inventory_empty", "Drag modules here.");
+            return;
+        }
+
+        ModuleInstance module = entry.prefab.GetComponent<ModuleInstance>();
+        ModuleData data = module != null ? module.data : null;
+        if (module == null || data == null)
+        {
+            inventoryDetailText.text = entry.label;
+            return;
+        }
+
+        List<string> lines = new List<string>(5)
+        {
+            entry.label
+        };
+
+        if (module.GetMass() > 0f)
+            lines.Add(LocalizationManager.Format("info.mass", "Mass: {0}", module.GetMass().ToString("0.##")));
+
+        if (module.GetThrust() > 0f)
+            lines.Add(LocalizationManager.Format("info.thrust", "Thrust: {0}", module.GetThrust().ToString("0.##")));
+
+        if (module.GetMaxFuel() > 0f)
+            lines.Add(LocalizationManager.Format("info.fuel_cap", "Fuel Cap: {0}", module.GetMaxFuel().ToString("0.##")));
+
+        if (module.GetDps() > 0f)
+            lines.Add(LocalizationManager.Format("info.dps", "DPS: {0}", module.GetDps().ToString("0.##")));
+
+        inventoryDetailText.text = string.Join("\n", lines);
     }
 
     void RefreshNavigator()
@@ -735,7 +920,10 @@ public class PlayerHudRuntime : MonoBehaviour
             inventoryTitleText.text = LocalizationManager.Get("ui.inventory", "INVENTORY");
 
         if (inventoryEmptyText != null)
-            inventoryEmptyText.text = LocalizationManager.Get("ui.inventory_empty", "Stored modules will appear here.");
+            inventoryEmptyText.text = LocalizationManager.Get("ui.inventory_empty", "Drag modules here.");
+
+        if (inventoryDetailText != null && string.IsNullOrWhiteSpace(selectedInventoryEntryId))
+            inventoryDetailText.text = LocalizationManager.Get("ui.inventory_empty", "Drag modules here.");
 
         var scrapEntry = FindResource(resources, "scrap");
         if (scrapEntry != null)
@@ -856,39 +1044,45 @@ public class PlayerHudRuntime : MonoBehaviour
     InventoryRow CreateInventoryRow(RectTransform parent)
     {
         var row = CreateRect("InventoryRow", parent);
-        row.sizeDelta = new Vector2(0f, 34f);
-        CreateBackPlate(row, new Color(0.07f, 0.11f, 0.14f, 0.88f));
-
-        var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
-        layout.padding = new RectOffset(10, 10, 7, 7);
-        layout.spacing = 10f;
-        layout.childAlignment = TextAnchor.MiddleLeft;
-        layout.childControlHeight = false;
-        layout.childControlWidth = false;
-        layout.childForceExpandWidth = false;
-        layout.childForceExpandHeight = false;
+        row.sizeDelta = new Vector2(104f, 104f);
+        CreateBackPlate(row, new Color(0.05f, 0.08f, 0.11f, 0.8f));
+        var background = row.GetComponent<Image>();
+        if (background != null)
+            background.raycastTarget = true;
 
         var iconRect = CreateRect("Icon", row);
-        iconRect.sizeDelta = new Vector2(20f, 20f);
-        var icon = CreateImage(iconRect, new Color(0.8f, 0.84f, 0.88f, 1f));
+        Stretch(iconRect, new Vector2(0.14f, 0.14f), new Vector2(0.86f, 0.86f), Vector2.zero, Vector2.zero);
+        var icon = CreateImage(iconRect, new Color(0.22f, 0.3f, 0.35f, 0.55f));
+        icon.type = Image.Type.Simple;
+        icon.preserveAspect = true;
 
         var label = CreateInlineLabel(row, "Name", 15f, Color.white, FontStyles.Normal);
-        label.textWrappingMode = TextWrappingModes.NoWrap;
-        label.overflowMode = TextOverflowModes.Ellipsis;
-        label.rectTransform.sizeDelta = new Vector2(150f, 20f);
-
-        var spacer = CreateRect("Spacer", row);
-        spacer.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+        label.rectTransform.anchorMin = new Vector2(0f, 0f);
+        label.rectTransform.anchorMax = new Vector2(1f, 0f);
+        label.rectTransform.pivot = new Vector2(0.5f, 0f);
+        label.rectTransform.anchoredPosition = new Vector2(0f, 8f);
+        label.rectTransform.sizeDelta = new Vector2(-12f, 18f);
+        label.alignment = TextAlignmentOptions.Center;
+        label.gameObject.SetActive(false);
 
         var value = CreateInlineLabel(row, "Count", 14f, new Color(0.78f, 0.88f, 0.92f, 1f), FontStyles.Bold);
-        value.rectTransform.sizeDelta = new Vector2(44f, 20f);
+        value.rectTransform.anchorMin = new Vector2(1f, 0f);
+        value.rectTransform.anchorMax = new Vector2(1f, 0f);
+        value.rectTransform.pivot = new Vector2(1f, 0f);
+        value.rectTransform.anchoredPosition = new Vector2(-8f, 8f);
+        value.rectTransform.sizeDelta = new Vector2(40f, 18f);
+        value.alignment = TextAlignmentOptions.BottomRight;
+
+        var dragHandle = row.gameObject.AddComponent<InventoryEntryDragHandle>();
 
         return new InventoryRow
         {
             root = row.gameObject,
+            background = background,
             icon = icon,
             label = label,
-            value = value
+            value = value,
+            dragHandle = dragHandle
         };
     }
 
@@ -956,6 +1150,71 @@ public class PlayerHudRuntime : MonoBehaviour
         entry = new InventoryEntry(id, string.IsNullOrWhiteSpace(label) ? id : label, 0, color);
         inventoryEntries.Add(entry);
         return entry;
+    }
+
+    int GetStoredInventoryModuleCount()
+    {
+        int total = 0;
+        for (int i = 0; i < inventoryEntries.Count; i++)
+            total += Mathf.Max(0, inventoryEntries[i].amount);
+
+        return total;
+    }
+
+    string BuildInventoryId(GameObject prefab, ModuleData data, int upgradeLevel)
+    {
+        string baseId = data != null && !string.IsNullOrWhiteSpace(data.name)
+            ? data.name
+            : (prefab != null ? prefab.name : "module");
+        return $"{baseId}:{Mathf.Max(0, upgradeLevel)}:{nextInventoryEntrySerial++}";
+    }
+
+    string GetInventoryLabel(GameObject prefab, ModuleData data)
+    {
+        if (data != null)
+        {
+            string formatted = ModuleInstance.FormatDisplayName(data.displayName, data.tier);
+            return LocalizationManager.GetModuleText(data.localizationKey, formatted);
+        }
+
+        return prefab != null ? prefab.name : "Module";
+    }
+
+    Color GetInventoryColor(ModuleData data)
+    {
+        if (data == null)
+            return new Color(0.8f, 0.84f, 0.88f, 1f);
+
+        return data.type switch
+        {
+            ModuleType.Engine => new Color(0.35f, 0.78f, 1f, 1f),
+            ModuleType.Weapon => new Color(1f, 0.37f, 0.27f, 1f),
+            ModuleType.FuelTank => new Color(0.34f, 0.9f, 0.6f, 1f),
+            ModuleType.Reactor => new Color(1f, 0.82f, 0.29f, 1f),
+            ModuleType.Radiator => new Color(0.66f, 0.83f, 1f, 1f),
+            ModuleType.Repair => new Color(0.94f, 0.53f, 0.89f, 1f),
+            _ => new Color(0.8f, 0.84f, 0.88f, 1f)
+        };
+    }
+
+    Sprite ResolveModuleSprite(Transform moduleTransform)
+    {
+        if (moduleTransform == null)
+            return null;
+
+        SpriteRenderer renderer = moduleTransform.GetComponentInChildren<SpriteRenderer>(true);
+        return renderer != null ? renderer.sprite : null;
+    }
+
+    GameObject ResolveInventoryPrefab(ModuleInstance module)
+    {
+        if (module == null || module.data == null)
+            return null;
+
+        if (module.data.type == ModuleType.Weapon)
+            return WorldSpawnDirector.GetModulePrefabByType(ModuleType.Weapon);
+
+        return WorldSpawnDirector.GetModulePrefabByType(module.data.type);
     }
 
     TMP_FontAsset ResolveFontAsset()

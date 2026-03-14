@@ -169,7 +169,11 @@ public class ShipBuilder : MonoBehaviour
         {
             bool dropped = false;
             if (isDragging)
+            {
                 dropped = TryDrop();
+                if (!dropped)
+                    dropped = TryStoreDraggedModule();
+            }
 
             if (isDragging && draggingTf && !dropped)
                 EndDetachedDrag(draggingTf);
@@ -213,6 +217,19 @@ public class ShipBuilder : MonoBehaviour
         AttachModule(draggingTf, cand.grid, cand.rot90);
         RebuildOccupiedMap();
         if (shipStats) shipStats.Rebuild();
+        return true;
+    }
+
+    bool TryStoreDraggedModule()
+    {
+        if (!draggingTf)
+            return false;
+
+        var hud = PlayerHudRuntime.Instance;
+        if (hud == null || !hud.TryStoreDetachedModule(draggingTf, MouseScreen()))
+            return false;
+
+        AudioRuntime.EndModuleDrag();
         return true;
     }
 
@@ -320,6 +337,40 @@ public class ShipBuilder : MonoBehaviour
         rb.bodyType = RigidbodyType2D.Kinematic;
         rb.constraints = RigidbodyConstraints2D.FreezeAll;
         rb.simulated = false;
+    }
+
+    public bool BeginInventoryDrag(GameObject modulePrefab, int upgradeLevel, Vector2 screenPosition)
+    {
+        if (modulePrefab == null || cam == null || isDragging)
+            return false;
+
+        Vector3 spawnWorld = cam.ScreenToWorldPoint(screenPosition);
+        spawnWorld.z = 0f;
+
+        GameObject moduleGO = Instantiate(modulePrefab, spawnWorld, Quaternion.identity);
+        Transform moduleTf = moduleGO.transform;
+
+        ModuleInstance moduleInstance = moduleGO.GetComponent<ModuleInstance>();
+        if (moduleInstance != null && upgradeLevel > 0)
+            moduleInstance.ApplyUpgrade(upgradeLevel);
+
+        PrepareDetachedModule(moduleTf);
+
+        pointerWorldNow = spawnWorld;
+        pressWorld = spawnWorld;
+        pressT = longPressTime;
+        dragOffset = Vector3.zero;
+        pointerDown = true;
+        isDragging = true;
+        wasAttachedAtDragStart = false;
+        draggingTf = moduleTf;
+        draggingMod = moduleTf.GetComponent<Module>();
+        draggingCol = moduleTf.GetComponentInChildren<Collider2D>();
+
+        BeginDragPreview(moduleTf);
+        UpdateDrag();
+        AudioRuntime.BeginModuleDrag();
+        return true;
     }
 
     void EndDetachedDrag(Transform moduleTf)
@@ -659,6 +710,15 @@ bool IsOccupied(Vector2Int grid) => occupied.ContainsKey(grid);
         return cam.ScreenToWorldPoint(Input.mousePosition);
     }
 
+    Vector2 MouseScreen()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Mouse.current != null)
+            return Mouse.current.position.ReadValue();
+#endif
+        return Input.mousePosition;
+    }
+
     bool GetPointerDown()
     {
 #if ENABLE_INPUT_SYSTEM
@@ -731,6 +791,32 @@ void IgnoreCollisionsWithShip(Transform moduleTf, bool ignore)
         }
     }
 }
+
+    void PrepareDetachedModule(Transform moduleTf)
+    {
+        if (!moduleTf)
+            return;
+
+        ModuleAttachment attachment = moduleTf.GetComponent<ModuleAttachment>();
+        if (attachment != null)
+        {
+            attachment.shipRoot = null;
+            attachment.gridPos = default;
+            attachment.rot90 = 0;
+        }
+
+        SetModulePhysics(moduleTf, attachedToShip: false);
+        WorldSpawnDirector.NeutralizeDetachedModule(moduleTf);
+
+        WorldDistanceDespawn despawn = moduleTf.GetComponent<WorldDistanceDespawn>();
+        if (despawn == null)
+            despawn = moduleTf.gameObject.AddComponent<WorldDistanceDespawn>();
+        despawn.axisLimit = WorldSpawnDirector.CurrentDespawnAxisLimit;
+
+        ModuleInstance moduleInstance = moduleTf.GetComponent<ModuleInstance>();
+        if (moduleInstance != null)
+            NeutralModuleSpawnDirector.Unregister(moduleInstance);
+    }
 
 
 }

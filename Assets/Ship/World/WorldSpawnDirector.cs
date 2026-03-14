@@ -56,10 +56,12 @@ public class WorldSpawnDirector : MonoBehaviour
     public float extraEngineThreatStep = 1.35f;
     public float extraFuelTankThreatStep = 1.7f;
     public float extraLaserThreatStep = 1.1f;
+    public float moduleTierThreatStep = 1.8f;
     public float weaponTierThreatStep = 1.4f;
     public int maxExtraEngines = 4;
     public int maxExtraFuelTanks = 4;
     public int maxExtraLasers = 4;
+    public int maxModuleUpgradeLevel = 4;
     public int maxLaserUpgradeLevel = 4;
 
     static WorldSpawnDirector instance;
@@ -312,7 +314,7 @@ public class WorldSpawnDirector : MonoBehaviour
 
         float threat = EvaluateThreat(playerShip.totalScore);
         EnemyLoadout loadout = BuildLoadout(threat);
-        if (!TryCreateEnemyAssembly(loadout, out List<EnemyModulePlacement> assembly))
+        if (!TryCreateEnemyAssemblyWithFallback(loadout, out EnemyLoadout resolvedLoadout, out List<EnemyModulePlacement> assembly))
             return false;
 
         Vector2 spawnPosition = GetRandomSpawnPosition();
@@ -332,7 +334,7 @@ public class WorldSpawnDirector : MonoBehaviour
 
         var runtime = root.AddComponent<EnemyShipRuntime>();
         var ai = root.AddComponent<EnemyShipAI>();
-        ai.Initialize(enemyDesiredRange, enemyAttackRange, enemyFireConeAngle, enemyMaxSpeed + threat);
+        ai.Initialize(enemyDesiredRange, enemyAttackRange, enemyFireConeAngle, enemyMaxSpeed + threat + resolvedLoadout.moduleUpgradeLevel * 0.35f);
 
         var despawn = root.AddComponent<WorldDistanceDespawn>();
         despawn.axisLimit = despawnAxisDistance;
@@ -444,6 +446,7 @@ public class WorldSpawnDirector : MonoBehaviour
         int extraEngines = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1f) / Mathf.Max(0.01f, extraEngineThreatStep)), 0, maxExtraEngines);
         int extraFuelTanks = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1f) / Mathf.Max(0.01f, extraFuelTankThreatStep)), 0, maxExtraFuelTanks);
         int extraLasers = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1f) / Mathf.Max(0.01f, extraLaserThreatStep)), 0, maxExtraLasers);
+        int moduleUpgradeLevel = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1f) / Mathf.Max(0.01f, moduleTierThreatStep)), 0, maxModuleUpgradeLevel);
         int weaponUpgradeLevel = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1f) / Mathf.Max(0.01f, weaponTierThreatStep)), 0, maxLaserUpgradeLevel);
         int reactorBudget = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1.25f) / 2.5f), 0, 2);
         int repairBudget = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 2f) / 3.25f), 0, 1);
@@ -454,11 +457,30 @@ public class WorldSpawnDirector : MonoBehaviour
             engineCount = Mathf.Min(EngineSlots.Length, 1 + extraEngines + Mathf.Max(0, extraLasers / 2)),
             fuelTankCount = Mathf.Min(FuelTankSlots.Length, 1 + extraFuelTanks),
             laserCount = Mathf.Min(LaserSlots.Length, 1 + extraLasers),
+            moduleUpgradeLevel = moduleUpgradeLevel,
             weaponUpgradeLevel = weaponUpgradeLevel,
-            powerPlantCount = powerPlantModulePrefab != null ? Random.Range(0, reactorBudget + 1) : 0,
+            powerPlantCount = powerPlantModulePrefab != null && reactorBudget > 0 ? Random.Range(1, reactorBudget + 1) : 0,
             repairCount = repairModulePrefab != null ? Random.Range(0, repairBudget + 1) : 0,
-            radiatorCount = radiatorModulePrefab != null ? Random.Range(0, radiatorBudget + 1) : 0
+            radiatorCount = radiatorModulePrefab != null && radiatorBudget > 0 ? Random.Range(1, radiatorBudget + 1) : 0
         };
+    }
+
+    bool TryCreateEnemyAssemblyWithFallback(EnemyLoadout loadout, out EnemyLoadout resolvedLoadout, out List<EnemyModulePlacement> placements)
+    {
+        resolvedLoadout = loadout;
+        placements = null;
+
+        for (int attempt = 0; attempt < 12; attempt++)
+        {
+            if (TryCreateEnemyAssembly(resolvedLoadout, out placements))
+                return true;
+
+            if (!TryReduceLoadoutForAssembly(ref resolvedLoadout))
+                break;
+        }
+
+        placements = null;
+        return false;
     }
 
     bool TryCreateEnemyAssembly(EnemyLoadout loadout, out List<EnemyModulePlacement> placements)
@@ -479,16 +501,69 @@ public class WorldSpawnDirector : MonoBehaviour
     {
         var requests = new List<EnemyModuleRequest>
         {
-            new EnemyModuleRequest(coreModulePrefab, ModuleType.Core, 0)
+            new EnemyModuleRequest(coreModulePrefab, ModuleType.Core, loadout.moduleUpgradeLevel)
         };
 
-        AddRequests(requests, fuelTankModulePrefab, ModuleType.FuelTank, loadout.fuelTankCount, 0);
-        AddRequests(requests, powerPlantModulePrefab, ModuleType.Reactor, loadout.powerPlantCount, 0);
-        AddRequests(requests, repairModulePrefab, ModuleType.Repair, loadout.repairCount, 0);
-        AddRequests(requests, engineModulePrefab, ModuleType.Engine, loadout.engineCount, 0);
+        AddRequests(requests, powerPlantModulePrefab, ModuleType.Reactor, loadout.powerPlantCount, loadout.moduleUpgradeLevel);
+        AddRequests(requests, repairModulePrefab, ModuleType.Repair, loadout.repairCount, loadout.moduleUpgradeLevel);
+        AddRequests(requests, radiatorModulePrefab, ModuleType.Radiator, loadout.radiatorCount, loadout.moduleUpgradeLevel);
+        AddRequests(requests, engineModulePrefab, ModuleType.Engine, loadout.engineCount, loadout.moduleUpgradeLevel);
         AddRequests(requests, laserModulePrefab, ModuleType.Weapon, loadout.laserCount, Mathf.Clamp(loadout.weaponUpgradeLevel, 0, maxLaserUpgradeLevel));
-        AddRequests(requests, radiatorModulePrefab, ModuleType.Radiator, loadout.radiatorCount, 0);
+        AddRequests(requests, fuelTankModulePrefab, ModuleType.FuelTank, loadout.fuelTankCount, loadout.moduleUpgradeLevel);
         return requests;
+    }
+
+    bool TryReduceLoadoutForAssembly(ref EnemyLoadout loadout)
+    {
+        if (loadout.fuelTankCount > 1)
+        {
+            loadout.fuelTankCount--;
+            return true;
+        }
+
+        if (loadout.engineCount > 1)
+        {
+            loadout.engineCount--;
+            return true;
+        }
+
+        if (loadout.laserCount > 1)
+        {
+            loadout.laserCount--;
+            return true;
+        }
+
+        if (loadout.repairCount > 0)
+        {
+            loadout.repairCount--;
+            return true;
+        }
+
+        if (loadout.powerPlantCount > 1)
+        {
+            loadout.powerPlantCount--;
+            return true;
+        }
+
+        if (loadout.radiatorCount > 1)
+        {
+            loadout.radiatorCount--;
+            return true;
+        }
+
+        if (loadout.powerPlantCount > 0)
+        {
+            loadout.powerPlantCount--;
+            return true;
+        }
+
+        if (loadout.radiatorCount > 0)
+        {
+            loadout.radiatorCount--;
+            return true;
+        }
+
+        return false;
     }
 
     void AddRequests(List<EnemyModuleRequest> requests, GameObject prefab, ModuleType type, int count, int upgradeLevel)
@@ -915,6 +990,7 @@ public class WorldSpawnDirector : MonoBehaviour
         public int engineCount;
         public int fuelTankCount;
         public int laserCount;
+        public int moduleUpgradeLevel;
         public int weaponUpgradeLevel;
         public int powerPlantCount;
         public int repairCount;

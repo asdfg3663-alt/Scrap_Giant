@@ -101,7 +101,7 @@ public class WeaponLaser : MonoBehaviour
             }
         }
 
-        inst.AddHeat(inst.GetDps() * Time.deltaTime);
+        inst.AddHeat(inst.GetWeaponHeatPerSecondPotential() * Time.deltaTime);
 
         Vector2 dir = GetForwardDir();
         Vector2 origin = (Vector2)muzzle.position + dir * startOffset;

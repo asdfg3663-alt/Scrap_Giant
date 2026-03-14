@@ -32,6 +32,6 @@ MonoBehaviour:
   weaponDamage: 2
   weaponFireRate: 1
   weaponPowerPerShot: 0
-  weaponHeatPerShot: 0
+  weaponHeatPerShot: 2
   weaponAmmoPerShot: 0
   dps: 0

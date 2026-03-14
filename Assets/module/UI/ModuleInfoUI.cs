@@ -138,12 +138,18 @@ public class ModuleInfoUI : MonoBehaviour
         float energyCap = module.GetMaxEnergy();
         float fuelCap = module.GetMaxFuel();
         float fuelSynth = module.GetFuelSynthesisPerSec();
+        float maxHeat = module.GetMaxHeat();
+        float heatGeneration = module.GetTotalHeatGenerationPerSecondPotential();
+        float heatDissipation = module.GetHeatDissipationPerSec();
 
         if (mass > 0f) AddLine(LocalizationManager.Format("info.mass", "Mass: {0}", mass.ToString("0.##")));
         if (thrust > 0f) AddLine(LocalizationManager.Format("info.thrust", "Thrust: {0}", thrust.ToString("0.##")));
         if (energyCap > 0f) AddLine(LocalizationManager.Format("info.energy_cap", "Energy Cap: {0}", energyCap.ToString("0.##")));
         if (fuelCap > 0f) AddLine(LocalizationManager.Format("info.fuel_cap", "Fuel Cap: {0}", fuelCap.ToString("0.##")));
         if (fuelSynth > 0f) AddLine(LocalizationManager.Format("info.fuel_synth", "Fuel Synth: {0}/s", fuelSynth.ToString("0.##")));
+        if (maxHeat > 0f) AddLine(LocalizationManager.Format("info.heat_capacity", "Heat: {0} / {1}", module.currentHeat.ToString("0.##"), maxHeat.ToString("0.##")));
+        if (heatGeneration > 0f || heatDissipation > 0f)
+            AddLine(LocalizationManager.Format("info.heat_flow", "Thermal: +{0}/s  -{1}/s", heatGeneration.ToString("0.##"), heatDissipation.ToString("0.##")));
 
         bool hasWeapon =
             data.weaponType != WeaponType.None ||

@@ -91,6 +91,35 @@ public class ModuleInstance : MonoBehaviour
         return Mathf.Max(0f, GetWeaponDamage()) * Mathf.Max(0f, GetWeaponFireRate());
     }
 
+    public float GetWeaponHeatPerSecondPotential()
+    {
+        float heatPerShot = GetWeaponHeatPerShot();
+        float fireRate = GetWeaponFireRate();
+        if (heatPerShot > 0f && fireRate > 0f)
+            return heatPerShot * fireRate;
+
+        if (data != null && data.weaponType == WeaponType.Laser)
+            return Mathf.Max(0f, GetDps());
+
+        return 0f;
+    }
+
+    public float GetPassiveHeatPerSecond()
+    {
+        if (data == null)
+            return 0f;
+
+        if (data.type == ModuleType.Reactor && GetPowerGenPerSec() > 0f)
+            return GetPowerGenPerSec() * 2f;
+
+        return 0f;
+    }
+
+    public float GetTotalHeatGenerationPerSecondPotential()
+    {
+        return GetPassiveHeatPerSecond() + GetWeaponHeatPerSecondPotential();
+    }
+
     public float GetHeatRatio()
     {
         float maxHeat = GetMaxHeat();

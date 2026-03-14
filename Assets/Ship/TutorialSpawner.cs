@@ -16,16 +16,20 @@ public class TutorialSpawner : MonoBehaviour
         if (!shipRoot)
             shipRoot = GameObject.Find("PlayerShip")?.transform;
 
-        if (enginePrefab && shipRoot)
-        {
-            var engine = Instantiate(enginePrefab, (Vector2)shipRoot.position + engineOffset, Quaternion.identity);
-            AddWorldDespawn(engine);
-        }
+        ShipStats ship = shipRoot != null ? shipRoot.GetComponent<ShipStats>() : null;
+        if (ship != null && ship.isPlayerShip)
+            PlayerHudRuntime.EnsureForPlayer(ship);
 
-        if (laserPrefab && shipRoot)
+        PlayerHudRuntime hud = PlayerHudRuntime.Instance;
+        if (hud != null)
         {
-            var laser = Instantiate(laserPrefab, (Vector2)shipRoot.position + laserOffset, Quaternion.identity);
-            AddWorldDespawn(laser);
+            hud.ClearStoredModules();
+
+            if (enginePrefab)
+                hud.AddStoredModulePrefab(enginePrefab);
+
+            if (laserPrefab)
+                hud.AddStoredModulePrefab(laserPrefab);
         }
 
         if (fuelTankPrefab && shipRoot)

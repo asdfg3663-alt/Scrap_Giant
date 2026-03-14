@@ -138,6 +138,12 @@ public class ShipEngineVfx : MonoBehaviour
 
     void EnsureExhaustAnchor()
     {
+        if (exhaustAnchor != null && !anchorOffsetInitialized)
+        {
+            exhaustLocalOffset = exhaustAnchor.localPosition;
+            anchorOffsetInitialized = true;
+        }
+
         if (exhaustAnchor == null)
         {
             Transform existing = transform.Find(ExhaustAnchorObjectName);
