@@ -285,21 +285,29 @@ public class ShipStats : MonoBehaviour
 
     public float GetEffectiveTotalThrust()
     {
-        if (totalThrust <= 0f)
+        return GetEffectiveThrust(totalThrust);
+    }
+
+    public float GetEffectiveThrust(float requestedThrust)
+    {
+        float clampedRequestedThrust = Mathf.Clamp(requestedThrust, 0f, Mathf.Max(0f, totalThrust));
+        if (clampedRequestedThrust <= 0f || totalThrust <= 0f)
             return 0f;
 
         if (fuelCurrent > 0.001f)
-            return totalThrust;
+            return clampedRequestedThrust;
 
-        return Mathf.Max(minimumEmergencyThrust, totalThrust * emptyFuelThrustMultiplier);
+        float effectiveTotalThrust = Mathf.Max(minimumEmergencyThrust, totalThrust * emptyFuelThrustMultiplier);
+        float thrustScale = effectiveTotalThrust / totalThrust;
+        return clampedRequestedThrust * thrustScale;
     }
 
-    public void ConsumeFuelForThrust(float deltaTime)
+    public void ConsumeFuelForThrust(float activeThrust, float deltaTime)
     {
-        if (deltaTime <= 0f || totalThrust <= 0f || fuelCurrent <= 0f)
+        if (deltaTime <= 0f || activeThrust <= 0f || fuelCurrent <= 0f)
             return;
 
-        fuelCurrent -= totalThrust * Mathf.Max(0f, fuelConsumptionMultiplier) * deltaTime;
+        fuelCurrent -= activeThrust * Mathf.Max(0f, fuelConsumptionMultiplier) * deltaTime;
         if (fuelCurrent < 0f)
             fuelCurrent = 0f;
     }

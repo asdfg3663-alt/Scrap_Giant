@@ -26,6 +26,7 @@ public class EnemyShipAI : MonoBehaviour
     public float wanderForwardThrottle = 0.03f;
     public float idleBrake = 7f;
     public float retaliationDuration = 12f;
+    [Range(0f, 1f)] public float engineDirectionThreshold = 0.75f;
 
     [Header("Behavior Timing")]
     public float decisionInterval = 5f;
@@ -173,6 +174,9 @@ public class EnemyShipAI : MonoBehaviour
             float steeringDot = Mathf.Clamp(Vector2.Dot(transform.up, targetDir), -1f, 1f);
             float drive = Mathf.Clamp01((steeringDot + 0.2f) * 0.5f);
             rb.AddForce((Vector2)transform.up * (thrust * throttleCommand * drive), ForceMode2D.Force);
+
+            if (drive > 0f)
+                ShipEngineVfx.RefreshForDirection(GetComponentsInChildren<ModuleInstance>(true), (Vector2)transform.up, engineDirectionThreshold, throttleCommand * drive);
         }
 
         if (rb.linearVelocity.magnitude > speedCap)

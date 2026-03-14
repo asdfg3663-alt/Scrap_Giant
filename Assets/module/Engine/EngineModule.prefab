@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 5197048203926549517}
   - component: {fileID: 6840824862846268514}
   - component: {fileID: 4956673531931807512}
+  - component: {fileID: 4725180641934567821}
   - component: {fileID: 127720311866911711}
   m_Layer: 11
   m_Name: EngineModule
@@ -35,6 +36,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 3259174102284113201}
   - {fileID: 7714039928539405447}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -183,7 +185,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ModuleInstance
   data: {fileID: 11400000, guid: d6ba8bd3db67a3541a55ab85c645833f, type: 2}
-  hp: 0
+  hp: 10
+  maxHp: 10
+  resetHpOnDataAssign: 1
+  currentHeat: 0
+  repairProgress: 0
+  upgradeLevel: 0
 --- !u!114 &4956673531931807512
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -202,6 +209,29 @@ MonoBehaviour:
   apDown: {fileID: 0}
   apLeft: {fileID: 0}
   apRight: {fileID: 0}
+--- !u!114 &4725180641934567821
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5628837094240442396}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b057fbe5bbb8ef243a33c279d9629c29, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShipEngineVfx
+  exhaustAnchor: {fileID: 3259174102284113201}
+  exhaustParticleSystem: {fileID: 0}
+  exhaustCoreRenderer: {fileID: 0}
+  exhaustLocalOffset: {x: 0, y: -2.2, z: 0}
+  minEmissionRate: 24
+  maxEmissionRate: 90
+  minVelocity: 1.8
+  maxVelocity: 4.2
+  minStartSize: 0.2
+  maxStartSize: 0.3
+  startLifetime: 0.18
 --- !u!114 &127720311866911711
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -214,14 +244,42 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 64918e830d464104b82930b74db6593f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ModuleHP
-  maxHP: 10
-  currentHP: 10
-  autoFromModuleData: 1
   explosionVfxPrefab: {fileID: 0}
   scrapPrefab: {fileID: 0}
   scrapMin: 1
   scrapMax: 10
   scrapImpulse: 2.5
+--- !u!1 &8841650974575224321
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3259174102284113201}
+  m_Layer: 0
+  m_Name: ExhaustAnchor
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3259174102284113201
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8841650974575224321}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -2.2, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4853329266887870393}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &8630463030346319192
 GameObject:
   m_ObjectHideFlags: 0
