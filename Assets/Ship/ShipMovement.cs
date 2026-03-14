@@ -4,15 +4,6 @@ using UnityEngine;
 [RequireComponent(typeof(ShipStats))]
 public class ShipMovement : MonoBehaviour
 {
-    struct ThrustResult
-    {
-        public Vector2 force;
-        public float torque;
-        public float requestedThrust;
-        public float appliedThrust;
-        public bool hasActiveEngines;
-    }
-
     [Header("Linear Movement")]
     public float baseMaxSpeed = 8f;
     public float maxSpeedFromAccelMultiplier = 6f;
@@ -83,13 +74,21 @@ public class ShipMovement : MonoBehaviour
         float maxSpeed = Mathf.Max(0.1f, baseMaxSpeed + accelEst * maxSpeedFromAccelMultiplier);
 
         var modules = GetComponentsInChildren<ModuleInstance>(true);
-        Vector2 com = useModuleCenterOfMass ? ComputeModuleCOM(modules) : rb.worldCenterOfMass;
+        Vector2 com = useModuleCenterOfMass
+            ? ShipThrustUtility.ComputeModuleCenterOfMass(modules, rb.worldCenterOfMass, minModuleMassForCOM)
+            : rb.worldCenterOfMass;
 
         bool engineLoopActive = false;
 
         if (thrustInput > 0f && effectiveTotalThrust > 0f)
         {
-            ThrustResult forwardThrust = BuildDirectionalThrust(modules, com, (Vector2)transform.up, thrustInput);
+            ShipThrustUtility.DirectionalThrustResult forwardThrust = ShipThrustUtility.BuildDirectionalThrust(
+                modules,
+                com,
+                (Vector2)transform.up,
+                thrustInput,
+                engineDirectionThreshold,
+                stats.GetEffectiveThrust);
             if (forwardThrust.appliedThrust > 0f)
             {
                 stats.ConsumeFuelForThrust(forwardThrust.appliedThrust, Time.fixedDeltaTime);
@@ -101,7 +100,13 @@ public class ShipMovement : MonoBehaviour
 
         if (thrustInput < 0f)
         {
-            ThrustResult reverseThrust = BuildDirectionalThrust(modules, com, -(Vector2)transform.up, -thrustInput);
+            ShipThrustUtility.DirectionalThrustResult reverseThrust = ShipThrustUtility.BuildDirectionalThrust(
+                modules,
+                com,
+                -(Vector2)transform.up,
+                -thrustInput,
+                engineDirectionThreshold,
+                stats.GetEffectiveThrust);
             if (reverseThrust.appliedThrust > 0f)
             {
                 stats.ConsumeFuelForThrust(reverseThrust.appliedThrust, Time.fixedDeltaTime);
@@ -156,102 +161,5 @@ public class ShipMovement : MonoBehaviour
             rb.angularVelocity = Mathf.Clamp(rb.angularVelocity, -maxAngularDegPerSec, maxAngularDegPerSec);
 
         AudioRuntime.SetEngineLoopActive(engineLoopActive);
-    }
-
-    ThrustResult BuildDirectionalThrust(ModuleInstance[] modules, Vector2 centerOfMass, Vector2 desiredDirection, float throttle)
-    {
-        ThrustResult result = default;
-        if (modules == null || modules.Length == 0)
-            return result;
-
-        float throttleAmount = Mathf.Clamp01(Mathf.Abs(throttle));
-        if (throttleAmount <= 0f)
-            return result;
-
-        Vector2 desiredDir = desiredDirection.sqrMagnitude > 0.0001f
-            ? desiredDirection.normalized
-            : (Vector2)transform.up;
-
-        for (int i = 0; i < modules.Length; i++)
-        {
-            ModuleInstance module = modules[i];
-            if (module == null || module.data == null)
-                continue;
-
-            float moduleThrust = module.GetThrust();
-            if (moduleThrust <= 0f)
-                continue;
-
-            Vector2 engineDir = module.transform.up;
-            if (Vector2.Dot(engineDir, desiredDir) < engineDirectionThreshold)
-                continue;
-
-            result.requestedThrust += moduleThrust * throttleAmount;
-        }
-
-        if (result.requestedThrust <= 0f)
-            return result;
-
-        float appliedThrustScale = stats.GetEffectiveThrust(result.requestedThrust) / result.requestedThrust;
-        if (appliedThrustScale <= 0f)
-            return result;
-
-        result.hasActiveEngines = true;
-        ShipEngineVfx.RefreshForDirection(modules, desiredDir, engineDirectionThreshold, throttleAmount * appliedThrustScale);
-
-        for (int i = 0; i < modules.Length; i++)
-        {
-            ModuleInstance module = modules[i];
-            if (module == null || module.data == null)
-                continue;
-
-            float moduleThrust = module.GetThrust();
-            if (moduleThrust <= 0f)
-                continue;
-
-            Vector2 engineDir = module.transform.up;
-            if (Vector2.Dot(engineDir, desiredDir) < engineDirectionThreshold)
-                continue;
-
-            float appliedThrust = moduleThrust * throttleAmount * appliedThrustScale;
-            if (appliedThrust <= 0f)
-                continue;
-
-            Vector2 force = engineDir * appliedThrust;
-            Vector2 offset = (Vector2)module.transform.position - centerOfMass;
-
-            result.force += force;
-            result.torque += offset.x * force.y - offset.y * force.x;
-            result.appliedThrust += appliedThrust;
-        }
-
-        return result;
-    }
-
-    Vector2 ComputeModuleCOM(ModuleInstance[] modules)
-    {
-        if (modules == null || modules.Length == 0)
-            return rb.worldCenterOfMass;
-
-        float totalModuleMass = 0f;
-        Vector2 weightedSum = Vector2.zero;
-
-        foreach (var module in modules)
-        {
-            if (module == null || module.data == null)
-                continue;
-
-            float moduleMass = Mathf.Max(0f, module.GetMass());
-            if (moduleMass < minModuleMassForCOM)
-                continue;
-
-            totalModuleMass += moduleMass;
-            weightedSum += (Vector2)module.transform.position * moduleMass;
-        }
-
-        if (totalModuleMass <= 0.0001f)
-            return rb.worldCenterOfMass;
-
-        return weightedSum / totalModuleMass;
     }
 }

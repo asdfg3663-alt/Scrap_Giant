@@ -14,7 +14,7 @@ public class ShipEngineVfx : MonoBehaviour
     [SerializeField] Transform exhaustAnchor;
     [SerializeField] ParticleSystem exhaustParticleSystem;
     [SerializeField] SpriteRenderer exhaustCoreRenderer;
-    [SerializeField] Vector3 exhaustLocalOffset = new Vector3(0f, -0.95f, 0f);
+    [SerializeField] Vector3 exhaustLocalOffset = new Vector3(0f, -2.2f, 0f);
     [SerializeField] float minEmissionRate = 24f;
     [SerializeField] float maxEmissionRate = 90f;
     [SerializeField] float minVelocity = 1.8f;
@@ -22,6 +22,7 @@ public class ShipEngineVfx : MonoBehaviour
     [SerializeField] float minStartSize = 0.12f;
     [SerializeField] float maxStartSize = 0.22f;
     [SerializeField] float startLifetime = 0.18f;
+    [SerializeField, HideInInspector] bool anchorOffsetInitialized;
 
     bool exhaustActive;
     float exhaustActiveUntil;
@@ -141,7 +142,14 @@ public class ShipEngineVfx : MonoBehaviour
         {
             Transform existing = transform.Find(ExhaustAnchorObjectName);
             if (existing != null)
+            {
                 exhaustAnchor = existing;
+                if (!anchorOffsetInitialized)
+                {
+                    exhaustLocalOffset = existing.localPosition;
+                    anchorOffsetInitialized = true;
+                }
+            }
         }
 
         if (exhaustAnchor == null)
@@ -152,6 +160,7 @@ public class ShipEngineVfx : MonoBehaviour
             anchorObject.transform.localRotation = Quaternion.identity;
             anchorObject.transform.localScale = Vector3.one;
             exhaustAnchor = anchorObject.transform;
+            anchorOffsetInitialized = true;
         }
     }
 

@@ -190,6 +190,27 @@ public class WeaponLaser : MonoBehaviour
         return enemyAI != null && enemyAI.WantsToFire;
     }
 
+    public Vector2 GetAimDirection()
+    {
+        if (!muzzle)
+            muzzle = transform;
+
+        return GetForwardDir();
+    }
+
+    public Vector2 GetMuzzleWorldPosition()
+    {
+        if (!muzzle)
+            muzzle = transform;
+
+        return muzzle != null ? (Vector2)muzzle.position : (Vector2)transform.position;
+    }
+
+    public float GetRange()
+    {
+        return Mathf.Max(0f, defaultRange);
+    }
+
     Vector2 GetForwardDir()
     {
         Vector2 dir = forwardAxis == ForwardAxis.Right ? (Vector2)muzzle.right : (Vector2)muzzle.up;

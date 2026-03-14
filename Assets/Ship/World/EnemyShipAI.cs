@@ -27,6 +27,8 @@ public class EnemyShipAI : MonoBehaviour
     public float idleBrake = 7f;
     public float retaliationDuration = 12f;
     [Range(0f, 1f)] public float engineDirectionThreshold = 0.75f;
+    public bool useModuleCenterOfMass = true;
+    public float minModuleMassForCOM = 0.001f;
 
     [Header("Behavior Timing")]
     public float decisionInterval = 5f;
@@ -124,10 +126,8 @@ public class EnemyShipAI : MonoBehaviour
         bool isRetaliating = retaliationTarget != null && targetShip == retaliationTarget;
         EvaluateBehavior(toTarget, isRetaliating);
 
-        float angleToTarget = Vector2.Angle(transform.up, toTarget.normalized);
-        bool inWeaponRange = toTarget.magnitude <= attackRange;
         bool mayAttack = isRetaliating || (activeBand == BehaviorBand.Close && closeRangeCanAttack);
-        wantsToFire = mayAttack && inWeaponRange && angleToTarget <= fireConeAngle;
+        wantsToFire = mayAttack && CanAnyLaserFireAt(target.position);
     }
 
     void FixedUpdate()
@@ -170,13 +170,30 @@ public class EnemyShipAI : MonoBehaviour
         }
         else if (throttleCommand > 0f)
         {
-            float thrust = Mathf.Max(1f, stats.totalThrust);
             float steeringDot = Mathf.Clamp(Vector2.Dot(transform.up, targetDir), -1f, 1f);
             float drive = Mathf.Clamp01((steeringDot + 0.2f) * 0.5f);
-            rb.AddForce((Vector2)transform.up * (thrust * throttleCommand * drive), ForceMode2D.Force);
 
             if (drive > 0f)
-                ShipEngineVfx.RefreshForDirection(GetComponentsInChildren<ModuleInstance>(true), (Vector2)transform.up, engineDirectionThreshold, throttleCommand * drive);
+            {
+                ModuleInstance[] modules = GetComponentsInChildren<ModuleInstance>(true);
+                Vector2 centerOfMass = useModuleCenterOfMass
+                    ? ShipThrustUtility.ComputeModuleCenterOfMass(modules, rb.worldCenterOfMass, minModuleMassForCOM)
+                    : rb.worldCenterOfMass;
+
+                ShipThrustUtility.DirectionalThrustResult thrust = ShipThrustUtility.BuildDirectionalThrust(
+                    modules,
+                    centerOfMass,
+                    (Vector2)transform.up,
+                    throttleCommand * drive,
+                    engineDirectionThreshold,
+                    requestedThrust => requestedThrust);
+
+                if (thrust.appliedThrust > 0f)
+                {
+                    rb.AddForce(thrust.force, ForceMode2D.Force);
+                    rb.AddTorque(thrust.torque, ForceMode2D.Force);
+                }
+            }
         }
 
         if (rb.linearVelocity.magnitude > speedCap)
@@ -315,6 +332,41 @@ public class EnemyShipAI : MonoBehaviour
         return player != null ? player.GetComponent<ShipStats>() : null;
     }
 
+    bool CanAnyLaserFireAt(Vector2 targetPosition)
+    {
+        WeaponLaser[] weapons = GetComponentsInChildren<WeaponLaser>(true);
+        if (weapons == null || weapons.Length == 0)
+            return false;
+
+        float fallbackRange = Mathf.Max(0f, attackRange);
+        for (int i = 0; i < weapons.Length; i++)
+        {
+            WeaponLaser weapon = weapons[i];
+            if (weapon == null || !weapon.isActiveAndEnabled)
+                continue;
+
+            ModuleInstance weaponModule = weapon.GetComponent<ModuleInstance>();
+            if (weaponModule == null || weaponModule.data == null || weaponModule.data.weaponType != WeaponType.Laser)
+                continue;
+
+            if (weaponModule.hp <= 0 || weaponModule.GetWeaponFireRate() <= 0f)
+                continue;
+
+            Vector2 origin = weapon.GetMuzzleWorldPosition();
+            Vector2 toTarget = targetPosition - origin;
+            float distance = toTarget.magnitude;
+            float weaponRange = Mathf.Max(fallbackRange, weapon.GetRange());
+            if (distance > weaponRange || distance <= 0.001f)
+                continue;
+
+            float angleToTarget = Vector2.Angle(weapon.GetAimDirection(), toTarget / distance);
+            if (angleToTarget <= fireConeAngle)
+                return true;
+        }
+
+        return false;
+    }
+
     void ResetModuleOrientations()
     {
         var attachments = GetComponentsInChildren<ModuleAttachment>(true);
@@ -324,7 +376,7 @@ public class EnemyShipAI : MonoBehaviour
             if (attachment == null)
                 continue;
 
-            attachment.transform.localRotation = Quaternion.identity;
+            attachment.transform.localRotation = Quaternion.Euler(0f, 0f, attachment.rot90 * 90f);
         }
     }
 

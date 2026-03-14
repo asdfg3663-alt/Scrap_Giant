@@ -117,6 +117,14 @@ public class WorldSpawnDirector : MonoBehaviour
         new Vector2Int(0, -3)
     };
 
+    static readonly Vector2Int[] connectionDirs =
+    {
+        Vector2Int.up,
+        Vector2Int.down,
+        Vector2Int.left,
+        Vector2Int.right
+    };
+
     public static Transform PlayerTransform => instance != null && instance.playerShip != null ? instance.playerShip.transform : null;
     public static float CurrentDespawnAxisLimit => instance != null ? instance.despawnAxisDistance : 100f;
     public static float GetStartingScrap() => ResolveInstance() != null ? Mathf.Max(0f, instance.startingScrap) : DefaultStartingScrap;
@@ -304,6 +312,8 @@ public class WorldSpawnDirector : MonoBehaviour
 
         float threat = EvaluateThreat(playerShip.totalScore);
         EnemyLoadout loadout = BuildLoadout(threat);
+        if (!TryCreateEnemyAssembly(loadout, out List<EnemyModulePlacement> assembly))
+            return false;
 
         Vector2 spawnPosition = GetRandomSpawnPosition();
         var root = new GameObject("EnemyShip");
@@ -327,35 +337,26 @@ public class WorldSpawnDirector : MonoBehaviour
         var despawn = root.AddComponent<WorldDistanceDespawn>();
         despawn.axisLimit = despawnAxisDistance;
 
-        ModuleInstance core = AttachModule(root.transform, coreModulePrefab, Vector2Int.zero, 0);
+        ModuleInstance core = null;
+        for (int i = 0; i < assembly.Count; i++)
+        {
+            EnemyModulePlacement placement = assembly[i];
+            ModuleInstance instance = AttachModule(root.transform, placement.prefab, placement.gridPos, placement.rot90, placement.upgradeLevel);
+            if (instance == null)
+            {
+                Destroy(root);
+                return false;
+            }
+
+            if (placement.type == ModuleType.Core && core == null)
+                core = instance;
+        }
+
         if (core == null)
         {
             Destroy(root);
             return false;
         }
-
-        int weaponUpgradeLevel = Mathf.Clamp(loadout.weaponUpgradeLevel, 0, maxLaserUpgradeLevel);
-        var occupied = new HashSet<Vector2Int> { Vector2Int.zero };
-
-        for (int i = 0; i < loadout.engineCount && i < EngineSlots.Length; i++)
-        {
-            AttachModule(root.transform, engineModulePrefab, EngineSlots[i], 0);
-            occupied.Add(EngineSlots[i]);
-        }
-
-        for (int i = 0; i < loadout.fuelTankCount && i < FuelTankSlots.Length; i++)
-        {
-            AttachModule(root.transform, fuelTankModulePrefab, FuelTankSlots[i], 0);
-            occupied.Add(FuelTankSlots[i]);
-        }
-
-        for (int i = 0; i < loadout.laserCount && i < LaserSlots.Length; i++)
-        {
-            AttachModule(root.transform, laserModulePrefab, LaserSlots[i], weaponUpgradeLevel);
-            occupied.Add(LaserSlots[i]);
-        }
-
-        AddSpecialModules(root.transform, occupied, loadout);
 
         IgnoreShipInternalCollisions(root.transform);
         ApplyEnemyVisualStyle(root.transform);
@@ -373,7 +374,7 @@ public class WorldSpawnDirector : MonoBehaviour
         return true;
     }
 
-    ModuleInstance AttachModule(Transform shipRoot, GameObject prefab, Vector2Int gridPos, int upgradeLevel)
+    ModuleInstance AttachModule(Transform shipRoot, GameObject prefab, Vector2Int gridPos, int rot90, int upgradeLevel)
     {
         if (prefab == null || shipRoot == null)
             return null;
@@ -381,7 +382,7 @@ public class WorldSpawnDirector : MonoBehaviour
         var moduleGO = Instantiate(prefab, shipRoot.position, shipRoot.rotation);
         moduleGO.transform.SetParent(shipRoot, false);
         moduleGO.transform.localPosition = new Vector3(gridPos.x, gridPos.y, 0f);
-        moduleGO.transform.localRotation = Quaternion.identity;
+        moduleGO.transform.localRotation = Quaternion.Euler(0f, 0f, rot90 * 90f);
 
         var rb = moduleGO.GetComponent<Rigidbody2D>();
         if (rb != null)
@@ -399,7 +400,7 @@ public class WorldSpawnDirector : MonoBehaviour
             attachment = moduleGO.AddComponent<ModuleAttachment>();
         attachment.shipRoot = shipRoot;
         attachment.gridPos = gridPos;
-        attachment.rot90 = 0;
+        attachment.rot90 = rot90;
 
         var instanceComponent = moduleGO.GetComponent<ModuleInstance>();
         if (instanceComponent != null && upgradeLevel > 0)
@@ -460,52 +461,284 @@ public class WorldSpawnDirector : MonoBehaviour
         };
     }
 
-    void AddSpecialModules(Transform shipRoot, HashSet<Vector2Int> occupied, EnemyLoadout loadout)
+    bool TryCreateEnemyAssembly(EnemyLoadout loadout, out List<EnemyModulePlacement> placements)
     {
-        if (shipRoot == null)
-            return;
+        placements = null;
 
-        var availableSlots = new List<Vector2Int>(SpecialSlots.Length);
-        for (int i = 0; i < SpecialSlots.Length; i++)
+        List<EnemyModuleRequest> requests = BuildEnemyModuleRequests(loadout);
+        for (int attempt = 0; attempt < 48; attempt++)
         {
-            if (!occupied.Contains(SpecialSlots[i]))
-                availableSlots.Add(SpecialSlots[i]);
+            if (TryCreateEnemyAssemblyAttempt(requests, out placements))
+                return true;
         }
 
-        ShuffleSlots(availableSlots);
-        int slotIndex = 0;
-
-        slotIndex = AddSpecialModuleGroup(shipRoot, powerPlantModulePrefab, loadout.powerPlantCount, availableSlots, occupied, slotIndex);
-        slotIndex = AddSpecialModuleGroup(shipRoot, repairModulePrefab, loadout.repairCount, availableSlots, occupied, slotIndex);
-        AddSpecialModuleGroup(shipRoot, radiatorModulePrefab, loadout.radiatorCount, availableSlots, occupied, slotIndex);
+        return false;
     }
 
-    int AddSpecialModuleGroup(Transform shipRoot, GameObject prefab, int count, List<Vector2Int> availableSlots, HashSet<Vector2Int> occupied, int slotIndex)
+    List<EnemyModuleRequest> BuildEnemyModuleRequests(EnemyLoadout loadout)
+    {
+        var requests = new List<EnemyModuleRequest>
+        {
+            new EnemyModuleRequest(coreModulePrefab, ModuleType.Core, 0)
+        };
+
+        AddRequests(requests, fuelTankModulePrefab, ModuleType.FuelTank, loadout.fuelTankCount, 0);
+        AddRequests(requests, powerPlantModulePrefab, ModuleType.Reactor, loadout.powerPlantCount, 0);
+        AddRequests(requests, repairModulePrefab, ModuleType.Repair, loadout.repairCount, 0);
+        AddRequests(requests, engineModulePrefab, ModuleType.Engine, loadout.engineCount, 0);
+        AddRequests(requests, laserModulePrefab, ModuleType.Weapon, loadout.laserCount, Mathf.Clamp(loadout.weaponUpgradeLevel, 0, maxLaserUpgradeLevel));
+        AddRequests(requests, radiatorModulePrefab, ModuleType.Radiator, loadout.radiatorCount, 0);
+        return requests;
+    }
+
+    void AddRequests(List<EnemyModuleRequest> requests, GameObject prefab, ModuleType type, int count, int upgradeLevel)
     {
         if (prefab == null || count <= 0)
-            return slotIndex;
+            return;
 
-        for (int i = 0; i < count && slotIndex < availableSlots.Count; i++, slotIndex++)
+        for (int i = 0; i < count; i++)
+            requests.Add(new EnemyModuleRequest(prefab, type, upgradeLevel));
+    }
+
+    bool TryCreateEnemyAssemblyAttempt(List<EnemyModuleRequest> requests, out List<EnemyModulePlacement> placements)
+    {
+        placements = new List<EnemyModulePlacement>();
+        var occupied = new Dictionary<Vector2Int, EnemyModulePlacement>();
+        var openSockets = new List<EnemyOpenSocket>();
+
+        Module coreModule = coreModulePrefab != null ? coreModulePrefab.GetComponent<Module>() : null;
+        if (coreModule == null)
+            return false;
+
+        EnemyModulePlacement corePlacement = new EnemyModulePlacement(coreModulePrefab, ModuleType.Core, Vector2Int.zero, 0, 0);
+        placements.Add(corePlacement);
+        occupied.Add(Vector2Int.zero, corePlacement);
+        AddOpenSocketsForPlacement(corePlacement, occupied, openSockets, connectedSide: null);
+
+        for (int i = 1; i < requests.Count; i++)
         {
-            Vector2Int gridPos = availableSlots[slotIndex];
-            if (occupied.Contains(gridPos))
+            if (!TryPlaceEnemyModule(requests[i], occupied, openSockets, out EnemyModulePlacement placement))
+                return false;
+
+            placements.Add(placement);
+            occupied.Add(placement.gridPos, placement);
+        }
+
+        return true;
+    }
+
+    bool TryPlaceEnemyModule(
+        EnemyModuleRequest request,
+        Dictionary<Vector2Int, EnemyModulePlacement> occupied,
+        List<EnemyOpenSocket> openSockets,
+        out EnemyModulePlacement placement)
+    {
+        placement = default;
+
+        Module module = request.prefab != null ? request.prefab.GetComponent<Module>() : null;
+        if (module == null)
+            return false;
+
+        EnemyPlacementCandidate bestCandidate = default;
+        bool found = false;
+
+        for (int i = 0; i < openSockets.Count; i++)
+        {
+            EnemyOpenSocket socket = openSockets[i];
+            Vector2Int targetGrid = socket.gridPos + SideToGridDelta(socket.side);
+            if (occupied.ContainsKey(targetGrid))
                 continue;
 
-            AttachModule(shipRoot, prefab, gridPos, 0);
-            occupied.Add(gridPos);
+            if (HasExtraAdjacentNeighbors(targetGrid, socket.gridPos, occupied))
+                continue;
+
+            List<int> rotations = GetValidRotationsForConnection(module, OppositeSide(socket.side));
+            for (int r = 0; r < rotations.Count; r++)
+            {
+                int rot90 = rotations[r];
+                float score = ScorePlacement(request.type, targetGrid, socket.side) + Random.value * 0.25f;
+                if (!found || score > bestCandidate.score)
+                {
+                    bestCandidate = new EnemyPlacementCandidate(socket, targetGrid, rot90, score);
+                    found = true;
+                }
+            }
         }
 
-        return slotIndex;
+        if (!found)
+            return false;
+
+        placement = new EnemyModulePlacement(request.prefab, request.type, bestCandidate.gridPos, bestCandidate.rot90, request.upgradeLevel);
+        RemoveOpenSocket(openSockets, bestCandidate.socket);
+        AddOpenSocketsForPlacement(placement, occupied, openSockets, OppositeSide(bestCandidate.socket.side));
+        return true;
     }
 
-    static void ShuffleSlots(List<Vector2Int> slots)
+    void AddOpenSocketsForPlacement(
+        EnemyModulePlacement placement,
+        Dictionary<Vector2Int, EnemyModulePlacement> occupied,
+        List<EnemyOpenSocket> openSockets,
+        Side? connectedSide)
     {
-        for (int i = slots.Count - 1; i > 0; i--)
+        Module module = placement.prefab != null ? placement.prefab.GetComponent<Module>() : null;
+        if (module == null)
+            return;
+
+        AddOpenSocketIfAvailable(module.apUp, Side.Up);
+        AddOpenSocketIfAvailable(module.apDown, Side.Down);
+        AddOpenSocketIfAvailable(module.apLeft, Side.Left);
+        AddOpenSocketIfAvailable(module.apRight, Side.Right);
+
+        void AddOpenSocketIfAvailable(Transform attachPoint, Side localSide)
         {
-            int swapIndex = Random.Range(0, i + 1);
-            (slots[i], slots[swapIndex]) = (slots[swapIndex], slots[i]);
+            if (attachPoint == null)
+                return;
+
+            Side worldSide = RotateSide(localSide, placement.rot90);
+            if (connectedSide.HasValue && worldSide == connectedSide.Value)
+                return;
+
+            Vector2Int targetGrid = placement.gridPos + SideToGridDelta(worldSide);
+            if (occupied.ContainsKey(targetGrid))
+                return;
+
+            EnemyOpenSocket socket = new EnemyOpenSocket(placement.gridPos, worldSide);
+            for (int i = 0; i < openSockets.Count; i++)
+            {
+                if (openSockets[i].gridPos == socket.gridPos && openSockets[i].side == socket.side)
+                    return;
+            }
+
+            openSockets.Add(socket);
         }
     }
+
+    void RemoveOpenSocket(List<EnemyOpenSocket> openSockets, EnemyOpenSocket socket)
+    {
+        for (int i = openSockets.Count - 1; i >= 0; i--)
+        {
+            if (openSockets[i].gridPos == socket.gridPos && openSockets[i].side == socket.side)
+            {
+                openSockets.RemoveAt(i);
+                return;
+            }
+        }
+    }
+
+    bool HasExtraAdjacentNeighbors(Vector2Int gridPos, Vector2Int anchorGrid, Dictionary<Vector2Int, EnemyModulePlacement> occupied)
+    {
+        for (int i = 0; i < connectionDirs.Length; i++)
+        {
+            Vector2Int neighbor = gridPos + connectionDirs[i];
+            if (neighbor == anchorGrid)
+                continue;
+
+            if (occupied.ContainsKey(neighbor))
+                return true;
+        }
+
+        return false;
+    }
+
+    List<int> GetValidRotationsForConnection(Module module, Side desiredWorldConnectionSide)
+    {
+        var rotations = new List<int>(4);
+        if (module == null)
+            return rotations;
+
+        for (int rot90 = 0; rot90 < 4; rot90++)
+        {
+            for (int i = 0; i < module.attachableLocalSides.Count; i++)
+            {
+                if (RotateSide(module.attachableLocalSides[i], rot90) != desiredWorldConnectionSide)
+                    continue;
+
+                rotations.Add(rot90);
+                break;
+            }
+        }
+
+        return rotations;
+    }
+
+    float ScorePlacement(ModuleType type, Vector2Int gridPos, Side anchorSide)
+    {
+        float score = 0f;
+        switch (type)
+        {
+            case ModuleType.Engine:
+                score += anchorSide == Side.Down ? 100f : (anchorSide == Side.Up ? -100f : 15f);
+                score += -gridPos.y * 8f;
+                break;
+
+            case ModuleType.Weapon:
+                score += anchorSide == Side.Up ? 100f : (anchorSide == Side.Down ? -100f : 10f);
+                score += gridPos.y * 8f;
+                break;
+
+            case ModuleType.Radiator:
+                score += (anchorSide == Side.Left || anchorSide == Side.Right) ? 60f : 10f;
+                score += Mathf.Abs(gridPos.x) * 3f;
+                break;
+
+            case ModuleType.FuelTank:
+                score += Mathf.Abs(gridPos.x) * 4f;
+                score += gridPos.y <= 0 ? 8f : 2f;
+                break;
+
+            case ModuleType.Reactor:
+            case ModuleType.Repair:
+                score += -gridPos.sqrMagnitude * 2f;
+                break;
+        }
+
+        return score;
+    }
+
+    static Side OppositeSide(Side side) => side switch
+    {
+        Side.Up => Side.Down,
+        Side.Down => Side.Up,
+        Side.Left => Side.Right,
+        Side.Right => Side.Left,
+        _ => Side.Up
+    };
+
+    static Side RotateSide(Side side, int rot90)
+    {
+        rot90 = ((rot90 % 4) + 4) % 4;
+        return rot90 switch
+        {
+            0 => side,
+            1 => side switch
+            {
+                Side.Up => Side.Left,
+                Side.Left => Side.Down,
+                Side.Down => Side.Right,
+                Side.Right => Side.Up,
+                _ => side
+            },
+            2 => OppositeSide(side),
+            3 => side switch
+            {
+                Side.Up => Side.Right,
+                Side.Right => Side.Down,
+                Side.Down => Side.Left,
+                Side.Left => Side.Up,
+                _ => side
+            },
+            _ => side
+        };
+    }
+
+    static Vector2Int SideToGridDelta(Side side) => side switch
+    {
+        Side.Up => Vector2Int.up,
+        Side.Down => Vector2Int.down,
+        Side.Left => Vector2Int.left,
+        Side.Right => Vector2Int.right,
+        _ => Vector2Int.zero
+    };
 
     Vector2 GetRandomSpawnPosition()
     {
@@ -686,5 +919,65 @@ public class WorldSpawnDirector : MonoBehaviour
         public int powerPlantCount;
         public int repairCount;
         public int radiatorCount;
+    }
+
+    struct EnemyModuleRequest
+    {
+        public readonly GameObject prefab;
+        public readonly ModuleType type;
+        public readonly int upgradeLevel;
+
+        public EnemyModuleRequest(GameObject prefab, ModuleType type, int upgradeLevel)
+        {
+            this.prefab = prefab;
+            this.type = type;
+            this.upgradeLevel = upgradeLevel;
+        }
+    }
+
+    struct EnemyModulePlacement
+    {
+        public readonly GameObject prefab;
+        public readonly ModuleType type;
+        public readonly Vector2Int gridPos;
+        public readonly int rot90;
+        public readonly int upgradeLevel;
+
+        public EnemyModulePlacement(GameObject prefab, ModuleType type, Vector2Int gridPos, int rot90, int upgradeLevel)
+        {
+            this.prefab = prefab;
+            this.type = type;
+            this.gridPos = gridPos;
+            this.rot90 = rot90;
+            this.upgradeLevel = upgradeLevel;
+        }
+    }
+
+    struct EnemyOpenSocket
+    {
+        public readonly Vector2Int gridPos;
+        public readonly Side side;
+
+        public EnemyOpenSocket(Vector2Int gridPos, Side side)
+        {
+            this.gridPos = gridPos;
+            this.side = side;
+        }
+    }
+
+    struct EnemyPlacementCandidate
+    {
+        public readonly EnemyOpenSocket socket;
+        public readonly Vector2Int gridPos;
+        public readonly int rot90;
+        public readonly float score;
+
+        public EnemyPlacementCandidate(EnemyOpenSocket socket, Vector2Int gridPos, int rot90, float score)
+        {
+            this.socket = socket;
+            this.gridPos = gridPos;
+            this.rot90 = rot90;
+            this.score = score;
+        }
     }
 }
