@@ -47,7 +47,7 @@ public class WorldSpawnDirector : MonoBehaviour
     public float enemyMaxSpeed = 10f;
     public Color enemyOutlineColor = new Color(1f, 0.2f, 0.18f, 0.95f);
     public float enemyOutlinePixelSize = 7f;
-    [Range(0f, 1f)] public float enemySaturationMultiplier = 0.3f;
+    [Range(0f, 1f)] public float enemySaturationMultiplier = 0.65f;
 
     [Header("Threat Scaling")]
     public float threatScoreScale = 0.18f;
@@ -905,9 +905,19 @@ public class WorldSpawnDirector : MonoBehaviour
 
             marker.Capture(renderer);
             renderer.color = marker.originalColor;
-            Material desaturateMaterial = GetEnemyDesaturateMaterial();
-            if (desaturateMaterial != null)
-                renderer.sharedMaterial = desaturateMaterial;
+            ModuleInstance moduleInstance = renderer.GetComponentInParent<ModuleInstance>();
+            bool preserveTierTint = moduleInstance != null && moduleInstance.CurrentTier > 1;
+            if (preserveTierTint)
+            {
+                if (marker.hasOriginalMaterial)
+                    renderer.sharedMaterial = marker.originalMaterial;
+            }
+            else
+            {
+                Material desaturateMaterial = GetEnemyDesaturateMaterial();
+                if (desaturateMaterial != null)
+                    renderer.sharedMaterial = desaturateMaterial;
+            }
             marker.outlineRoot = EnsureOutline(renderer, marker.originalMaterial);
         }
     }

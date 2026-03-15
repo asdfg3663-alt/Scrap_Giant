@@ -36,6 +36,9 @@ public static class ModuleTierVisualPalette
 
     public static float GetTintStrength(int tier)
     {
+        if (tier <= 1)
+            return 0f;
+
         float t = Mathf.InverseLerp(1f, 10f, Mathf.Clamp(tier, 1, 10));
         return Mathf.Lerp(0.72f, 1f, t);
     }

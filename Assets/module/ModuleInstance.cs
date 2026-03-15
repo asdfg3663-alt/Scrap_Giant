@@ -228,6 +228,12 @@ public class ModuleInstance : MonoBehaviour
                 continue;
 
             Color baseColor = GetBaseRendererColor(renderer);
+            if (CurrentTier <= 1)
+            {
+                renderer.color = new Color(1f, 1f, 1f, baseColor.a);
+                continue;
+            }
+
             Color tintedColor = Color.Lerp(baseColor, tierColor, tintStrength);
             tintedColor.a = baseColor.a;
             renderer.color = tintedColor;
