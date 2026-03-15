@@ -449,9 +449,6 @@ public class ShipStats : MonoBehaviour
         if (hud == null)
             return;
 
-        float fuelPerScrap = WorldSpawnDirector.GetFuelPerScrap();
-        synthesisScrapProgress += (fuelSynthesisPerSec * deltaTime) / fuelPerScrap;
-
         float missingFuel = fuelMax - fuelCurrent;
         if (missingFuel <= 0f)
         {
@@ -459,7 +456,16 @@ public class ShipStats : MonoBehaviour
             return;
         }
 
-        int scrapToSpend = Mathf.Min(hud.GetResourceAmount("scrap"), Mathf.FloorToInt(synthesisScrapProgress));
+        int availableScrap = hud.GetResourceAmount("scrap");
+        if (availableScrap <= 0)
+            return;
+
+        float fuelPerScrap = WorldSpawnDirector.GetFuelPerScrap();
+        synthesisScrapProgress = Mathf.Min(
+            synthesisScrapProgress + (fuelSynthesisPerSec * deltaTime) / fuelPerScrap,
+            availableScrap);
+
+        int scrapToSpend = Mathf.Min(availableScrap, Mathf.FloorToInt(synthesisScrapProgress));
         if (scrapToSpend <= 0)
             return;
 

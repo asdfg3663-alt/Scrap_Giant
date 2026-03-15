@@ -839,8 +839,10 @@ public class PlayerHudRuntime : MonoBehaviour
             return;
         }
 
+        int tier = Mathf.Max(1, data.tier + Mathf.Max(0, entry.upgradeLevel));
         List<string> lines = new List<string>(5)
         {
+            LocalizationManager.Format("info.tier", "Tier: {0}", tier),
             entry.label
         };
 
