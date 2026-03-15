@@ -47,7 +47,7 @@ public class WorldSpawnDirector : MonoBehaviour
     public float enemyMaxSpeed = 10f;
     public Color enemyOutlineColor = new Color(1f, 0.2f, 0.18f, 0.95f);
     public float enemyOutlinePixelSize = 7f;
-    [Range(0f, 1f)] public float enemySaturationMultiplier = 0.08f;
+    [Range(0f, 1f)] public float enemySaturationMultiplier = 0.3f;
 
     [Header("Threat Scaling")]
     public float threatScoreScale = 0.18f;
