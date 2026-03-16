@@ -297,9 +297,10 @@ public class ModuleInfoUI : MonoBehaviour
         upgradeHintLine = go.GetComponent<TMP_Text>();
         upgradeHintLine.fontSize = Mathf.Max(12f, lineTemplate.fontSize - 1f);
         upgradeHintLine.color = new Color(0.82f, 0.88f, 0.92f, 1f);
+        upgradeHintLine.alignment = TextAlignmentOptions.Center;
         upgradeHintLine.textWrappingMode = TextWrappingModes.NoWrap;
         upgradeHintLine.overflowMode = TextOverflowModes.Ellipsis;
-        upgradeHintLine.rectTransform.sizeDelta = new Vector2(360f, 28f);
+        upgradeHintLine.rectTransform.sizeDelta = new Vector2(330f, 28f);
         upgradeHintLine.raycastTarget = false;
         upgradeHintLine.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
         ConfigureDockedElement(upgradeHintLine.rectTransform, new Vector2(0f, 52f));
@@ -378,7 +379,7 @@ public class ModuleInfoUI : MonoBehaviour
             ConfigureDockedElement(upgradeActionLine.rectTransform, new Vector2(0f, 0f));
 
         if (upgradeHintLine != null)
-            ConfigureDockedElement(upgradeHintLine.rectTransform, new Vector2(0f, 52f));
+            ConfigureDockedElement(upgradeHintLine.rectTransform, new Vector2(0f, 54f));
     }
 
     void ShowUpgradeHint()
@@ -475,9 +476,9 @@ public class ModuleInfoUI : MonoBehaviour
         var go = new GameObject("UpgradeDockRoot", typeof(RectTransform));
         upgradeDockRoot = go.GetComponent<RectTransform>();
         upgradeDockRoot.SetParent(rootCanvas.transform, false);
-        ConfigureDockedElement(upgradeDockRoot, new Vector2(0f, 52f));
-        upgradeDockRoot.sizeDelta = new Vector2(360f, 70f);
+        upgradeDockRoot.sizeDelta = new Vector2(360f, 82f);
         upgradeDockRoot.SetAsLastSibling();
+        ConfigureDockedElement(upgradeDockRoot, new Vector2(0f, 68f));
         return upgradeDockRoot;
     }
 

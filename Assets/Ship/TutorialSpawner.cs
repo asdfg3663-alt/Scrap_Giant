@@ -32,11 +32,6 @@ public class TutorialSpawner : MonoBehaviour
                 hud.AddStoredModulePrefab(laserPrefab);
         }
 
-        if (fuelTankPrefab && shipRoot)
-        {
-            var fuelTank = Instantiate(fuelTankPrefab, shipRoot.position, shipRoot.rotation);
-            AttachStartingFuelTank(fuelTank.transform);
-        }
     }
 
     void AttachStartingFuelTank(Transform moduleTf)

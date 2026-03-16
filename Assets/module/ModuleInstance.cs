@@ -8,6 +8,8 @@ public class ModuleInstance : MonoBehaviour
     const string TierGlowObjectName = "TierGlow";
     const string TierAuraRootObjectName = "TierAura";
     const float TierAuraPixelRadius = 5f;
+    const float HeatPenaltyThreshold = 0.8f;
+    const float HeatCriticalThreshold = 0.95f;
 
     static readonly Vector2[] TierAuraDirections =
     {
@@ -118,8 +120,12 @@ public class ModuleInstance : MonoBehaviour
     public float GetDps()
     {
         if (data == null) return 0f;
-        if (data.dps > 0f) return data.dps * GetTierStatMultiplier(data.dpsPerTierMultiplier);
-        return Mathf.Max(0f, GetWeaponDamage()) * Mathf.Max(0f, GetWeaponFireRate());
+
+        float heatMultiplier = GetHeatEfficiencyMultiplierForWeapon();
+        if (data.dps > 0f)
+            return data.dps * GetTierStatMultiplier(data.dpsPerTierMultiplier) * heatMultiplier;
+
+        return Mathf.Max(0f, GetWeaponDamage()) * Mathf.Max(0f, GetWeaponFireRate()) * heatMultiplier;
     }
 
     public float GetWeaponHeatPerSecondPotential()
@@ -141,7 +147,7 @@ public class ModuleInstance : MonoBehaviour
             return 0f;
 
         if (data.type == ModuleType.Reactor && GetPowerGenPerSec() > 0f)
-            return GetPowerGenPerSec() * 2f;
+            return GetEffectivePowerGenPerSec() * 2f;
 
         return 0f;
     }
@@ -181,7 +187,7 @@ public class ModuleInstance : MonoBehaviour
         if (data == null || data.weaponType != WeaponType.Laser || GetMaxHeat() <= 0f)
             return 1f;
 
-        return Mathf.Lerp(1f, 0.5f, GetHeatRatio());
+        return GetDiscreteHeatEfficiencyMultiplier();
     }
 
     float GetHeatEfficiencyMultiplierForPower()
@@ -189,7 +195,19 @@ public class ModuleInstance : MonoBehaviour
         if (data == null || data.type != ModuleType.Reactor || GetMaxHeat() <= 0f)
             return 1f;
 
-        return Mathf.Lerp(1f, 0.5f, GetHeatRatio());
+        return GetDiscreteHeatEfficiencyMultiplier();
+    }
+
+    float GetDiscreteHeatEfficiencyMultiplier()
+    {
+        float heatRatio = GetHeatRatio();
+        if (heatRatio >= HeatCriticalThreshold)
+            return 0.25f;
+
+        if (heatRatio >= HeatPenaltyThreshold)
+            return 0.5f;
+
+        return 1f;
     }
 
     string GetLocalizedDisplayName()

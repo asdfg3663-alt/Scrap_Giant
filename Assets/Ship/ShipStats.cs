@@ -54,6 +54,7 @@ public class ShipStats : MonoBehaviour
     bool fuelSynthesisActive;
     bool hasInitializedFuelReserve;
     bool weaponBatteryLocked;
+    CoreFallbackLaser coreFallbackLaser;
     readonly System.Collections.Generic.List<ModuleInstance> repairQueue = new();
     readonly Vector2Int[] connectionDirs =
     {
@@ -80,6 +81,7 @@ public class ShipStats : MonoBehaviour
         {
             PlayerHudRuntime.EnsureForPlayer(this);
             WorldSpawnDirector.RegisterPlayer(this);
+            EnsureFallbackLaser();
             RefreshHudFuel();
         }
     }
@@ -194,6 +196,9 @@ public class ShipStats : MonoBehaviour
             fuelSynthesisActive = false;
 
         PruneRepairQueue();
+
+        if (isPlayerShip)
+            EnsureFallbackLaser();
     }
 
     public void RefreshHudNow()
@@ -354,6 +359,55 @@ public class ShipStats : MonoBehaviour
         return false;
     }
 
+    public bool HasOperationalWeaponModules()
+    {
+        if (modules == null || modules.Length == 0)
+            modules = GetComponentsInChildren<ModuleInstance>(true);
+
+        for (int i = 0; i < modules.Length; i++)
+        {
+            var module = modules[i];
+            if (module == null || module.data == null)
+                continue;
+
+            bool isWeapon =
+                module.data.type == ModuleType.Weapon ||
+                module.data.weaponType != WeaponType.None ||
+                module.data.dps > 0f;
+            if (!isWeapon)
+                continue;
+
+            if (!module.gameObject.activeInHierarchy || module.hp <= 0)
+                continue;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    public bool HasCriticalOverheatModules(float threshold = 0.95f)
+    {
+        if (modules == null || modules.Length == 0)
+            modules = GetComponentsInChildren<ModuleInstance>(true);
+
+        float clampedThreshold = Mathf.Clamp01(threshold);
+        for (int i = 0; i < modules.Length; i++)
+        {
+            var module = modules[i];
+            if (module == null || module.data == null)
+                continue;
+
+            if (module.GetMaxHeat() <= 0f)
+                continue;
+
+            if (module.GetHeatRatio() >= clampedThreshold)
+                return true;
+        }
+
+        return false;
+    }
+
     public int GetInstalledModuleCount()
     {
         if (modules == null || modules.Length == 0)
@@ -485,6 +539,18 @@ public class ShipStats : MonoBehaviour
         UpdateFuelSynthesis(deltaTime);
     }
 
+    void EnsureFallbackLaser()
+    {
+        if (!isPlayerShip)
+            return;
+
+        if (coreFallbackLaser == null)
+            coreFallbackLaser = GetComponent<CoreFallbackLaser>();
+
+        if (coreFallbackLaser == null)
+            coreFallbackLaser = gameObject.AddComponent<CoreFallbackLaser>();
+    }
+
     bool TryProcessRepairQueue(float deltaTime)
     {
         if (!isPlayerShip || deltaTime <= 0f)
@@ -499,7 +565,7 @@ public class ShipStats : MonoBehaviour
 
         var hud = PlayerHudRuntime.Instance;
         if (hud == null)
-            return true;
+            return false;
 
         float missingHp = Mathf.Max(0f, target.maxHp - (target.hp + target.repairProgress));
         if (missingHp <= 0.001f)
@@ -516,10 +582,10 @@ public class ShipStats : MonoBehaviour
         repairAmount = Mathf.Min(repairAmount, affordableRepair);
 
         if (repairAmount <= 0f)
-            return true;
+            return false;
 
         if (!hud.TryConsumeResource("scrap", repairAmount * repairScrapCostPerHp))
-            return true;
+            return false;
 
         target.repairProgress += repairAmount;
         int wholeHp = Mathf.FloorToInt(target.repairProgress);

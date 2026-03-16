@@ -216,7 +216,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ModuleInstance
   data: {fileID: 11400000, guid: 957a57c9cfbacb646be937c34d54f2df, type: 2}
-  hp: 0
+  hp: 10
+  maxHp: 10
+  resetHpOnDataAssign: 1
+  currentHeat: 0
+  repairProgress: 0
+  upgradeLevel: 0
 --- !u!114 &2118721487480888542
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -253,6 +258,8 @@ MonoBehaviour:
     m_Bits: 4294967295
   defaultRange: 20
   startOffset: 0.25
+  fullDamageRange: 5
+  minDamageMultiplierAtMaxRange: 0.5
   beamThickness: 0.1
   beamSortingOrder: 9999
   beamSortingLayer: Default
@@ -271,9 +278,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 64918e830d464104b82930b74db6593f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ModuleHP
-  maxHP: 10
-  currentHP: 10
-  autoFromModuleData: 1
   explosionVfxPrefab: {fileID: 0}
   scrapPrefab: {fileID: 0}
   scrapMin: 0

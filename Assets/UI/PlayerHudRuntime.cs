@@ -99,6 +99,7 @@ public class PlayerHudRuntime : MonoBehaviour
     TMP_Text bestTitleText;
     TMP_Text bestValueText;
     TMP_Text currentScoreText;
+    TMP_Text overheatWarningText;
     TMP_Text assemblyTitleText;
     TMP_Text assemblyPrimaryText;
     TMP_Text assemblySecondaryText;
@@ -482,6 +483,7 @@ public class PlayerHudRuntime : MonoBehaviour
         }
 
         RefreshScore(force: false);
+        RefreshOverheatWarning();
         RefreshNavigator();
 
         if (resourceUiDirty) RefreshResourceRows();
@@ -604,6 +606,19 @@ public class PlayerHudRuntime : MonoBehaviour
         bestTitleText = CreateLabel(panel, LocalizationManager.Get("ui.best", "BEST"), 15f, new Color(0.94f, 0.97f, 0.84f, 1f), TextAlignmentOptions.Top, new Vector2(0f, -8f), new Vector2(0.5f, 1f), FontStyles.Bold);
         bestValueText = CreateLabel(panel, "0", 34f, Color.white, TextAlignmentOptions.Center, new Vector2(0f, -2f), new Vector2(0.5f, 0.5f), FontStyles.Bold);
         currentScoreText = CreateLabel(panel, LocalizationManager.Format("ui.current_score", "Current {0}", 0), 13f, new Color(0.76f, 0.85f, 0.89f, 1f), TextAlignmentOptions.Bottom, new Vector2(0f, 10f), new Vector2(0.5f, 0f), FontStyles.Normal);
+        overheatWarningText = CreateLabel(
+            panel,
+            string.Empty,
+            13f,
+            new Color(1f, 0.32f, 0.32f, 1f),
+            TextAlignmentOptions.Top,
+            new Vector2(0f, -10f),
+            new Vector2(0.5f, 0f),
+            FontStyles.Bold);
+        overheatWarningText.enableWordWrapping = false;
+        overheatWarningText.overflowMode = TextOverflowModes.Ellipsis;
+        overheatWarningText.rectTransform.sizeDelta = new Vector2(380f, 22f);
+        overheatWarningText.gameObject.SetActive(false);
     }
 
     void BuildAssemblyPanel(RectTransform panel)
@@ -861,6 +876,26 @@ public class PlayerHudRuntime : MonoBehaviour
         inventoryDetailText.text = string.Join("\n", lines);
     }
 
+    void RefreshOverheatWarning()
+    {
+        if (overheatWarningText == null)
+            return;
+
+        bool showWarning = trackedShip != null && trackedShip.HasCriticalOverheatModules();
+        if (!showWarning)
+        {
+            overheatWarningText.text = string.Empty;
+            overheatWarningText.gameObject.SetActive(false);
+            return;
+        }
+
+        overheatWarningText.text = LocalizationManager.Get(
+            "warning.overheat_modules",
+            "[Modules are overheating and losing efficiency. (Radiator needed)]");
+        if (!overheatWarningText.gameObject.activeSelf)
+            overheatWarningText.gameObject.SetActive(true);
+    }
+
     void RefreshNavigator()
     {
         if (navigatorRoot == null || trackedShip == null)
@@ -926,6 +961,8 @@ public class PlayerHudRuntime : MonoBehaviour
 
         if (inventoryDetailText != null && string.IsNullOrWhiteSpace(selectedInventoryEntryId))
             inventoryDetailText.text = LocalizationManager.Get("ui.inventory_empty", "Drag modules here.");
+
+        RefreshOverheatWarning();
 
         var scrapEntry = FindResource(resources, "scrap");
         if (scrapEntry != null)

@@ -166,8 +166,10 @@ MonoBehaviour:
   angularDamping: 0
   lowAngularStopStartRPM: 6
   lowAngularStopDamping: 6
+  sasAssistRangeMultiplier: 2
   useModuleCenterOfMass: 1
   minModuleMassForCOM: 0.001
+  engineDirectionThreshold: 0.75
   maxRPM: 30
 --- !u!50 &10065786
 Rigidbody2D:
@@ -5973,32 +5975,43 @@ MonoBehaviour:
   fuelPerScrap: 30
   initialFuelFillRatio: 1
   maxFloatingScraps: 10
-  maxEnemyShips: 5
+  maxEnemyShips: 7
   spawnCheckInterval: 3
   enemyInitialSpawnDelay: 10
   minSpawnDistance: 50
   maxSpawnDistance: 100
   despawnAxisDistance: 150
-  scrapMassFromPlayerMassMultiplier: 2
+  scrapMassFromPlayerMassMultiplier: 1
   scrapDriftImpulse: 1.25
   enemyDesiredRange: 30
   enemyAttackRange: 20
   enemyFireConeAngle: 20
-  enemyMaxSpeed: 10
+  enemyMaxSpeed: 15
   enemyOutlineColor: {r: 1, g: 0.2, b: 0.18, a: 0.95}
-  enemyOutlinePixelSize: 7
-  enemySaturationMultiplier: 0.65
-  threatScoreScale: 0.18
-  threatLogBase: 2
-  baseThreat: 1
+  enemyOutlinePixelSize: 10
+  enemySaturationMultiplier: 0.8
+  threatScoreScale: 0.1
+  threatLogBase: 3
+  baseThreat: 0.5
   extraEngineThreatStep: 1.35
   extraFuelTankThreatStep: 1.7
   extraLaserThreatStep: 1.1
+  moduleTierThreatStep: 1.8
   weaponTierThreatStep: 1.4
   maxExtraEngines: 7
   maxExtraFuelTanks: 7
   maxExtraLasers: 6
-  maxLaserUpgradeLevel: 9
+  maxEnemyEngineCount: 10
+  maxEnemyFuelTankCount: 10
+  maxEnemyLaserCount: 8
+  maxEnemyPowerPlantCount: 4
+  maxEnemyRepairCount: 2
+  maxEnemyRadiatorCount: 4
+  maxModuleUpgradeLevel: 10
+  maxLaserUpgradeLevel: 10
+  extraEngineRollChance: 0.3
+  extraLaserRollChance: 0.24
+  extraFuelTankRollChance: 0.72
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -6685,7 +6698,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   longPressTime: 0.25
-  dragStartDistance: 0.15
+  dragStartDistance: 0.1
   drawDebug: 0
 --- !u!4 &1485773383
 Transform:
