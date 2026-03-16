@@ -6,6 +6,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using UnityEngine.Video;
+using System.Collections;
 
 [DisallowMultipleComponent]
 public sealed partial class TitleScreenRuntime : MonoBehaviour
@@ -66,11 +67,15 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
     Canvas canvas;
     RawImage videoImage;
+    RawImage loadingBackgroundImage;
     VideoPlayer videoPlayer;
     RenderTexture videoTexture;
     Texture2D fallbackTexture;
+    Texture2D loadingBackgroundTexture;
     RectTransform modalRoot;
     RectTransform previewPulse;
+    GameObject loadingOverlay;
+    Image loadingBarFill;
 
     TMP_Text highScoreLabel;
     TMP_Text playButtonLabel;
@@ -117,6 +122,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
     float howToPreviewPhase;
     AudioSource audioSource;
     AudioClip buttonClickClip;
+    bool isStartingGame;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Bootstrap()
@@ -156,6 +162,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         EnsureEventSystem();
         BuildUi();
         PrepareBackgroundVideo();
+        PrepareLoadingBackground();
     }
 
     void OnEnable()
@@ -175,6 +182,12 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
         if (videoTexture != null)
             videoTexture.Release();
+
+        if (fallbackTexture != null)
+            Destroy(fallbackTexture);
+
+        if (loadingBackgroundTexture != null && loadingBackgroundTexture != fallbackTexture)
+            Destroy(loadingBackgroundTexture);
 
         Time.timeScale = 1f;
         GameRuntimeState.SetGameplayBlocked(false);
@@ -274,6 +287,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         BuildCreditsPanel(GetPanelBody(creditsPanel.transform));
 
         HidePanels();
+        BuildLoadingOverlay(root);
         RefreshLocalizedText();
     }
 
@@ -309,6 +323,53 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         fallbackTexture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
         fallbackTexture.LoadImage(File.ReadAllBytes(fallbackPath));
         videoImage.texture = fallbackTexture;
+    }
+
+    void PrepareLoadingBackground()
+    {
+        if (loadingBackgroundTexture != null)
+            return;
+
+        string fallbackPath = Path.Combine(Application.dataPath, "Title", "Title img.jpg");
+        if (!File.Exists(fallbackPath))
+            return;
+
+        loadingBackgroundTexture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+        loadingBackgroundTexture.LoadImage(File.ReadAllBytes(fallbackPath));
+    }
+
+    void BuildLoadingOverlay(RectTransform root)
+    {
+        RectTransform overlay = CreateRect("LoadingOverlay", root);
+        Stretch(overlay, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        loadingOverlay = overlay.gameObject;
+
+        loadingBackgroundImage = overlay.gameObject.AddComponent<RawImage>();
+        loadingBackgroundImage.color = Color.white;
+        loadingBackgroundImage.raycastTarget = true;
+        loadingBackgroundImage.texture = loadingBackgroundTexture != null ? loadingBackgroundTexture : videoImage.texture;
+
+        RectTransform dimRect = CreateRect("LoadingDim", overlay);
+        Stretch(dimRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        CreateImage(dimRect, new Color(0.01f, 0.02f, 0.04f, 0.24f));
+
+        RectTransform barRoot = CreateRect("LoadingBarRoot", overlay);
+        SetAnchored(barRoot, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 120f), new Vector2(560f, 26f));
+        CreateImage(barRoot, new Color(0.06f, 0.1f, 0.13f, 0.92f));
+
+        RectTransform fillArea = CreateRect("FillArea", barRoot);
+        Stretch(fillArea, Vector2.zero, Vector2.one, new Vector2(4f, 4f), new Vector2(-4f, -4f));
+
+        RectTransform fillRect = CreateRect("Fill", fillArea);
+        fillRect.anchorMin = new Vector2(0f, 0f);
+        fillRect.anchorMax = new Vector2(0f, 1f);
+        fillRect.pivot = new Vector2(0f, 0.5f);
+        fillRect.sizeDelta = new Vector2(0f, 0f);
+        fillRect.anchoredPosition = Vector2.zero;
+        loadingBarFill = CreateImage(fillRect, new Color(0.88f, 0.93f, 0.38f, 1f));
+
+        SetLoadingProgress(0f);
+        loadingOverlay.SetActive(false);
     }
 
     GameObject BuildModalPanel(string name, out TMP_Text titleText)
@@ -810,16 +871,60 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
     void OnPlayPressed()
     {
-        GameSaveSystem.MarkSessionStarted();
+        if (isStartingGame)
+            return;
 
+        StartCoroutine(BeginGameWithLoading());
+    }
+
+    IEnumerator BeginGameWithLoading()
+    {
+        isStartingGame = true;
+        HidePanels();
+
+        if (loadingOverlay != null)
+        {
+            loadingBackgroundImage.texture = loadingBackgroundTexture != null ? loadingBackgroundTexture : videoImage.texture;
+            loadingOverlay.SetActive(true);
+        }
+
+        SetLoadingProgress(0.08f);
+        yield return null;
+
+        SetLoadingProgress(0.28f);
+        GameSaveSystem.MarkSessionStarted();
+        yield return null;
+
+        SetLoadingProgress(0.62f);
         if (GameSaveSystem.HasSaveFile())
             GameSaveSystem.LoadIntoCurrentScene();
         else
             GameSaveSystem.SaveCurrentGame(force: true);
+        yield return null;
+
+        SetLoadingProgress(0.88f);
+        yield return null;
+
+        SetLoadingProgress(1f);
+        yield return new WaitForSecondsRealtime(0.12f);
 
         Time.timeScale = 1f;
         GameRuntimeState.SetGameplayBlocked(false);
         Destroy(gameObject);
+    }
+
+    void SetLoadingProgress(float progress01)
+    {
+        if (loadingBarFill == null)
+            return;
+
+        RectTransform fillRect = loadingBarFill.rectTransform;
+        RectTransform parentRect = fillRect.parent as RectTransform;
+        if (parentRect == null)
+            return;
+
+        float width = Mathf.Max(0f, parentRect.rect.width * Mathf.Clamp01(progress01));
+        fillRect.sizeDelta = new Vector2(width, 0f);
     }
 
     void ShowPanel(GameObject panel)

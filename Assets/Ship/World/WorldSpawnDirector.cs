@@ -53,6 +53,11 @@ public class WorldSpawnDirector : MonoBehaviour
     public float threatScoreScale = 0.18f;
     public float threatLogBase = 2f;
     public float baseThreat = 1f;
+    public float threatGraceScore = 250f;
+    [Range(0f, 1f)] public float earlyThreatMultiplier = 0.3f;
+    public float threatAccelerationScore = 900f;
+    public float threatAccelerationScale = 0.012f;
+    public float threatAccelerationExponent = 1.3f;
     public float extraEngineThreatStep = 1.35f;
     public float extraFuelTankThreatStep = 1.7f;
     public float extraLaserThreatStep = 1.1f;
@@ -72,6 +77,12 @@ public class WorldSpawnDirector : MonoBehaviour
     [Range(0f, 1f)] public float extraEngineRollChance = 0.32f;
     [Range(0f, 1f)] public float extraLaserRollChance = 0.24f;
     [Range(0f, 1f)] public float extraFuelTankRollChance = 0.72f;
+    [Range(0f, 1f)] public float symmetryPreference = 0.8f;
+    public float mirrorOccupiedBonus = 90f;
+    public float mirrorOpenSocketBonus = 42f;
+    public float centerlinePlacementBonus = 14f;
+    public float supportModuleNearCoreBonus = 95f;
+    public float supportModuleNearCoreFalloff = 24f;
 
     static WorldSpawnDirector instance;
     static Material enemyDesaturateMaterial;
@@ -445,9 +456,26 @@ public class WorldSpawnDirector : MonoBehaviour
 
     float EvaluateThreat(float currentScore)
     {
-        float logBase = Mathf.Max(1.01f, threatLogBase);
-        float scaledScore = Mathf.Max(0f, currentScore) * Mathf.Max(0.001f, threatScoreScale);
-        return baseThreat + Mathf.Log(1f + scaledScore, logBase);
+        float score = Mathf.Max(0f, currentScore);
+        float logBase = Mathf.Max(1.2f, threatLogBase);
+        float scale = Mathf.Max(0.001f, threatScoreScale);
+
+        float graceScore = Mathf.Max(0f, threatGraceScore);
+        float earlyScore = Mathf.Max(0f, score - graceScore);
+        float earlyThreat = Mathf.Log(
+            1f + earlyScore * scale * Mathf.Clamp01(earlyThreatMultiplier),
+            logBase);
+
+        float accelerationStart = Mathf.Max(graceScore, threatAccelerationScore);
+        float lateScore = Mathf.Max(0f, score - accelerationStart);
+        float lateThreat = 0f;
+        if (lateScore > 0f)
+        {
+            float accelerated = lateScore * Mathf.Max(0f, threatAccelerationScale);
+            lateThreat = Mathf.Pow(1f + accelerated, Mathf.Max(1f, threatAccelerationExponent)) - 1f;
+        }
+
+        return Mathf.Max(0.1f, baseThreat) + Mathf.Max(0f, earlyThreat) + Mathf.Max(0f, lateThreat);
     }
 
     EnemyLoadout BuildLoadout(float threat)
@@ -544,9 +572,9 @@ public class WorldSpawnDirector : MonoBehaviour
         AddRequests(requests, powerPlantModulePrefab, ModuleType.Reactor, loadout.powerPlantCount, loadout.moduleUpgradeLevel);
         AddRequests(requests, repairModulePrefab, ModuleType.Repair, loadout.repairCount, loadout.moduleUpgradeLevel);
         AddRequests(requests, radiatorModulePrefab, ModuleType.Radiator, loadout.radiatorCount, loadout.moduleUpgradeLevel);
+        AddRequests(requests, fuelTankModulePrefab, ModuleType.FuelTank, loadout.fuelTankCount, loadout.moduleUpgradeLevel);
         AddRequests(requests, engineModulePrefab, ModuleType.Engine, loadout.engineCount, loadout.moduleUpgradeLevel);
         AddRequests(requests, laserModulePrefab, ModuleType.Weapon, loadout.laserCount, Mathf.Clamp(loadout.weaponUpgradeLevel, 0, maxLaserUpgradeLevel));
-        AddRequests(requests, fuelTankModulePrefab, ModuleType.FuelTank, loadout.fuelTankCount, loadout.moduleUpgradeLevel);
         return requests;
     }
 
@@ -688,7 +716,11 @@ public class WorldSpawnDirector : MonoBehaviour
             for (int r = 0; r < rotations.Count; r++)
             {
                 int rot90 = rotations[r];
-                float score = ScorePlacement(request.type, targetGrid, socket.side) + Random.value * 0.25f;
+                float score =
+                    ScorePlacement(request.type, targetGrid, socket.side) +
+                    GetCoreAdjacencyBonus(request.type, targetGrid) +
+                    GetSymmetryBonus(request.type, socket, targetGrid, occupied, openSockets) +
+                    Random.value * 0.25f;
                 if (!found || score > bestCandidate.score)
                 {
                     bestCandidate = new EnemyPlacementCandidate(socket, targetGrid, rot90, score);
@@ -814,8 +846,11 @@ public class WorldSpawnDirector : MonoBehaviour
                 break;
 
             case ModuleType.FuelTank:
-                score += Mathf.Abs(gridPos.x) * 4f;
-                score += gridPos.y <= 0 ? 8f : 2f;
+                score += (anchorSide == Side.Left || anchorSide == Side.Right) ? 70f : 16f;
+                score += (Mathf.Abs(gridPos.x) == 1 && gridPos.y == 0) ? 120f : 0f;
+                score += (Mathf.Abs(gridPos.x) <= 1 && gridPos.y <= 0) ? 18f : 0f;
+                score += -gridPos.sqrMagnitude * 8f;
+                score += -Mathf.Abs(gridPos.y) * 6f;
                 break;
 
             case ModuleType.Reactor:
@@ -827,6 +862,67 @@ public class WorldSpawnDirector : MonoBehaviour
         return score;
     }
 
+    float GetCoreAdjacencyBonus(ModuleType type, Vector2Int gridPos)
+    {
+        bool isSupportModule =
+            type == ModuleType.FuelTank ||
+            type == ModuleType.Reactor ||
+            type == ModuleType.Repair ||
+            type == ModuleType.Radiator;
+        if (!isSupportModule)
+            return 0f;
+
+        int taxiDistance = Mathf.Abs(gridPos.x) + Mathf.Abs(gridPos.y);
+        if (taxiDistance <= 0)
+            return 0f;
+
+        if (taxiDistance == 1)
+            return supportModuleNearCoreBonus;
+
+        return Mathf.Max(0f, supportModuleNearCoreBonus - (taxiDistance - 1) * supportModuleNearCoreFalloff);
+    }
+
+    float GetSymmetryBonus(
+        ModuleType type,
+        EnemyOpenSocket socket,
+        Vector2Int targetGrid,
+        Dictionary<Vector2Int, EnemyModulePlacement> occupied,
+        List<EnemyOpenSocket> openSockets)
+    {
+        float preference = Mathf.Clamp01(symmetryPreference);
+        if (preference <= 0f)
+            return 0f;
+
+        if (targetGrid.x == 0)
+            return centerlinePlacementBonus * preference;
+
+        Vector2Int mirroredGrid = MirrorGrid(targetGrid);
+        if (occupied.TryGetValue(mirroredGrid, out EnemyModulePlacement mirroredPlacement))
+        {
+            float typeMatchBonus = mirroredPlacement.type == type ? mirrorOccupiedBonus : mirrorOccupiedBonus * 0.2f;
+            return typeMatchBonus * preference;
+        }
+
+        if (HasMirroredOpenSocket(socket, openSockets))
+            return mirrorOpenSocketBonus * preference;
+
+        return 0f;
+    }
+
+    bool HasMirroredOpenSocket(EnemyOpenSocket socket, List<EnemyOpenSocket> openSockets)
+    {
+        Vector2Int mirroredGrid = MirrorGrid(socket.gridPos);
+        Side mirroredSide = MirrorSide(socket.side);
+
+        for (int i = 0; i < openSockets.Count; i++)
+        {
+            if (openSockets[i].gridPos == mirroredGrid && openSockets[i].side == mirroredSide)
+                return true;
+        }
+
+        return false;
+    }
+
     static Side OppositeSide(Side side) => side switch
     {
         Side.Up => Side.Down,
@@ -834,6 +930,15 @@ public class WorldSpawnDirector : MonoBehaviour
         Side.Left => Side.Right,
         Side.Right => Side.Left,
         _ => Side.Up
+    };
+
+    static Vector2Int MirrorGrid(Vector2Int grid) => new Vector2Int(-grid.x, grid.y);
+
+    static Side MirrorSide(Side side) => side switch
+    {
+        Side.Left => Side.Right,
+        Side.Right => Side.Left,
+        _ => side
     };
 
     static Side RotateSide(Side side, int rot90)

@@ -5876,8 +5876,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ModuleInstance
   data: {fileID: 11400000, guid: 7b876c0dd20edc6419ee1b7098262a6b, type: 2}
-  hp: 30
-  maxHp: 30
+  hp: 15
+  maxHp: 15
   resetHpOnDataAssign: 1
   currentHeat: 0
   repairProgress: 0
@@ -5984,15 +5984,20 @@ MonoBehaviour:
   scrapMassFromPlayerMassMultiplier: 1
   scrapDriftImpulse: 1.25
   enemyDesiredRange: 30
-  enemyAttackRange: 20
+  enemyAttackRange: 25
   enemyFireConeAngle: 20
   enemyMaxSpeed: 15
   enemyOutlineColor: {r: 1, g: 0.2, b: 0.18, a: 0.95}
-  enemyOutlinePixelSize: 10
+  enemyOutlinePixelSize: 15
   enemySaturationMultiplier: 0.8
-  threatScoreScale: 0.1
-  threatLogBase: 3
-  baseThreat: 0.5
+  threatScoreScale: 0.15
+  threatLogBase: 1
+  baseThreat: 0.4
+  threatGraceScore: 50
+  earlyThreatMultiplier: 0.3
+  threatAccelerationScore: 500
+  threatAccelerationScale: 0.012
+  threatAccelerationExponent: 1.3
   extraEngineThreatStep: 1.35
   extraFuelTankThreatStep: 1.7
   extraLaserThreatStep: 1.1
@@ -6001,17 +6006,23 @@ MonoBehaviour:
   maxExtraEngines: 7
   maxExtraFuelTanks: 7
   maxExtraLasers: 6
-  maxEnemyEngineCount: 10
-  maxEnemyFuelTankCount: 10
+  maxEnemyEngineCount: 12
+  maxEnemyFuelTankCount: 12
   maxEnemyLaserCount: 8
-  maxEnemyPowerPlantCount: 4
-  maxEnemyRepairCount: 2
+  maxEnemyPowerPlantCount: 2
+  maxEnemyRepairCount: 1
   maxEnemyRadiatorCount: 4
-  maxModuleUpgradeLevel: 10
-  maxLaserUpgradeLevel: 10
+  maxModuleUpgradeLevel: 3
+  maxLaserUpgradeLevel: 3
   extraEngineRollChance: 0.3
   extraLaserRollChance: 0.24
   extraFuelTankRollChance: 0.72
+  symmetryPreference: 0.8
+  mirrorOccupiedBonus: 90
+  mirrorOpenSocketBonus: 42
+  centerlinePlacementBonus: 14
+  supportModuleNearCoreBonus: 95
+  supportModuleNearCoreFalloff: 24
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0

@@ -26,6 +26,11 @@ public class EnemyShipAI : MonoBehaviour
     public float maxThrustTorque = 8f;
     public float thrustTorqueSlowdownStartDegPerSec = 120f;
     public float maxAngularDegPerSec = 220f;
+    public float thrustTorqueCompensation = 0.72f;
+    public float highTorqueDrivePenalty = 0.45f;
+    public float angularStabilityDamping = 2.25f;
+    public float lowAngularStopStartRPM = 4f;
+    public float lowAngularStopDamping = 5f;
     public float wanderForwardThrottle = 0.03f;
     public float idleBrake = 7f;
     public float retaliationDuration = 12f;
@@ -199,9 +204,13 @@ public class EnemyShipAI : MonoBehaviour
 
                 if (thrust.appliedThrust > 0f)
                 {
-                    rb.AddForce(thrust.force, ForceMode2D.Force);
                     float clampedTorque = Mathf.Clamp(thrust.torque, -Mathf.Abs(maxThrustTorque), Mathf.Abs(maxThrustTorque));
-                    rb.AddTorque(clampedTorque, ForceMode2D.Force);
+                    float torquePenalty = 1f - Mathf.InverseLerp(0f, Mathf.Max(0.01f, Mathf.Abs(maxThrustTorque)), Mathf.Abs(clampedTorque)) * Mathf.Clamp01(highTorqueDrivePenalty);
+                    Vector2 compensatedForce = thrust.force * Mathf.Clamp01(torquePenalty);
+                    float compensatedTorque = clampedTorque * (1f - Mathf.Clamp01(thrustTorqueCompensation));
+
+                    rb.AddForce(compensatedForce, ForceMode2D.Force);
+                    rb.AddTorque(compensatedTorque, ForceMode2D.Force);
                 }
             }
         }
@@ -209,7 +218,33 @@ public class EnemyShipAI : MonoBehaviour
         if (rb.linearVelocity.magnitude > speedCap)
             rb.linearVelocity = rb.linearVelocity.normalized * speedCap;
 
+        ApplyAngularStability();
         rb.angularVelocity = Mathf.Clamp(rb.angularVelocity, -Mathf.Abs(maxAngularDegPerSec), Mathf.Abs(maxAngularDegPerSec));
+    }
+
+    void ApplyAngularStability()
+    {
+        if (rb == null)
+            return;
+
+        bool precisionStabilize = shouldBrake || prefersAimTurn || throttleCommand <= 0.001f;
+        if (!precisionStabilize)
+            return;
+
+        float damping = Mathf.Max(0f, angularStabilityDamping);
+        float angularSpeedRpm = Mathf.Abs(rb.angularVelocity) * 60f / 360f;
+
+        if (angularSpeedRpm <= Mathf.Max(lowAngularStopStartRPM, 0.01f) && lowAngularStopDamping > 0f)
+        {
+            float stopAssist = Mathf.Lerp(
+                damping,
+                Mathf.Max(damping, lowAngularStopDamping),
+                1f - Mathf.InverseLerp(0f, Mathf.Max(lowAngularStopStartRPM, 0.01f), angularSpeedRpm));
+            damping = Mathf.Max(damping, stopAssist);
+        }
+
+        if (damping > 0f)
+            rb.angularVelocity = Mathf.MoveTowards(rb.angularVelocity, 0f, damping * Time.fixedDeltaTime);
     }
 
     void EvaluateBehavior(Vector2 toTarget, bool isRetaliating)
