@@ -25,6 +25,7 @@ public class ShipMovement : MonoBehaviour
     public float angularDamping = 0.0f;
     public float lowAngularStopStartRPM = 6f;
     public float lowAngularStopDamping = 6f;
+    public float sasAssistRangeMultiplier = 2f;
 
     [Header("Engine Torque Model")]
     public bool useModuleCenterOfMass = true;
@@ -148,9 +149,14 @@ public class ShipMovement : MonoBehaviour
         {
             float angularSpeedRpm = Mathf.Abs(rb.angularVelocity) * 60f / 360f;
             float damping = angularDamping;
+            float sasAssistThresholdRpm = Mathf.Max(lowAngularStopStartRPM, lowAngularStopStartRPM * Mathf.Max(1f, sasAssistRangeMultiplier));
 
-            if (angularSpeedRpm <= lowAngularStopStartRPM && lowAngularStopDamping > 0f)
-                damping = lowAngularStopDamping;
+            if (angularSpeedRpm <= sasAssistThresholdRpm && lowAngularStopDamping > 0f)
+            {
+                float assistBlend = 1f - Mathf.InverseLerp(lowAngularStopStartRPM, sasAssistThresholdRpm, angularSpeedRpm);
+                float assistedDamping = Mathf.Lerp(lowAngularStopDamping * 0.5f, lowAngularStopDamping, Mathf.Clamp01(assistBlend));
+                damping = Mathf.Max(damping, assistedDamping);
+            }
 
             if (damping > 0f)
                 rb.angularVelocity = Mathf.MoveTowards(rb.angularVelocity, 0f, damping * Time.fixedDeltaTime);

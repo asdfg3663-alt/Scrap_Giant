@@ -41,7 +41,7 @@ public class ModuleInstance : MonoBehaviour
 
     public int CurrentTier => data != null ? Mathf.Max(1, data.tier + upgradeLevel) : Mathf.Max(1, upgradeLevel);
     public string DisplayName => GetLocalizedDisplayName();
-    public float TierMultiplier => Mathf.Pow(2f, Mathf.Max(0, upgradeLevel));
+    public float TierMultiplier => GetTierStatMultiplier(2f);
 
     void Awake()
     {
@@ -87,33 +87,38 @@ public class ModuleInstance : MonoBehaviour
         if (data == null)
             return Mathf.Max(1, maxHp);
 
-        int bonusPerTier = data.type == ModuleType.FuelTank ? 10 : 5;
-        return Mathf.Max(1, data.maxHP + Mathf.Max(0, upgradeLevel) * bonusPerTier);
+        return Mathf.Max(1, Mathf.RoundToInt(data.maxHP * GetTierStatMultiplier(data.hpPerTierMultiplier)));
     }
 
-    public float GetPowerGenPerSec() { return data != null ? data.powerGenPerSec * TierMultiplier : 0f; }
+    public float GetPowerGenPerSec() { return data != null ? data.powerGenPerSec * GetTierStatMultiplier(data.powerGenPerTierMultiplier) : 0f; }
     public float GetEffectivePowerGenPerSec() { return GetPowerGenPerSec() * GetHeatEfficiencyMultiplierForPower(); }
-    public float GetPowerUsePerSec() { return data != null ? data.powerUsePerSec * TierMultiplier : 0f; }
-    public float GetMaxEnergy() { return data != null ? data.maxEnergy * TierMultiplier : 0f; }
-    public float GetMaxFuel() { return data != null ? data.maxFuel * TierMultiplier : 0f; }
-    public float GetFuelSynthesisPerSec() { return data != null ? data.fuelSynthesisPerSec * TierMultiplier : 0f; }
-    public float GetThrust() { return data != null ? data.thrust * TierMultiplier : 0f; }
-    public float GetMass() { return data != null ? data.mass * TierMultiplier : 0f; }
-    public float GetScoreValue() { return data != null ? GetMass() * Mathf.Max(0f, data.scoreMultiplier) : 0f; }
-    public float GetWeaponDamage() { return data != null ? data.weaponDamage * TierMultiplier : 0f; }
+    public float GetPowerUsePerSec() { return data != null ? data.powerUsePerSec * GetTierStatMultiplier(data.powerUsePerTierMultiplier) : 0f; }
+    public float GetMaxEnergy() { return data != null ? data.maxEnergy * GetTierStatMultiplier(data.energyPerTierMultiplier) : 0f; }
+    public float GetMaxFuel() { return data != null ? data.maxFuel * GetTierStatMultiplier(data.fuelPerTierMultiplier) : 0f; }
+    public float GetFuelSynthesisPerSec() { return data != null ? data.fuelSynthesisPerSec * GetTierStatMultiplier(data.fuelSynthesisPerTierMultiplier) : 0f; }
+    public float GetThrust() { return data != null ? data.thrust * GetTierStatMultiplier(data.thrustPerTierMultiplier) : 0f; }
+    public float GetMass() { return data != null ? data.mass * GetTierStatMultiplier(data.massPerTierMultiplier) : 0f; }
+    public float GetScoreValue()
+    {
+        if (data == null)
+            return 0f;
+
+        return GetMass() * Mathf.Max(0f, data.scoreMultiplier) * GetTierStatMultiplier(data.scorePerTierMultiplier);
+    }
+    public float GetWeaponDamage() { return data != null ? data.weaponDamage * GetTierStatMultiplier(data.weaponDamagePerTierMultiplier) : 0f; }
     public float GetEffectiveWeaponDamage() { return GetWeaponDamage() * GetHeatEfficiencyMultiplierForWeapon(); }
-    public float GetWeaponFireRate() { return data != null ? data.weaponFireRate * TierMultiplier : 0f; }
-    public float GetWeaponPowerPerShot() { return data != null ? data.weaponPowerPerShot * TierMultiplier : 0f; }
-    public float GetWeaponHeatPerShot() { return data != null ? data.weaponHeatPerShot * TierMultiplier : 0f; }
-    public float GetWeaponAmmoPerShot() { return data != null ? data.weaponAmmoPerShot * TierMultiplier : 0f; }
-    public float GetMaxHeat() { return data != null ? data.maxHeat * TierMultiplier : 0f; }
-    public float GetHeatDissipationPerSec() { return data != null ? data.heatDissipationPerSec * TierMultiplier : 0f; }
-    public float GetRepairPerSecond() { return data != null ? data.repairPerSecond * TierMultiplier : 0f; }
+    public float GetWeaponFireRate() { return data != null ? data.weaponFireRate * GetTierStatMultiplier(data.weaponFireRatePerTierMultiplier) : 0f; }
+    public float GetWeaponPowerPerShot() { return data != null ? data.weaponPowerPerShot * GetTierStatMultiplier(data.weaponPowerPerShotPerTierMultiplier) : 0f; }
+    public float GetWeaponHeatPerShot() { return data != null ? data.weaponHeatPerShot * GetTierStatMultiplier(data.weaponHeatPerShotPerTierMultiplier) : 0f; }
+    public float GetWeaponAmmoPerShot() { return data != null ? data.weaponAmmoPerShot * GetTierStatMultiplier(data.weaponAmmoPerShotPerTierMultiplier) : 0f; }
+    public float GetMaxHeat() { return data != null ? data.maxHeat * GetTierStatMultiplier(data.maxHeatPerTierMultiplier) : 0f; }
+    public float GetHeatDissipationPerSec() { return data != null ? data.heatDissipationPerSec * GetTierStatMultiplier(data.heatDissipationPerTierMultiplier) : 0f; }
+    public float GetRepairPerSecond() { return data != null ? data.repairPerSecond * GetTierStatMultiplier(data.repairPerTierMultiplier) : 0f; }
 
     public float GetDps()
     {
         if (data == null) return 0f;
-        if (data.dps > 0f) return data.dps * TierMultiplier;
+        if (data.dps > 0f) return data.dps * GetTierStatMultiplier(data.dpsPerTierMultiplier);
         return Mathf.Max(0f, GetWeaponDamage()) * Mathf.Max(0f, GetWeaponFireRate());
     }
 
@@ -191,6 +196,15 @@ public class ModuleInstance : MonoBehaviour
     {
         string fallback = FormatDisplayName(data != null ? data.displayName : "Module", CurrentTier);
         return LocalizationManager.GetModuleText(data != null ? data.localizationKey : string.Empty, fallback);
+    }
+
+    float GetTierStatMultiplier(float perTierMultiplier)
+    {
+        int tierSteps = Mathf.Max(0, upgradeLevel);
+        if (tierSteps <= 0)
+            return 1f;
+
+        return Mathf.Pow(Mathf.Max(0.01f, perTierMultiplier), tierSteps);
     }
 
     public static string FormatDisplayName(string rawName, int tier)

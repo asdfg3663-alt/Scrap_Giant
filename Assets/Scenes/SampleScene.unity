@@ -5988,17 +5988,17 @@ MonoBehaviour:
   enemyOutlineColor: {r: 1, g: 0.2, b: 0.18, a: 0.95}
   enemyOutlinePixelSize: 7
   enemySaturationMultiplier: 0.65
-  threatScoreScale: 0.1
+  threatScoreScale: 0.18
   threatLogBase: 2
-  baseThreat: 0.3
+  baseThreat: 1
   extraEngineThreatStep: 1.35
   extraFuelTankThreatStep: 1.7
   extraLaserThreatStep: 1.1
   weaponTierThreatStep: 1.4
-  maxExtraEngines: 4
-  maxExtraFuelTanks: 4
-  maxExtraLasers: 4
-  maxLaserUpgradeLevel: 4
+  maxExtraEngines: 7
+  maxExtraFuelTanks: 7
+  maxExtraLasers: 6
+  maxLaserUpgradeLevel: 9
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0

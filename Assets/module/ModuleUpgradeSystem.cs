@@ -185,13 +185,20 @@ public class ModuleUpgradeSystem : MonoBehaviour
     int CalculateScrapCost(ModuleInstance module)
     {
         if (module == null || module.data == null) return 0;
-        return Mathf.CeilToInt(Mathf.Max(0f, module.GetMass() * 10f));
+
+        float baseCost = Mathf.Max(0f, module.data.mass * Mathf.Max(0f, module.data.upgradeScrapCostMassMultiplier));
+        float tierScale = Mathf.Pow(
+            Mathf.Max(0.01f, module.data.upgradeScrapCostPerTierMultiplier),
+            Mathf.Max(0, module.upgradeLevel));
+        return Mathf.Max(1, Mathf.CeilToInt(baseCost * tierScale));
     }
 
     float CalculateDuration(ModuleInstance module)
     {
         if (module == null || module.data == null) return 0f;
-        return Mathf.Max(0.1f, module.GetMass() * 3f);
+
+        float duration = Mathf.Max(0.1f, module.GetMass() * 3f);
+        return duration / GetCoreUpgradeSpeedMultiplier(module);
     }
 
     void CompleteUpgrade()
@@ -249,6 +256,29 @@ public class ModuleUpgradeSystem : MonoBehaviour
 
         var renderer = module.GetComponentInChildren<SpriteRenderer>(true);
         return renderer != null ? renderer.sprite : null;
+    }
+
+    float GetCoreUpgradeSpeedMultiplier(ModuleInstance module)
+    {
+        if (module == null)
+            return 1f;
+
+        ShipStats ship = module.GetComponentInParent<ShipStats>();
+        if (ship == null)
+            return 1f;
+
+        ModuleInstance[] installedModules = ship.GetComponentsInChildren<ModuleInstance>(true);
+        int highestCoreTier = 1;
+        for (int i = 0; i < installedModules.Length; i++)
+        {
+            ModuleInstance installedModule = installedModules[i];
+            if (installedModule == null || installedModule.data == null || installedModule.data.type != ModuleType.Core)
+                continue;
+
+            highestCoreTier = Mathf.Max(highestCoreTier, installedModule.CurrentTier);
+        }
+
+        return Mathf.Pow(2f, Mathf.Max(0, highestCoreTier - 1));
     }
 
     AudioClip CreateCompletionClip()

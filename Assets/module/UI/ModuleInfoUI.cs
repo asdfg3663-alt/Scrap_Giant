@@ -200,7 +200,7 @@ public class ModuleInfoUI : MonoBehaviour
         {
             float progress = info.progress01;
 
-            upgradeActionLine.text = $"<mark=#214B3D padding=\"22,22,7,7\">{LocalizationManager.Get("action.upgrading", "UPGRADING")}</mark>";
+            upgradeActionLine.text = $"<mark=#214B3D padding=\"32,32,10,10\">{LocalizationManager.Get("action.upgrading", "UPGRADING")}</mark>";
             upgradeActionLine.color = upgradeProgressColor;
             upgradeActionLine.raycastTarget = true;
             upgradeButton.interactable = true;
@@ -212,7 +212,7 @@ public class ModuleInfoUI : MonoBehaviour
 
         if (upgradeSystem.CanStartUpgrade(module, out string reason))
         {
-            upgradeActionLine.text = $"<mark=#5A6218 padding=\"22,22,7,7\">{LocalizationManager.Get("action.upgrade", "UPGRADE")}</mark>";
+            upgradeActionLine.text = $"<mark=#5A6218 padding=\"32,32,10,10\">{LocalizationManager.Get("action.upgrade", "UPGRADE")}</mark>";
             upgradeActionLine.color = upgradeReadyColor;
             upgradeActionLine.raycastTarget = true;
             upgradeButton.interactable = true;
@@ -223,8 +223,12 @@ public class ModuleInfoUI : MonoBehaviour
         }
 
         upgradeHoverMessage = reason;
-        ForceHideUpgradeHint();
-        upgradeActionLine.gameObject.SetActive(false);
+        upgradeActionLine.text = $"<mark=#363C44 padding=\"32,32,10,10\">{LocalizationManager.Get("action.upgrade", "UPGRADE")}</mark>";
+        upgradeActionLine.color = upgradeLockedColor;
+        upgradeActionLine.raycastTarget = true;
+        upgradeButton.interactable = true;
+        RefreshUpgradeHintVisibility();
+        upgradeActionLine.gameObject.SetActive(true);
     }
 
     void EnsureNameLine()
@@ -263,7 +267,7 @@ public class ModuleInfoUI : MonoBehaviour
         upgradeActionLine.text = "";
         upgradeActionLine.color = upgradeReadyColor;
         upgradeActionLine.raycastTarget = true;
-        upgradeActionLine.rectTransform.sizeDelta = new Vector2(220f, 30f);
+        upgradeActionLine.rectTransform.sizeDelta = new Vector2(330f, 45f);
         upgradeActionLine.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
         ConfigureDockedElement(upgradeActionLine.rectTransform, new Vector2(0f, 0f));
         ApplyLocalizedFont(upgradeActionLine);
@@ -295,10 +299,10 @@ public class ModuleInfoUI : MonoBehaviour
         upgradeHintLine.color = new Color(0.82f, 0.88f, 0.92f, 1f);
         upgradeHintLine.textWrappingMode = TextWrappingModes.NoWrap;
         upgradeHintLine.overflowMode = TextOverflowModes.Ellipsis;
-        upgradeHintLine.rectTransform.sizeDelta = new Vector2(320f, 24f);
+        upgradeHintLine.rectTransform.sizeDelta = new Vector2(360f, 28f);
         upgradeHintLine.raycastTarget = false;
         upgradeHintLine.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
-        ConfigureDockedElement(upgradeHintLine.rectTransform, new Vector2(0f, 36f));
+        ConfigureDockedElement(upgradeHintLine.rectTransform, new Vector2(0f, 52f));
         ApplyLocalizedFont(upgradeHintLine);
     }
 
@@ -351,7 +355,16 @@ public class ModuleInfoUI : MonoBehaviour
         var module = ModuleSelection.Selected;
         if (module == null) return;
 
-        ModuleUpgradeSystem.Instance.StartUpgrade(module);
+        var upgradeSystem = ModuleUpgradeSystem.Instance;
+        if (upgradeSystem.StartUpgrade(module))
+            return;
+
+        if (upgradeSystem.CanStartUpgrade(module, out string reason))
+            return;
+
+        upgradeHoverMessage = reason;
+        isUpgradeHovered = true;
+        ShowUpgradeHint();
     }
 
     void LayoutUpgradeControls()
@@ -359,13 +372,13 @@ public class ModuleInfoUI : MonoBehaviour
         if (upgradeDockRoot == null)
             return;
 
-        ConfigureDockedElement(upgradeDockRoot, new Vector2(0f, 52f));
+        ConfigureDockedElement(upgradeDockRoot, new Vector2(0f, 68f));
 
         if (upgradeActionLine != null)
             ConfigureDockedElement(upgradeActionLine.rectTransform, new Vector2(0f, 0f));
 
         if (upgradeHintLine != null)
-            ConfigureDockedElement(upgradeHintLine.rectTransform, new Vector2(0f, 36f));
+            ConfigureDockedElement(upgradeHintLine.rectTransform, new Vector2(0f, 52f));
     }
 
     void ShowUpgradeHint()

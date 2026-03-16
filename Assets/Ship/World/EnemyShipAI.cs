@@ -23,6 +23,9 @@ public class EnemyShipAI : MonoBehaviour
     public float thrustTurnTorqueMultiplier = 0.02f;
     public float turnTorqueScale = 0.1f;
     public float aimTurnMultiplier = 1.15f;
+    public float maxThrustTorque = 8f;
+    public float thrustTorqueSlowdownStartDegPerSec = 120f;
+    public float maxAngularDegPerSec = 220f;
     public float wanderForwardThrottle = 0.03f;
     public float idleBrake = 7f;
     public float retaliationDuration = 12f;
@@ -172,6 +175,12 @@ public class EnemyShipAI : MonoBehaviour
         {
             float steeringDot = Mathf.Clamp(Vector2.Dot(transform.up, targetDir), -1f, 1f);
             float drive = Mathf.Clamp01((steeringDot + 0.2f) * 0.5f);
+            float angularSpeed = Mathf.Abs(rb.angularVelocity);
+            float torqueThrottleScale = 1f - Mathf.InverseLerp(
+                thrustTorqueSlowdownStartDegPerSec,
+                Mathf.Max(thrustTorqueSlowdownStartDegPerSec + 1f, maxAngularDegPerSec),
+                angularSpeed);
+            drive *= Mathf.Clamp01(torqueThrottleScale);
 
             if (drive > 0f)
             {
@@ -191,13 +200,16 @@ public class EnemyShipAI : MonoBehaviour
                 if (thrust.appliedThrust > 0f)
                 {
                     rb.AddForce(thrust.force, ForceMode2D.Force);
-                    rb.AddTorque(thrust.torque, ForceMode2D.Force);
+                    float clampedTorque = Mathf.Clamp(thrust.torque, -Mathf.Abs(maxThrustTorque), Mathf.Abs(maxThrustTorque));
+                    rb.AddTorque(clampedTorque, ForceMode2D.Force);
                 }
             }
         }
 
         if (rb.linearVelocity.magnitude > speedCap)
             rb.linearVelocity = rb.linearVelocity.normalized * speedCap;
+
+        rb.angularVelocity = Mathf.Clamp(rb.angularVelocity, -Mathf.Abs(maxAngularDegPerSec), Mathf.Abs(maxAngularDegPerSec));
     }
 
     void EvaluateBehavior(Vector2 toTarget, bool isRetaliating)

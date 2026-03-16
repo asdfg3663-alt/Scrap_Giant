@@ -32,6 +32,30 @@ public class ModuleData : ScriptableObject
     [Header("Durability")]
     public int maxHP = 30;
 
+    [Header("Tier Scaling")]
+    [Min(0.01f)] public float hpPerTierMultiplier = 1.5f;
+    [Min(0.01f)] public float powerGenPerTierMultiplier = 1.3f;
+    [Min(0.01f)] public float powerUsePerTierMultiplier = 1.12f;
+    [Min(0.01f)] public float energyPerTierMultiplier = 1.3f;
+    [Min(0.01f)] public float fuelPerTierMultiplier = 1.3f;
+    [Min(0.01f)] public float fuelSynthesisPerTierMultiplier = 1.25f;
+    [Min(0.01f)] public float thrustPerTierMultiplier = 1.25f;
+    [Min(0.01f)] public float massPerTierMultiplier = 1.12f;
+    [Min(0.01f)] public float scorePerTierMultiplier = 1f;
+    [Min(0.01f)] public float maxHeatPerTierMultiplier = 1.2f;
+    [Min(0.01f)] public float heatDissipationPerTierMultiplier = 1.2f;
+    [Min(0.01f)] public float repairPerTierMultiplier = 1.2f;
+    [Min(0.01f)] public float weaponDamagePerTierMultiplier = 1.3f;
+    [Min(0.01f)] public float weaponFireRatePerTierMultiplier = 1.1f;
+    [Min(0.01f)] public float weaponPowerPerShotPerTierMultiplier = 1.1f;
+    [Min(0.01f)] public float weaponHeatPerShotPerTierMultiplier = 1.12f;
+    [Min(0.01f)] public float weaponAmmoPerShotPerTierMultiplier = 1f;
+    [Min(0.01f)] public float dpsPerTierMultiplier = 1.25f;
+
+    [Header("Upgrade Economy")]
+    [Min(0f)] public float upgradeScrapCostMassMultiplier = 10f;
+    [Min(0.01f)] public float upgradeScrapCostPerTierMultiplier = 1.5f;
+
     [Header("Power (per second)")]
     public float powerGenPerSec = 1f;
     public float powerUsePerSec = 0f;

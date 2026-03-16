@@ -58,11 +58,20 @@ public class WorldSpawnDirector : MonoBehaviour
     public float extraLaserThreatStep = 1.1f;
     public float moduleTierThreatStep = 1.8f;
     public float weaponTierThreatStep = 1.4f;
-    public int maxExtraEngines = 4;
-    public int maxExtraFuelTanks = 4;
-    public int maxExtraLasers = 4;
-    public int maxModuleUpgradeLevel = 4;
-    public int maxLaserUpgradeLevel = 4;
+    public int maxExtraEngines = 7;
+    public int maxExtraFuelTanks = 7;
+    public int maxExtraLasers = 6;
+    public int maxEnemyEngineCount = 10;
+    public int maxEnemyFuelTankCount = 10;
+    public int maxEnemyLaserCount = 8;
+    public int maxEnemyPowerPlantCount = 4;
+    public int maxEnemyRepairCount = 2;
+    public int maxEnemyRadiatorCount = 4;
+    public int maxModuleUpgradeLevel = 9;
+    public int maxLaserUpgradeLevel = 9;
+    [Range(0f, 1f)] public float extraEngineRollChance = 0.32f;
+    [Range(0f, 1f)] public float extraLaserRollChance = 0.24f;
+    [Range(0f, 1f)] public float extraFuelTankRollChance = 0.72f;
 
     static WorldSpawnDirector instance;
     static Material enemyDesaturateMaterial;
@@ -448,21 +457,42 @@ public class WorldSpawnDirector : MonoBehaviour
         int extraLasers = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1f) / Mathf.Max(0.01f, extraLaserThreatStep)), 0, maxExtraLasers);
         int moduleUpgradeLevel = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1f) / Mathf.Max(0.01f, moduleTierThreatStep)), 0, maxModuleUpgradeLevel);
         int weaponUpgradeLevel = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1f) / Mathf.Max(0.01f, weaponTierThreatStep)), 0, maxLaserUpgradeLevel);
-        int reactorBudget = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1.25f) / 2.5f), 0, 2);
-        int repairBudget = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 2f) / 3.25f), 0, 1);
-        int radiatorBudget = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1f) / 2f), 0, 2);
+        int reactorBudget = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1.25f) / 1.9f), 0, maxEnemyPowerPlantCount);
+        int repairBudget = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 2f) / 2.8f), 0, maxEnemyRepairCount);
+        int radiatorBudget = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1f) / 1.55f), 0, maxEnemyRadiatorCount);
+        int guaranteedFuelTanks = Mathf.Max(0, extraEngines / 2) + Mathf.Max(0, moduleUpgradeLevel / 3);
+        int guaranteedEngines = Mathf.Max(0, moduleUpgradeLevel / 4);
+        int guaranteedLasers = Mathf.Max(0, weaponUpgradeLevel / 5);
 
         return new EnemyLoadout
         {
-            engineCount = Mathf.Min(EngineSlots.Length, 1 + extraEngines + Mathf.Max(0, extraLasers / 2)),
-            fuelTankCount = Mathf.Min(FuelTankSlots.Length, 1 + extraFuelTanks),
-            laserCount = Mathf.Min(LaserSlots.Length, 1 + extraLasers),
+            engineCount = Mathf.Clamp(1 + guaranteedEngines + RollAdditionalCount(extraEngines + Mathf.Max(0, extraLasers / 2), extraEngineRollChance), 1, maxEnemyEngineCount),
+            fuelTankCount = Mathf.Clamp(1 + guaranteedFuelTanks + RollAdditionalCount(extraFuelTanks + Mathf.Max(0, extraEngines / 2), extraFuelTankRollChance), 1, maxEnemyFuelTankCount),
+            laserCount = Mathf.Clamp(1 + guaranteedLasers + RollAdditionalCount(extraLasers, extraLaserRollChance), 1, maxEnemyLaserCount),
             moduleUpgradeLevel = moduleUpgradeLevel,
             weaponUpgradeLevel = weaponUpgradeLevel,
             powerPlantCount = powerPlantModulePrefab != null && reactorBudget > 0 ? Random.Range(1, reactorBudget + 1) : 0,
-            repairCount = repairModulePrefab != null ? Random.Range(0, repairBudget + 1) : 0,
+            repairCount = repairModulePrefab != null && repairBudget > 0 ? Random.Range(0, repairBudget + 1) : 0,
             radiatorCount = radiatorModulePrefab != null && radiatorBudget > 0 ? Random.Range(1, radiatorBudget + 1) : 0
         };
+    }
+
+    int RollAdditionalCount(int maxAdditional, float rollChance)
+    {
+        int count = 0;
+        int attempts = Mathf.Max(0, maxAdditional);
+        float chance = Mathf.Clamp01(rollChance);
+
+        for (int i = 0; i < attempts; i++)
+        {
+            if (Random.value > chance)
+                continue;
+
+            count++;
+            chance *= 0.82f;
+        }
+
+        return count;
     }
 
     bool TryCreateEnemyAssemblyWithFallback(EnemyLoadout loadout, out EnemyLoadout resolvedLoadout, out List<EnemyModulePlacement> placements)
@@ -470,13 +500,20 @@ public class WorldSpawnDirector : MonoBehaviour
         resolvedLoadout = loadout;
         placements = null;
 
-        for (int attempt = 0; attempt < 12; attempt++)
+        for (int attempt = 0; attempt < 48; attempt++)
         {
             if (TryCreateEnemyAssembly(resolvedLoadout, out placements))
                 return true;
 
             if (!TryReduceLoadoutForAssembly(ref resolvedLoadout))
                 break;
+        }
+
+        EnemyLoadout emergencyLoadout = BuildEmergencyLoadout(loadout);
+        if (TryCreateEnemyAssembly(emergencyLoadout, out placements))
+        {
+            resolvedLoadout = emergencyLoadout;
+            return true;
         }
 
         placements = null;
@@ -566,6 +603,21 @@ public class WorldSpawnDirector : MonoBehaviour
         return false;
     }
 
+    EnemyLoadout BuildEmergencyLoadout(EnemyLoadout source)
+    {
+        return new EnemyLoadout
+        {
+            engineCount = 1,
+            fuelTankCount = 1,
+            laserCount = 1,
+            moduleUpgradeLevel = source.moduleUpgradeLevel,
+            weaponUpgradeLevel = source.weaponUpgradeLevel,
+            powerPlantCount = 0,
+            repairCount = 0,
+            radiatorCount = 0
+        };
+    }
+
     void AddRequests(List<EnemyModuleRequest> requests, GameObject prefab, ModuleType type, int count, int upgradeLevel)
     {
         if (prefab == null || count <= 0)
@@ -585,7 +637,12 @@ public class WorldSpawnDirector : MonoBehaviour
         if (coreModule == null)
             return false;
 
-        EnemyModulePlacement corePlacement = new EnemyModulePlacement(coreModulePrefab, ModuleType.Core, Vector2Int.zero, 0, 0);
+        EnemyModulePlacement corePlacement = new EnemyModulePlacement(
+            coreModulePrefab,
+            ModuleType.Core,
+            Vector2Int.zero,
+            0,
+            requests.Count > 0 ? requests[0].upgradeLevel : 0);
         placements.Add(corePlacement);
         occupied.Add(Vector2Int.zero, corePlacement);
         AddOpenSocketsForPlacement(corePlacement, occupied, openSockets, connectedSide: null);
