@@ -32,6 +32,7 @@ public sealed class AudioRuntime : MonoBehaviour
     AudioClip moduleDragClip;
     AudioClip scrapPickupClip;
     AudioClip moduleBreakClip;
+    AudioClip powerPlantExplosionClip;
 
     MusicMode currentMusicMode;
     int gameplayShuffleCursor;
@@ -76,6 +77,7 @@ public sealed class AudioRuntime : MonoBehaviour
         moduleDragClip = CreateElectricBuzzClip();
         scrapPickupClip = CreateScrapPickupClip();
         moduleBreakClip = CreateModuleBreakClip();
+        powerPlantExplosionClip = CreatePowerPlantExplosionClip();
         dragLoopSource.clip = moduleDragClip;
 
         StartCoroutine(LoadAudioLibrary());
@@ -169,6 +171,15 @@ public sealed class AudioRuntime : MonoBehaviour
             return;
 
         instance.oneShotSource.PlayOneShot(instance.moduleBreakClip, GameOptions.SfxVolume);
+    }
+
+    public static void PlayPowerPlantExplosion()
+    {
+        EnsureInstance();
+        if (instance == null || instance.powerPlantExplosionClip == null)
+            return;
+
+        instance.oneShotSource.PlayOneShot(instance.powerPlantExplosionClip, GameOptions.SfxVolume * 1.05f);
     }
 
     AudioSource CreateSource(string name, bool loop, bool playOnAwake)
@@ -493,6 +504,29 @@ public sealed class AudioRuntime : MonoBehaviour
         }
 
         AudioClip clip = AudioClip.Create("ModuleBreak", sampleCount, 1, sampleRate, false);
+        clip.SetData(samples, 0);
+        return clip;
+    }
+
+    AudioClip CreatePowerPlantExplosionClip()
+    {
+        const int sampleRate = 22050;
+        const float duration = 0.42f;
+        int sampleCount = Mathf.CeilToInt(sampleRate * duration);
+        float[] samples = new float[sampleCount];
+
+        for (int i = 0; i < sampleCount; i++)
+        {
+            float t = i / (float)sampleRate;
+            float envelope = Mathf.Exp(-t * 6.5f);
+            float boom = Mathf.Sin(2f * Mathf.PI * 62f * t) * 0.5f;
+            float crack = Mathf.Sin(2f * Mathf.PI * 240f * t) * 0.2f;
+            float fizz = Mathf.Sign(Mathf.Sin(2f * Mathf.PI * 95f * t)) * 0.08f;
+            float tail = Mathf.Sin(2f * Mathf.PI * 34f * t) * 0.18f;
+            samples[i] = Mathf.Clamp((boom + crack + fizz + tail) * envelope, -1f, 1f);
+        }
+
+        AudioClip clip = AudioClip.Create("PowerPlantExplosion", sampleCount, 1, sampleRate, false);
         clip.SetData(samples, 0);
         return clip;
     }

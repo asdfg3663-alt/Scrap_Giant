@@ -7,7 +7,7 @@ public class CoreFallbackLaser : MonoBehaviour
     public LayerMask hitMask = ~0;
     public float dps = 1f;
     public float fireRate = 5f;
-    public float range = 18f;
+    public float range = 10f;
     public float startOffset = 0.4f;
 
     [Header("Damage Falloff")]

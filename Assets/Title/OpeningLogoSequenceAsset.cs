@@ -7,7 +7,7 @@ public class OpeningLogoEntry
 {
     public Sprite logoSprite;
     [Min(0f)] public float fadeInDuration = 1f;
-    [Min(0f)] public float holdDuration = 3f;
+    [Min(0f)] public float holdDuration = 4f;
     [Min(0f)] public float fadeOutDuration = 1f;
 }
 

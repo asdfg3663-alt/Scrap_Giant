@@ -4,6 +4,9 @@ using System.Collections.Generic;
 public class ShipStats : MonoBehaviour
 {
     static readonly Color FuelColor = new Color(0.38f, 0.85f, 0.95f, 1f);
+    const float BaseHeatDissipationPerSecond = 1f;
+    const float PowerPlantCriticalHeatThreshold = 0.96f;
+    const float PowerPlantOverheatDamagePerSecond = 0.1f;
 
     [Header("Identity")]
     [Tooltip("Player-controlled ship if true.")]
@@ -613,7 +616,11 @@ public class ShipStats : MonoBehaviour
         if (modules == null || modules.Length == 0)
             modules = GetComponentsInChildren<ModuleInstance>(true);
 
-        float coolingPerSecond = 1f + Mathf.Max(0f, totalHeatDissipationPerSec);
+        int heatSourceCount = CountHeatSourceModules();
+        float radiatorCoolingPerHeatSource = heatSourceCount > 0
+            ? Mathf.Max(0f, totalHeatDissipationPerSec) / heatSourceCount
+            : Mathf.Max(0f, totalHeatDissipationPerSec);
+
         for (int i = 0; i < modules.Length; i++)
         {
             var module = modules[i];
@@ -624,8 +631,71 @@ public class ShipStats : MonoBehaviour
             if (passiveHeat > 0f)
                 module.AddHeat(passiveHeat * deltaTime);
 
+            float coolingPerSecond = BaseHeatDissipationPerSecond;
+            if (module.IsHeatSourceModule())
+                coolingPerSecond += radiatorCoolingPerHeatSource;
+
             module.CoolHeat(coolingPerSecond * deltaTime);
+            TickPlayerPowerPlantOverheatDamage(module, deltaTime);
         }
+    }
+
+    int CountHeatSourceModules()
+    {
+        if (modules == null || modules.Length == 0)
+            return 0;
+
+        int count = 0;
+        for (int i = 0; i < modules.Length; i++)
+        {
+            ModuleInstance module = modules[i];
+            if (module == null || module.data == null || module.hp <= 0 || !module.gameObject.activeInHierarchy)
+                continue;
+
+            if (module.IsHeatSourceModule())
+                count++;
+        }
+
+        return count;
+    }
+
+    void TickPlayerPowerPlantOverheatDamage(ModuleInstance module, float deltaTime)
+    {
+        if (!isPlayerShip || module == null || module.data == null || module.data.type != ModuleType.Reactor)
+            return;
+
+        if (module.hp <= 0)
+            return;
+
+        if (module.GetHeatRatio() < PowerPlantCriticalHeatThreshold)
+        {
+            module.overheatDamageProgress = 0f;
+            return;
+        }
+
+        module.overheatDamageProgress += PowerPlantOverheatDamagePerSecond * deltaTime;
+        int damage = Mathf.FloorToInt(module.overheatDamageProgress);
+        if (damage <= 0)
+            return;
+
+        module.overheatDamageProgress -= damage;
+        module.hp = Mathf.Max(0, module.hp - damage);
+        if (module.hp > 0)
+            return;
+
+        ModuleHP moduleHp = module.GetComponent<ModuleHP>();
+        if (moduleHp != null)
+        {
+            Vector2 hitNormal = Random.insideUnitCircle;
+            if (hitNormal.sqrMagnitude < 0.0001f)
+                hitNormal = Vector2.up;
+
+            moduleHp.ForceDestroy(module.transform.position, hitNormal.normalized);
+            return;
+        }
+
+        HandleOwnedModuleDestroyed(module, module.transform, module.transform.position, Vector2.up);
+        Destroy(module.gameObject);
     }
 
     float ComputeEffectivePowerGeneration()

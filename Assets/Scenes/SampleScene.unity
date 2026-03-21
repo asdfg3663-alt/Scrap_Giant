@@ -5881,6 +5881,7 @@ MonoBehaviour:
   resetHpOnDataAssign: 1
   currentHeat: 0
   repairProgress: 0
+  overheatDamageProgress: 0
   upgradeLevel: 0
 --- !u!114 &485038386
 MonoBehaviour:
@@ -5980,13 +5981,13 @@ MonoBehaviour:
   maxEnemyShips: 7
   spawnCheckInterval: 3
   enemyInitialSpawnDelay: 10
-  minSpawnDistance: 50
-  maxSpawnDistance: 100
+  minSpawnDistance: 60
+  maxSpawnDistance: 120
   despawnAxisDistance: 150
-  scrapMassFromPlayerMassMultiplier: 1
+  scrapMassFromPlayerMassMultiplier: 0.8
   scrapDriftImpulse: 1.25
   enemyDesiredRange: 30
-  enemyAttackRange: 22
+  enemyAttackRange: 23
   enemyFireConeAngle: 20
   enemyMaxSpeed: 15
   enemyOutlineColor: {r: 1, g: 0.2, b: 0.18, a: 0.95}
@@ -6016,7 +6017,7 @@ MonoBehaviour:
   maxEnemyPowerPlantCount: 2
   maxEnemyRepairCount: 1
   maxEnemyRadiatorCount: 4
-  maxEnemyStructureCount: 12
+  maxEnemyStructureCount: 16
   maxEnemySolarPanelCount: 6
   maxModuleUpgradeLevel: 8
   maxLaserUpgradeLevel: 6
@@ -6090,7 +6091,7 @@ MonoBehaviour:
   m_Dithering: 0
   m_ClearDepth: 1
   m_AllowXRRendering: 1
-  m_AllowHDROutput: 1
+  m_AllowHDROutput: 0
   m_UseScreenCoordOverride: 0
   m_ScreenSizeOverride: {x: 0, y: 0, z: 0, w: 0}
   m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}

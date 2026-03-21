@@ -5,6 +5,7 @@ public class EnemyShipRuntime : MonoBehaviour
 {
     public float detachLinearImpulse = 1.1f;
     public float detachAngularImpulse = 0.4f;
+    [Range(0f, 1f)] public float powerPlantExplosionChance = 0.9f;
 
     ModuleInstance coreModule;
     bool coreDestroyed;
@@ -28,10 +29,34 @@ public class EnemyShipRuntime : MonoBehaviour
             if (module == null || module == coreModule)
                 continue;
 
+            if (TryExplodePowerPlant(module, hitPoint, hitNormal))
+                continue;
+
             ScatterModule(module.transform, hitPoint, hitNormal);
         }
 
         Destroy(gameObject);
+    }
+
+    bool TryExplodePowerPlant(ModuleInstance module, Vector2 hitPoint, Vector2 hitNormal)
+    {
+        if (module == null || module.data == null || module.data.type != ModuleType.Reactor)
+            return false;
+
+        if (Random.value > powerPlantExplosionChance)
+            return false;
+
+        AudioRuntime.PlayPowerPlantExplosion();
+
+        ModuleHP moduleHp = module.GetComponent<ModuleHP>();
+        if (moduleHp != null)
+        {
+            moduleHp.ForceDestroy(module.transform.position, hitNormal, awardResources: false);
+            return true;
+        }
+
+        Destroy(module.gameObject);
+        return true;
     }
 
     void ScatterModule(Transform moduleTransform, Vector2 hitPoint, Vector2 hitNormal)

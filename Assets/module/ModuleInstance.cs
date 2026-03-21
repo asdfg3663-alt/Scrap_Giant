@@ -31,6 +31,7 @@ public class ModuleInstance : MonoBehaviour
     public bool resetHpOnDataAssign = true;
     public float currentHeat;
     public float repairProgress;
+    public float overheatDamageProgress;
 
     [Header("Upgrade")]
     [Min(0)] public int upgradeLevel = 0;
@@ -75,6 +76,7 @@ public class ModuleInstance : MonoBehaviour
         hp = Mathf.Clamp(hp, 0, maxHp);
         currentHeat = Mathf.Clamp(currentHeat, 0f, GetMaxHeat());
         repairProgress = Mathf.Max(0f, repairProgress);
+        overheatDamageProgress = Mathf.Max(0f, overheatDamageProgress);
     }
 
     public void ApplyUpgrade(int amount = 1)
@@ -161,6 +163,11 @@ public class ModuleInstance : MonoBehaviour
     public float GetTotalHeatGenerationPerSecondPotential()
     {
         return GetPassiveHeatPerSecond() + GetWeaponHeatPerSecondPotential();
+    }
+
+    public bool IsHeatSourceModule()
+    {
+        return GetTotalHeatGenerationPerSecondPotential() > 0.001f;
     }
 
     public float GetHeatRatio()

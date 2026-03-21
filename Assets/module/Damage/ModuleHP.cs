@@ -57,10 +57,21 @@ public class ModuleHP : MonoBehaviour, IDamageable
         }
 
         inst.hp = 0;
-        Die(hitPoint, hitNormal);
+        Die(hitPoint, hitNormal, true);
     }
 
-    void Die(Vector2 hitPoint, Vector2 hitNormal)
+    public void ForceDestroy(Vector2 hitPoint, Vector2 hitNormal, bool awardResources = true)
+    {
+        if (inst == null)
+            inst = GetComponent<ModuleInstance>();
+
+        if (inst != null)
+            inst.hp = 0;
+
+        Die(hitPoint, hitNormal, awardResources);
+    }
+
+    void Die(Vector2 hitPoint, Vector2 hitNormal, bool awardResources)
     {
         if (explosionVfxPrefab)
             Instantiate(explosionVfxPrefab, hitPoint, Quaternion.identity);
@@ -74,7 +85,7 @@ public class ModuleHP : MonoBehaviour, IDamageable
         if (isPlayerOwned)
             currentShip?.HandleOwnedModuleDestroyed(inst, transform, hitPoint, hitNormal);
 
-        if (!isPlayerOwned && inst != null)
+        if (!isPlayerOwned && inst != null && awardResources)
             WorldResourceUtility.AwardScrapFromMass(inst.GetMass(), transform.position);
 
         if (!isPlayerOwned && inst != null && inst.data != null && inst.data.type == ModuleType.Core)
