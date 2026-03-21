@@ -11,6 +11,8 @@ using System.Collections;
 [DisallowMultipleComponent]
 public sealed partial class TitleScreenRuntime : MonoBehaviour
 {
+    const float StartupVideoPreloadTimeout = 12f;
+
     sealed class HowToPage
     {
         public string tabKey;
@@ -78,6 +80,9 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
     RectTransform previewPulse;
     GameObject loadingOverlay;
     Image loadingBarFill;
+    GameObject startupLoadingOverlay;
+    RawImage startupLoadingBackgroundImage;
+    Image startupLoadingBarFill;
     GameObject openingLogoOverlay;
     Image openingLogoImage;
     OpeningLogoSequenceAsset openingLogoSequence;
@@ -128,6 +133,8 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
     AudioSource audioSource;
     AudioClip buttonClickClip;
     bool isStartingGame;
+    bool backgroundVideoReady;
+    bool backgroundVideoPreparing;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Bootstrap()
@@ -169,6 +176,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         PrepareBackgroundVideo();
         PrepareLoadingBackground();
         PrepareOpeningLogos();
+        StartCoroutine(BeginStartupSequence());
     }
 
     void OnEnable()
@@ -296,12 +304,16 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
         HidePanels();
         BuildLoadingOverlay(titleRoot);
+        BuildStartupLoadingOverlay();
         BuildOpeningLogoOverlay();
         RefreshLocalizedText();
     }
 
     void PrepareBackgroundVideo()
     {
+        backgroundVideoReady = false;
+        backgroundVideoPreparing = false;
+
         videoTexture = new RenderTexture(1920, 1080, 0, RenderTextureFormat.ARGB32);
         videoTexture.Create();
         videoImage.texture = videoTexture;
@@ -318,20 +330,26 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         string videoPath = Path.Combine(Application.dataPath, "Title", "Title.mp4");
         if (File.Exists(videoPath))
         {
+            backgroundVideoPreparing = true;
             videoPlayer.source = VideoSource.Url;
             videoPlayer.url = videoPath;
-            videoPlayer.prepareCompleted += _ => videoPlayer.Play();
+            videoPlayer.prepareCompleted += HandleBackgroundVideoPrepared;
+            videoPlayer.errorReceived += HandleBackgroundVideoError;
             videoPlayer.Prepare();
             return;
         }
 
         string fallbackPath = Path.Combine(Application.dataPath, "Title", "Title img.jpg");
         if (!File.Exists(fallbackPath))
+        {
+            backgroundVideoReady = true;
             return;
+        }
 
         fallbackTexture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
         fallbackTexture.LoadImage(File.ReadAllBytes(fallbackPath));
         videoImage.texture = fallbackTexture;
+        backgroundVideoReady = true;
     }
 
     void PrepareLoadingBackground()
@@ -350,14 +368,6 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
     void PrepareOpeningLogos()
     {
         openingLogoSequence = Resources.Load<OpeningLogoSequenceAsset>("OpeningLogoSequence");
-
-        if (HasOpeningLogoSequence())
-        {
-            StartCoroutine(PlayOpeningLogoSequence());
-            return;
-        }
-
-        SetTitleUiVisible(true);
     }
 
     void BuildLoadingOverlay(RectTransform root)
@@ -394,6 +404,39 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         loadingOverlay.SetActive(false);
     }
 
+    void BuildStartupLoadingOverlay()
+    {
+        RectTransform overlay = CreateRect("StartupLoadingOverlay", transform);
+        Stretch(overlay, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        startupLoadingOverlay = overlay.gameObject;
+
+        startupLoadingBackgroundImage = overlay.gameObject.AddComponent<RawImage>();
+        startupLoadingBackgroundImage.color = Color.white;
+        startupLoadingBackgroundImage.raycastTarget = true;
+
+        RectTransform dimRect = CreateRect("StartupLoadingDim", overlay);
+        Stretch(dimRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        CreateImage(dimRect, new Color(0f, 0f, 0f, 0.3f));
+
+        RectTransform barRoot = CreateRect("StartupLoadingBarRoot", overlay);
+        SetAnchored(barRoot, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 120f), new Vector2(560f, 26f));
+        CreateImage(barRoot, new Color(0.06f, 0.1f, 0.13f, 0.92f));
+
+        RectTransform fillArea = CreateRect("StartupFillArea", barRoot);
+        Stretch(fillArea, Vector2.zero, Vector2.one, new Vector2(4f, 4f), new Vector2(-4f, -4f));
+
+        RectTransform fillRect = CreateRect("StartupFill", fillArea);
+        fillRect.anchorMin = new Vector2(0f, 0f);
+        fillRect.anchorMax = new Vector2(0f, 1f);
+        fillRect.pivot = new Vector2(0f, 0.5f);
+        fillRect.sizeDelta = new Vector2(0f, 0f);
+        fillRect.anchoredPosition = Vector2.zero;
+        startupLoadingBarFill = CreateImage(fillRect, new Color(0.88f, 0.93f, 0.38f, 1f));
+
+        SetStartupLoadingProgress(0f);
+        startupLoadingOverlay.SetActive(false);
+    }
+
     void BuildOpeningLogoOverlay()
     {
         RectTransform overlay = CreateRect("OpeningLogoOverlay", transform);
@@ -409,7 +452,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
             new Vector2(0.5f, 0.5f),
             new Vector2(0.5f, 0.5f),
             new Vector2(0.5f, 0.5f),
-            Vector2.zero,
+            new Vector2(-18f, 0f),
             new Vector2(860f, 420f));
 
         openingLogoImage = logoRect.gameObject.AddComponent<Image>();
@@ -536,10 +579,10 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
     void BuildHowToPanel(Transform parent)
     {
-        RectTransform previewBlock = CreateBlock(parent, 270f);
+        RectTransform previewBlock = CreateBlock(parent, 250f);
 
         RectTransform previewFrame = CreateRect("PreviewFrame", previewBlock);
-        SetAnchored(previewFrame, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(18f, -18f), new Vector2(250f, 220f));
+        SetAnchored(previewFrame, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(18f, -18f), new Vector2(250f, 124f));
         CreateImage(previewFrame, new Color(0.07f, 0.13f, 0.16f, 0.92f));
 
         previewPulse = CreateRect("PreviewPulse", previewFrame);
@@ -547,20 +590,21 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         CreateImage(previewPulse, howToPages[0].previewColor);
 
         RectTransform textBlock = CreateRect("TextBlock", previewBlock);
-        Stretch(textBlock, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(292f, 18f), new Vector2(-18f, -18f));
+        Stretch(textBlock, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(486f, 18f), new Vector2(-18f, -18f));
 
         howToPreviewTitleLabel = CreateText(textBlock, "How To Play", 26f, Color.white, FontStyles.Bold, TextAlignmentOptions.TopLeft);
-        Stretch(howToPreviewTitleLabel.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, -46f));
+        Stretch(howToPreviewTitleLabel.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, 0f), new Vector2(-18f, -56f));
 
         howToPreviewBodyLabel = CreateText(textBlock, string.Empty, 18f, new Color(0.82f, 0.9f, 0.95f, 1f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
         howToPreviewBodyLabel.enableWordWrapping = true;
-        Stretch(howToPreviewBodyLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0f, 8f), new Vector2(0f, -62f));
+        Stretch(howToPreviewBodyLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(18f, 12f), new Vector2(-18f, -96f));
 
         RectTransform tabRow = CreateRect("HowToTabs", parent);
-        tabRow.sizeDelta = new Vector2(0f, 58f);
+        tabRow.sizeDelta = new Vector2(0f, 72f);
         HorizontalLayoutGroup tabLayout = tabRow.gameObject.AddComponent<HorizontalLayoutGroup>();
         tabLayout.spacing = 12f;
-        tabLayout.childAlignment = TextAnchor.MiddleCenter;
+        tabLayout.padding = new RectOffset(0, 18, 6, 0);
+        tabLayout.childAlignment = TextAnchor.LowerRight;
         tabLayout.childControlWidth = false;
         tabLayout.childControlHeight = false;
         tabLayout.childForceExpandWidth = false;
@@ -961,6 +1005,47 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         Destroy(gameObject);
     }
 
+    IEnumerator BeginStartupSequence()
+    {
+        if (startupLoadingOverlay != null)
+        {
+            if (startupLoadingBackgroundImage != null)
+                startupLoadingBackgroundImage.texture = loadingBackgroundTexture != null ? loadingBackgroundTexture : videoImage.texture;
+
+            startupLoadingOverlay.SetActive(true);
+        }
+
+        SetStartupLoadingProgress(0.08f);
+        yield return null;
+
+        float elapsed = 0f;
+        while (!IsStartupPreloadComplete())
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float easedProgress = 0.12f + 0.78f * (1f - Mathf.Exp(-elapsed * 1.35f));
+            SetStartupLoadingProgress(easedProgress);
+
+            if (elapsed >= StartupVideoPreloadTimeout)
+            {
+                ForceCompleteBackgroundPreload();
+                break;
+            }
+
+            yield return null;
+        }
+
+        SetStartupLoadingProgress(1f);
+        yield return new WaitForSecondsRealtime(0.35f);
+
+        if (startupLoadingOverlay != null)
+            startupLoadingOverlay.SetActive(false);
+
+        if (HasOpeningLogoSequence())
+            yield return PlayOpeningLogoSequence();
+        else
+            SetTitleUiVisible(true);
+    }
+
     void SetLoadingProgress(float progress01)
     {
         if (loadingBarFill == null)
@@ -975,11 +1060,59 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         fillRect.sizeDelta = new Vector2(width, 0f);
     }
 
+    void SetStartupLoadingProgress(float progress01)
+    {
+        if (startupLoadingBarFill == null)
+            return;
+
+        RectTransform fillRect = startupLoadingBarFill.rectTransform;
+        RectTransform parentRect = fillRect.parent as RectTransform;
+        if (parentRect == null)
+            return;
+
+        float width = Mathf.Max(0f, parentRect.rect.width * Mathf.Clamp01(progress01));
+        fillRect.sizeDelta = new Vector2(width, 0f);
+    }
+
+    bool IsStartupPreloadComplete()
+    {
+        return backgroundVideoReady;
+    }
+
+    void ForceCompleteBackgroundPreload()
+    {
+        backgroundVideoPreparing = false;
+        backgroundVideoReady = true;
+
+        if (loadingBackgroundTexture != null)
+            videoImage.texture = loadingBackgroundTexture;
+        else if (fallbackTexture != null)
+            videoImage.texture = fallbackTexture;
+    }
+
     bool HasOpeningLogoSequence()
     {
         return openingLogoSequence != null &&
             openingLogoSequence.logos != null &&
             openingLogoSequence.logos.Count > 0;
+    }
+
+    void HandleBackgroundVideoPrepared(VideoPlayer source)
+    {
+        backgroundVideoPreparing = false;
+        backgroundVideoReady = true;
+        source.Play();
+    }
+
+    void HandleBackgroundVideoError(VideoPlayer source, string _)
+    {
+        backgroundVideoPreparing = false;
+        backgroundVideoReady = true;
+
+        if (loadingBackgroundTexture != null)
+            videoImage.texture = loadingBackgroundTexture;
+        else if (fallbackTexture != null)
+            videoImage.texture = fallbackTexture;
     }
 
     IEnumerator PlayOpeningLogoSequence()
