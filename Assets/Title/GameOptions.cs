@@ -58,6 +58,25 @@ public static class GameOptions
     public static void ApplyAll()
     {
         AudioListener.volume = MasterVolume;
-        Screen.fullScreen = Fullscreen;
+        ApplyFullscreenMode();
+    }
+
+    static void ApplyFullscreenMode()
+    {
+        Resolution currentResolution = Screen.currentResolution;
+        int width = currentResolution.width > 0 ? currentResolution.width : Screen.width;
+        int height = currentResolution.height > 0 ? currentResolution.height : Screen.height;
+
+        if (Fullscreen)
+        {
+            Screen.fullScreenMode = FullScreenMode.FullScreenWindow;
+            Screen.SetResolution(width, height, FullScreenMode.FullScreenWindow);
+            return;
+        }
+
+        int windowedWidth = Mathf.Max(1280, Mathf.RoundToInt(width * 0.85f));
+        int windowedHeight = Mathf.Max(720, Mathf.RoundToInt(height * 0.85f));
+        Screen.fullScreenMode = FullScreenMode.Windowed;
+        Screen.SetResolution(windowedWidth, windowedHeight, FullScreenMode.Windowed);
     }
 }

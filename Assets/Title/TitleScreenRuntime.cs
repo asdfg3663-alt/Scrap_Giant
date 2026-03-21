@@ -327,19 +327,19 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         videoPlayer.targetTexture = videoTexture;
         videoPlayer.timeUpdateMode = VideoTimeUpdateMode.UnscaledGameTime;
 
-        string videoPath = Path.Combine(Application.dataPath, "Title", "Title.mp4");
+        string videoPath = ResolveMediaFilePath("Title", "Title.mp4");
         if (File.Exists(videoPath))
         {
             backgroundVideoPreparing = true;
             videoPlayer.source = VideoSource.Url;
-            videoPlayer.url = videoPath;
+            videoPlayer.url = ToFileUri(videoPath);
             videoPlayer.prepareCompleted += HandleBackgroundVideoPrepared;
             videoPlayer.errorReceived += HandleBackgroundVideoError;
             videoPlayer.Prepare();
             return;
         }
 
-        string fallbackPath = Path.Combine(Application.dataPath, "Title", "Title img.jpg");
+        string fallbackPath = ResolveMediaFilePath("Title", "Title img.jpg");
         if (!File.Exists(fallbackPath))
         {
             backgroundVideoReady = true;
@@ -357,7 +357,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         if (loadingBackgroundTexture != null)
             return;
 
-        string fallbackPath = Path.Combine(Application.dataPath, "Title", "Title img.jpg");
+        string fallbackPath = ResolveMediaFilePath("Title", "Title img.jpg");
         if (!File.Exists(fallbackPath))
             return;
 
@@ -452,7 +452,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
             new Vector2(0.5f, 0.5f),
             new Vector2(0.5f, 0.5f),
             new Vector2(0.5f, 0.5f),
-            new Vector2(-18f, 0f),
+            Vector2.zero,
             new Vector2(860f, 420f));
 
         openingLogoImage = logoRect.gameObject.AddComponent<Image>();
@@ -1113,6 +1113,26 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
             videoImage.texture = loadingBackgroundTexture;
         else if (fallbackTexture != null)
             videoImage.texture = fallbackTexture;
+    }
+
+    static string ResolveMediaFilePath(params string[] relativeSegments)
+    {
+        string relativePath = Path.Combine(relativeSegments);
+
+        string streamingAssetsPath = Path.Combine(Application.streamingAssetsPath, relativePath);
+        if (File.Exists(streamingAssetsPath))
+            return streamingAssetsPath;
+
+        string projectAssetsPath = Path.Combine(Application.dataPath, relativePath);
+        if (File.Exists(projectAssetsPath))
+            return projectAssetsPath;
+
+        return streamingAssetsPath;
+    }
+
+    static string ToFileUri(string filePath)
+    {
+        return new System.Uri(filePath).AbsoluteUri;
     }
 
     IEnumerator PlayOpeningLogoSequence()

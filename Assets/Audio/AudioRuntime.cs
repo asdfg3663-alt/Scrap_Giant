@@ -278,7 +278,7 @@ public sealed class AudioRuntime : MonoBehaviour
 
     IEnumerator LoadAudioLibrary()
     {
-        string customSfxFolder = Path.Combine(Application.dataPath, "Audio", "SFX");
+        string customSfxFolder = ResolveMediaDirectory("Audio", "SFX");
         string attachOverridePath = FindFirstAudioFile(customSfxFolder, "ModuleAttach");
         if (!string.IsNullOrWhiteSpace(attachOverridePath))
             yield return LoadClip(attachOverridePath, clip => moduleAttachClip = clip ?? moduleAttachClip);
@@ -293,21 +293,21 @@ public sealed class AudioRuntime : MonoBehaviour
             });
         }
 
-        yield return LoadClip(Path.Combine(Application.dataPath, "Title", "Title_BGM1.mp3"), clip => titleBgmClip = clip);
-        yield return LoadClip(Path.Combine(Application.dataPath, "module", "Engine", "engine sound.mp3"), clip =>
+        yield return LoadClip(ResolveMediaFilePath("Title", "Title_BGM1.mp3"), clip => titleBgmClip = clip);
+        yield return LoadClip(ResolveMediaFilePath("module", "Engine", "engine sound.mp3"), clip =>
         {
             engineLoopClip = clip;
             if (engineLoopClip != null)
                 engineLoopClip.name = "EngineLoop";
         });
-        yield return LoadClip(Path.Combine(Application.dataPath, "module", "Laser", "Laser Sound.mp3"), clip =>
+        yield return LoadClip(ResolveMediaFilePath("module", "Laser", "Laser Sound.mp3"), clip =>
         {
             laserLoopClip = clip;
             if (laserLoopClip != null)
                 laserLoopClip.name = "LaserLoop";
         });
 
-        string soundtrackFolder = Path.Combine(Application.dataPath, "Sound Track");
+        string soundtrackFolder = ResolveMediaDirectory("Sound Track");
         if (Directory.Exists(soundtrackFolder))
         {
             string[] playlistFiles = Directory.GetFiles(soundtrackFolder, "*.mp3", SearchOption.TopDirectoryOnly);
@@ -348,8 +348,7 @@ public sealed class AudioRuntime : MonoBehaviour
             yield break;
         }
 
-        string normalized = filePath.Replace("\\", "/");
-        using UnityWebRequest request = UnityWebRequestMultimedia.GetAudioClip("file:///" + normalized, GuessAudioType(filePath));
+        using UnityWebRequest request = UnityWebRequestMultimedia.GetAudioClip(ToFileUri(filePath), GuessAudioType(filePath));
         yield return request.SendWebRequest();
 
         if (request.result != UnityWebRequest.Result.Success)
@@ -375,6 +374,41 @@ public sealed class AudioRuntime : MonoBehaviour
             ".ogg" => AudioType.OGGVORBIS,
             _ => AudioType.MPEG
         };
+    }
+
+    static string ResolveMediaDirectory(params string[] relativeSegments)
+    {
+        string relativePath = Path.Combine(relativeSegments);
+
+        string streamingAssetsPath = Path.Combine(Application.streamingAssetsPath, relativePath);
+        if (Directory.Exists(streamingAssetsPath))
+            return streamingAssetsPath;
+
+        string projectAssetsPath = Path.Combine(Application.dataPath, relativePath);
+        if (Directory.Exists(projectAssetsPath))
+            return projectAssetsPath;
+
+        return streamingAssetsPath;
+    }
+
+    static string ResolveMediaFilePath(params string[] relativeSegments)
+    {
+        string relativePath = Path.Combine(relativeSegments);
+
+        string streamingAssetsPath = Path.Combine(Application.streamingAssetsPath, relativePath);
+        if (File.Exists(streamingAssetsPath))
+            return streamingAssetsPath;
+
+        string projectAssetsPath = Path.Combine(Application.dataPath, relativePath);
+        if (File.Exists(projectAssetsPath))
+            return projectAssetsPath;
+
+        return streamingAssetsPath;
+    }
+
+    static string ToFileUri(string filePath)
+    {
+        return new System.Uri(filePath).AbsoluteUri;
     }
 
     AudioClip CreateAttachThunkClip()

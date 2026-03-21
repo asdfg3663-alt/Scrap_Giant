@@ -84,6 +84,12 @@ public class ModuleInstance : MonoBehaviour
         ApplyTierVisuals();
     }
 
+    public void RefreshVisualState(bool forceReset = false)
+    {
+        SyncFromDataIfNeeded(forceReset);
+        ApplyTierVisuals();
+    }
+
     public int GetMaxHp()
     {
         if (data == null)

@@ -16,7 +16,7 @@ MonoBehaviour:
   localizationKey: module.thermoelectric_generator
   type: 3
   tier: 1
-  maxHP: 10
+  maxHP: 4
   hpPerTierMultiplier: 1.5
   powerGenPerTierMultiplier: 1.3
   powerUsePerTierMultiplier: 1.4
@@ -35,7 +35,7 @@ MonoBehaviour:
   weaponHeatPerShotPerTierMultiplier: 1.12
   weaponAmmoPerShotPerTierMultiplier: 1
   dpsPerTierMultiplier: 1.25
-  upgradeScrapCostMassMultiplier: 10
+  upgradeScrapCostMassMultiplier: 12
   upgradeScrapCostPerTierMultiplier: 1.6
   powerGenPerSec: 5
   powerUsePerSec: 0
@@ -43,8 +43,8 @@ MonoBehaviour:
   maxFuel: 0
   fuelSynthesisPerSec: 0
   thrust: 0
-  mass: 20
-  scoreMultiplier: 1
+  mass: 25
+  scoreMultiplier: 1.3
   maxHeat: 50
   heatDissipationPerSec: 0
   repairPerSecond: 0

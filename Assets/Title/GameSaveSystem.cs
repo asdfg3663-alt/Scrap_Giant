@@ -288,7 +288,7 @@ public static class GameSaveSystem
 
         int savedUpgrade = data != null ? Mathf.Max(0, data.upgradeLevel) : 0;
         instance.upgradeLevel = savedUpgrade;
-        instance.SyncFromDataIfNeeded(forceReset: true);
+        instance.RefreshVisualState(forceReset: true);
 
         if (data != null)
         {

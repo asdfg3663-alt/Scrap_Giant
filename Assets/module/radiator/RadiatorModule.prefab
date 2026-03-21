@@ -183,8 +183,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ModuleInstance
   data: {fileID: 11400000, guid: 0a6c0d4383754cb0a30283f03c6c2f1e, type: 2}
-  hp: 5
-  maxHp: 5
+  hp: 4
+  maxHp: 4
   resetHpOnDataAssign: 1
   currentHeat: 0
   repairProgress: 0
