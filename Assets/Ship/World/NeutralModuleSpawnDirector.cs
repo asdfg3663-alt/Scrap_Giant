@@ -100,6 +100,8 @@ public class NeutralModuleSpawnDirector : MonoBehaviour
         AddPrefab(worldDirector.powerPlantModulePrefab);
         AddPrefab(worldDirector.repairModulePrefab);
         AddPrefab(worldDirector.radiatorModulePrefab);
+        AddPrefab(worldDirector.structureModulePrefab);
+        AddPrefab(worldDirector.solarPanelModulePrefab);
     }
 
     void AddPrefab(GameObject prefab)

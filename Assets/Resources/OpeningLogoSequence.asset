@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6fa1d54005a840e9a91ea57cc7b50786, type: 3}
+  m_Name: OpeningLogoSequence
+  m_EditorClassIdentifier: Assembly-CSharp::OpeningLogoSequenceAsset
+  logos:
+  - logoSprite: {fileID: 6838678067970726026, guid: 33a70ee7fe56ded49b6b3c60153f725e, type: 3}
+    fadeInDuration: 1
+    holdDuration: 3
+    fadeOutDuration: 1

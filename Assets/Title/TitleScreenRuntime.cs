@@ -66,6 +66,8 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
     };
 
     Canvas canvas;
+    CanvasGroup titleCanvasGroup;
+    RectTransform titleRoot;
     RawImage videoImage;
     RawImage loadingBackgroundImage;
     VideoPlayer videoPlayer;
@@ -76,6 +78,9 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
     RectTransform previewPulse;
     GameObject loadingOverlay;
     Image loadingBarFill;
+    GameObject openingLogoOverlay;
+    Image openingLogoImage;
+    OpeningLogoSequenceAsset openingLogoSequence;
 
     TMP_Text highScoreLabel;
     TMP_Text playButtonLabel;
@@ -163,6 +168,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         BuildUi();
         PrepareBackgroundVideo();
         PrepareLoadingBackground();
+        PrepareOpeningLogos();
     }
 
     void OnEnable()
@@ -212,22 +218,24 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
         gameObject.AddComponent<GraphicRaycaster>();
 
-        RectTransform root = CreateRect("TitleRoot", transform);
-        Stretch(root, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        titleRoot = CreateRect("TitleRoot", transform);
+        Stretch(titleRoot, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        titleCanvasGroup = titleRoot.gameObject.AddComponent<CanvasGroup>();
+        SetTitleUiVisible(false);
 
-        RectTransform backgroundRect = CreateRect("VideoBackground", root);
+        RectTransform backgroundRect = CreateRect("VideoBackground", titleRoot);
         Stretch(backgroundRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         videoImage = backgroundRect.gameObject.AddComponent<RawImage>();
         videoImage.color = Color.white;
 
-        RectTransform dimRect = CreateRect("BackgroundDim", root);
+        RectTransform dimRect = CreateRect("BackgroundDim", titleRoot);
         Stretch(dimRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         CreateImage(dimRect, new Color(0.02f, 0.04f, 0.07f, 0.38f));
 
-        highScoreLabel = CreateText(root, string.Empty, 33f, new Color(0.94f, 0.22f, 0.2f, 1f), FontStyles.Bold, TextAlignmentOptions.Center);
+        highScoreLabel = CreateText(titleRoot, string.Empty, 33f, new Color(0.94f, 0.22f, 0.2f, 1f), FontStyles.Bold, TextAlignmentOptions.Center);
         SetAnchored(highScoreLabel.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -242f), new Vector2(900f, 54f));
 
-        RectTransform buttonBar = CreateRect("ButtonBar", root);
+        RectTransform buttonBar = CreateRect("ButtonBar", titleRoot);
         SetAnchored(buttonBar, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 88f), new Vector2(980f, 112f));
         HorizontalLayoutGroup layout = buttonBar.gameObject.AddComponent<HorizontalLayoutGroup>();
         layout.spacing = 18f;
@@ -262,7 +270,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         shopButton.GetComponent<RectTransform>().sizeDelta = new Vector2(176f, 58f);
         creditsButton.GetComponent<RectTransform>().sizeDelta = new Vector2(176f, 58f);
 
-        modalDimmer = CreateRect("ModalDimmer", root).gameObject;
+        modalDimmer = CreateRect("ModalDimmer", titleRoot).gameObject;
         Stretch(modalDimmer.GetComponent<RectTransform>(), Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         Image dimImage = CreateImage(modalDimmer.GetComponent<RectTransform>(), new Color(0.01f, 0.03f, 0.04f, 0.74f));
         dimImage.raycastTarget = true;
@@ -271,7 +279,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         dimButton.onClick.AddListener(HidePanels);
         modalDimmer.SetActive(false);
 
-        modalRoot = CreateRect("ModalRoot", root);
+        modalRoot = CreateRect("ModalRoot", titleRoot);
         SetAnchored(modalRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -12f), new Vector2(1040f, 620f));
 
         optionsPanel = BuildModalPanel("OptionsPanel", out optionsTitleLabel);
@@ -287,7 +295,8 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         BuildCreditsPanel(GetPanelBody(creditsPanel.transform));
 
         HidePanels();
-        BuildLoadingOverlay(root);
+        BuildLoadingOverlay(titleRoot);
+        BuildOpeningLogoOverlay();
         RefreshLocalizedText();
     }
 
@@ -338,6 +347,19 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         loadingBackgroundTexture.LoadImage(File.ReadAllBytes(fallbackPath));
     }
 
+    void PrepareOpeningLogos()
+    {
+        openingLogoSequence = Resources.Load<OpeningLogoSequenceAsset>("OpeningLogoSequence");
+
+        if (HasOpeningLogoSequence())
+        {
+            StartCoroutine(PlayOpeningLogoSequence());
+            return;
+        }
+
+        SetTitleUiVisible(true);
+    }
+
     void BuildLoadingOverlay(RectTransform root)
     {
         RectTransform overlay = CreateRect("LoadingOverlay", root);
@@ -370,6 +392,32 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
         SetLoadingProgress(0f);
         loadingOverlay.SetActive(false);
+    }
+
+    void BuildOpeningLogoOverlay()
+    {
+        RectTransform overlay = CreateRect("OpeningLogoOverlay", transform);
+        Stretch(overlay, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        openingLogoOverlay = overlay.gameObject;
+
+        Image background = CreateImage(overlay, Color.black);
+        background.raycastTarget = true;
+
+        RectTransform logoRect = CreateRect("Logo", overlay);
+        SetAnchored(
+            logoRect,
+            new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f),
+            Vector2.zero,
+            new Vector2(860f, 420f));
+
+        openingLogoImage = logoRect.gameObject.AddComponent<Image>();
+        openingLogoImage.preserveAspect = true;
+        openingLogoImage.raycastTarget = false;
+        openingLogoImage.color = new Color(1f, 1f, 1f, 0f);
+
+        openingLogoOverlay.SetActive(false);
     }
 
     GameObject BuildModalPanel(string name, out TMP_Text titleText)
@@ -925,6 +973,98 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
         float width = Mathf.Max(0f, parentRect.rect.width * Mathf.Clamp01(progress01));
         fillRect.sizeDelta = new Vector2(width, 0f);
+    }
+
+    bool HasOpeningLogoSequence()
+    {
+        return openingLogoSequence != null &&
+            openingLogoSequence.logos != null &&
+            openingLogoSequence.logos.Count > 0;
+    }
+
+    IEnumerator PlayOpeningLogoSequence()
+    {
+        if (openingLogoOverlay == null || openingLogoImage == null || !HasOpeningLogoSequence())
+        {
+            SetTitleUiVisible(true);
+            yield break;
+        }
+
+        HidePanels();
+        openingLogoOverlay.SetActive(true);
+
+        bool displayedAnyLogo = false;
+        for (int i = 0; i < openingLogoSequence.logos.Count; i++)
+        {
+            OpeningLogoEntry entry = openingLogoSequence.logos[i];
+            if (entry == null || entry.logoSprite == null)
+                continue;
+
+            displayedAnyLogo = true;
+            openingLogoImage.sprite = entry.logoSprite;
+            SetOpeningLogoAlpha(0f);
+
+            yield return FadeOpeningLogo(0f, 1f, entry.fadeInDuration);
+            yield return WaitForRealtime(entry.holdDuration);
+            yield return FadeOpeningLogo(1f, 0f, entry.fadeOutDuration);
+        }
+
+        openingLogoOverlay.SetActive(false);
+        SetTitleUiVisible(true);
+
+        if (!displayedAnyLogo)
+            yield break;
+    }
+
+    IEnumerator FadeOpeningLogo(float fromAlpha, float toAlpha, float duration)
+    {
+        float clampedDuration = Mathf.Max(0f, duration);
+        if (clampedDuration <= 0.001f)
+        {
+            SetOpeningLogoAlpha(toAlpha);
+            yield break;
+        }
+
+        float elapsed = 0f;
+        while (elapsed < clampedDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / clampedDuration);
+            SetOpeningLogoAlpha(Mathf.Lerp(fromAlpha, toAlpha, t));
+            yield return null;
+        }
+
+        SetOpeningLogoAlpha(toAlpha);
+    }
+
+    IEnumerator WaitForRealtime(float duration)
+    {
+        float remaining = Mathf.Max(0f, duration);
+        while (remaining > 0f)
+        {
+            remaining -= Time.unscaledDeltaTime;
+            yield return null;
+        }
+    }
+
+    void SetOpeningLogoAlpha(float alpha)
+    {
+        if (openingLogoImage == null)
+            return;
+
+        Color color = openingLogoImage.color;
+        color.a = Mathf.Clamp01(alpha);
+        openingLogoImage.color = color;
+    }
+
+    void SetTitleUiVisible(bool visible)
+    {
+        if (titleCanvasGroup == null)
+            return;
+
+        titleCanvasGroup.alpha = visible ? 1f : 0f;
+        titleCanvasGroup.blocksRaycasts = visible;
+        titleCanvasGroup.interactable = visible;
     }
 
     void ShowPanel(GameObject panel)

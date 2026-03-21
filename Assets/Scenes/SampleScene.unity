@@ -5993,15 +5993,15 @@ MonoBehaviour:
   enemyOutlinePixelSize: 15
   enemySaturationMultiplier: 0.8
   threatScoreScale: 0.1
-  threatLogBase: 1.2
-  baseThreat: 0.2
+  threatLogBase: 1.5
+  baseThreat: 0.15
   threatGraceScore: 50
   earlyThreatMultiplier: 0.3
   threatAccelerationScore: 500
   threatAccelerationScale: 0.012
   threatAccelerationExponent: 1.3
   weakEnemyChance: 0.3
-  weakEnemyThreatMultiplier: 0.5
+  weakEnemyThreatMultiplier: 0.4
   extraEngineThreatStep: 1.35
   extraFuelTankThreatStep: 1.7
   extraLaserThreatStep: 1.1
@@ -6023,6 +6023,9 @@ MonoBehaviour:
   extraEngineRollChance: 0.3
   extraLaserRollChance: 0.24
   extraFuelTankRollChance: 0.72
+  baseStructureChance: 0.72
+  baseFuelTankChance: 0.3
+  baseSolarPanelChance: 0.08
   symmetryPreference: 0.8
   mirrorOccupiedBonus: 90
   mirrorOpenSocketBonus: 42

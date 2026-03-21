@@ -83,6 +83,9 @@ public class WorldSpawnDirector : MonoBehaviour
     [Range(0f, 1f)] public float extraEngineRollChance = 0.32f;
     [Range(0f, 1f)] public float extraLaserRollChance = 0.24f;
     [Range(0f, 1f)] public float extraFuelTankRollChance = 0.72f;
+    [Range(0f, 1f)] public float baseStructureChance = 0.72f;
+    [Range(0f, 1f)] public float baseFuelTankChance = 0.3f;
+    [Range(0f, 1f)] public float baseSolarPanelChance = 0.08f;
     [Range(0f, 1f)] public float symmetryPreference = 0.8f;
     public float mirrorOccupiedBonus = 90f;
     public float mirrorOpenSocketBonus = 42f;
@@ -510,20 +513,40 @@ public class WorldSpawnDirector : MonoBehaviour
         int guaranteedFuelTanks = Mathf.Max(0, extraEngines / 2) + Mathf.Max(0, moduleUpgradeLevel / 3);
         int guaranteedEngines = Mathf.Max(0, moduleUpgradeLevel / 4);
         int guaranteedLasers = Mathf.Max(0, weaponUpgradeLevel / 5);
+        int baseFuelTankCount = RollGuaranteedCount(fuelTankModulePrefab, GetScaledBaseChance(baseFuelTankChance, threat, 0.1f, 0.78f));
+        int baseStructureCount = RollGuaranteedCount(structureModulePrefab, GetScaledBaseChance(baseStructureChance, threat, 0.25f, 0.96f));
+        int baseSolarPanelCount = RollGuaranteedCount(solarPanelModulePrefab, GetScaledBaseChance(baseSolarPanelChance, threat, 0.08f, 0.35f));
 
         return new EnemyLoadout
         {
             engineCount = Mathf.Clamp(1 + guaranteedEngines + RollAdditionalCount(extraEngines + Mathf.Max(0, extraLasers / 2), extraEngineRollChance), 1, maxEnemyEngineCount),
-            fuelTankCount = Mathf.Clamp(1 + guaranteedFuelTanks + RollAdditionalCount(extraFuelTanks + Mathf.Max(0, extraEngines / 2), extraFuelTankRollChance), 1, maxEnemyFuelTankCount),
+            fuelTankCount = Mathf.Clamp(baseFuelTankCount + guaranteedFuelTanks + RollAdditionalCount(extraFuelTanks + Mathf.Max(0, extraEngines / 2), extraFuelTankRollChance), 0, maxEnemyFuelTankCount),
             laserCount = Mathf.Clamp(1 + guaranteedLasers + RollAdditionalCount(extraLasers, extraLaserRollChance), 1, maxEnemyLaserCount),
             moduleUpgradeLevel = moduleUpgradeLevel,
             weaponUpgradeLevel = weaponUpgradeLevel,
             powerPlantCount = powerPlantModulePrefab != null && reactorBudget > 0 ? Random.Range(1, reactorBudget + 1) : 0,
             repairCount = repairModulePrefab != null && repairBudget > 0 ? Random.Range(0, repairBudget + 1) : 0,
             radiatorCount = radiatorModulePrefab != null && radiatorBudget > 0 ? Random.Range(1, radiatorBudget + 1) : 0,
-            structureCount = structureModulePrefab != null && structureBudget > 0 ? Random.Range(0, structureBudget + 1) : 0,
-            solarPanelCount = solarPanelModulePrefab != null && solarPanelBudget > 0 ? Random.Range(0, solarPanelBudget + 1) : 0
+            structureCount = Mathf.Clamp(baseStructureCount + (structureModulePrefab != null && structureBudget > 0 ? Random.Range(0, structureBudget + 1) : 0), 0, maxEnemyStructureCount),
+            solarPanelCount = Mathf.Clamp(baseSolarPanelCount + (solarPanelModulePrefab != null && solarPanelBudget > 0 ? Random.Range(0, solarPanelBudget + 1) : 0), 0, maxEnemySolarPanelCount)
         };
+    }
+
+    int RollGuaranteedCount(GameObject prefab, float chance)
+    {
+        if (prefab == null)
+            return 0;
+
+        return Random.value < Mathf.Clamp01(chance) ? 1 : 0;
+    }
+
+    float GetScaledBaseChance(float baseChance, float threat, float minimum, float maximum)
+    {
+        float t = Mathf.Clamp01(Mathf.Max(0f, threat - 1f) / 5f);
+        return Mathf.Lerp(
+            Mathf.Clamp(baseChance, 0f, 1f),
+            Mathf.Clamp(Mathf.Max(baseChance, minimum), 0f, maximum),
+            t);
     }
 
     int RollAdditionalCount(int maxAdditional, float rollChance)
@@ -593,8 +616,8 @@ public class WorldSpawnDirector : MonoBehaviour
         AddRequests(requests, powerPlantModulePrefab, ModuleType.Reactor, loadout.powerPlantCount, loadout.moduleUpgradeLevel);
         AddRequests(requests, repairModulePrefab, ModuleType.Repair, loadout.repairCount, loadout.moduleUpgradeLevel);
         AddRequests(requests, radiatorModulePrefab, ModuleType.Radiator, loadout.radiatorCount, loadout.moduleUpgradeLevel);
-        AddRequests(requests, fuelTankModulePrefab, ModuleType.FuelTank, loadout.fuelTankCount, loadout.moduleUpgradeLevel);
         AddRequests(requests, structureModulePrefab, ModuleType.Structure, loadout.structureCount, loadout.moduleUpgradeLevel);
+        AddRequests(requests, fuelTankModulePrefab, ModuleType.FuelTank, loadout.fuelTankCount, loadout.moduleUpgradeLevel);
         AddRequests(requests, solarPanelModulePrefab, ModuleType.SolarPanel, loadout.solarPanelCount, loadout.moduleUpgradeLevel);
         AddRequests(requests, engineModulePrefab, ModuleType.Engine, loadout.engineCount, loadout.moduleUpgradeLevel);
         AddRequests(requests, laserModulePrefab, ModuleType.Weapon, loadout.laserCount, Mathf.Clamp(loadout.weaponUpgradeLevel, 0, maxLaserUpgradeLevel));
@@ -603,21 +626,27 @@ public class WorldSpawnDirector : MonoBehaviour
 
     bool TryReduceLoadoutForAssembly(ref EnemyLoadout loadout)
     {
+        if (loadout.fuelTankCount > 1)
+        {
+            loadout.fuelTankCount--;
+            return true;
+        }
+
         if (loadout.solarPanelCount > 0)
         {
             loadout.solarPanelCount--;
             return true;
         }
 
-        if (loadout.structureCount > 0)
+        if (loadout.fuelTankCount > 0)
         {
-            loadout.structureCount--;
+            loadout.fuelTankCount--;
             return true;
         }
 
-        if (loadout.fuelTankCount > 1)
+        if (loadout.structureCount > 0)
         {
-            loadout.fuelTankCount--;
+            loadout.structureCount--;
             return true;
         }
 
@@ -671,15 +700,15 @@ public class WorldSpawnDirector : MonoBehaviour
         return new EnemyLoadout
         {
             engineCount = 1,
-            fuelTankCount = 1,
+            fuelTankCount = structureModulePrefab == null && fuelTankModulePrefab != null ? 1 : 0,
             laserCount = 1,
             moduleUpgradeLevel = source.moduleUpgradeLevel,
             weaponUpgradeLevel = source.weaponUpgradeLevel,
             powerPlantCount = 0,
             repairCount = 0,
             radiatorCount = 0,
-            structureCount = 0,
-            solarPanelCount = 0
+            structureCount = structureModulePrefab != null ? 1 : 0,
+            solarPanelCount = RollGuaranteedCount(solarPanelModulePrefab, Mathf.Clamp01(baseSolarPanelChance))
         };
     }
 
