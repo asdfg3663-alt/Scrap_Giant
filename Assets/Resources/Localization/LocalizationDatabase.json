@@ -58,6 +58,8 @@
     { "key": "module.thermoelectric_generator", "en": "Thermoelectric Generator", "ko": "열전 발전기", "ja": "熱電発電機", "es": "Generador termoeléctrico", "ru": "Термоэлектрический генератор" },
     { "key": "module.radiator", "en": "Radiator", "ko": "라디에이터", "ja": "ラジエーター", "es": "Radiador", "ru": "Радиатор" },
     { "key": "module.repair_drone_bay", "en": "Repair Drone Bay", "ko": "수리 드론 베이", "ja": "修理ドローンベイ", "es": "Bahía de drones de reparación", "ru": "Отсек ремонтных дронов" },
+    { "key": "module.structure", "en": "Structure", "ko": "구조체", "ja": "構造体", "es": "Estructura", "ru": "Конструкция" },
+    { "key": "module.solar_panel", "en": "Solar Panel", "ko": "태양광 패널", "ja": "ソーラーパネル", "es": "Panel solar", "ru": "Солнечная панель" },
 
     { "key": "world.floating_scrap", "en": "Floating Scrap", "ko": "부유 스크랩", "ja": "漂流スクラップ", "es": "Chatarra flotante", "ru": "Плавающий лом" },
 

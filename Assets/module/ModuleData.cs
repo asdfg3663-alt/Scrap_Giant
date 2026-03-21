@@ -9,7 +9,9 @@ public enum ModuleType
     Weapon,
     Radiator,
     Scrap,
-    Repair
+    Repair,
+    Structure,
+    SolarPanel
 }
 
 public enum WeaponType

@@ -1232,6 +1232,8 @@ public class PlayerHudRuntime : MonoBehaviour
             ModuleType.Reactor => new Color(1f, 0.82f, 0.29f, 1f),
             ModuleType.Radiator => new Color(0.66f, 0.83f, 1f, 1f),
             ModuleType.Repair => new Color(0.94f, 0.53f, 0.89f, 1f),
+            ModuleType.Structure => new Color(0.72f, 0.76f, 0.82f, 1f),
+            ModuleType.SolarPanel => new Color(0.56f, 0.95f, 0.48f, 1f),
             _ => new Color(0.8f, 0.84f, 0.88f, 1f)
         };
     }

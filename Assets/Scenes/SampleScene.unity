@@ -5970,6 +5970,8 @@ MonoBehaviour:
   powerPlantModulePrefab: {fileID: 7443228181453321000, guid: 3a0d8076997c0aa4887a7bccb0ec2b7f, type: 3}
   repairModulePrefab: {fileID: 7443228181453321000, guid: af1898e0e0430e949829da20ecb2f2c9, type: 3}
   radiatorModulePrefab: {fileID: 5628837094240442396, guid: a0a6c079d7374074f9dbb77782b5db54, type: 3}
+  structureModulePrefab: {fileID: 7443228181453321000, guid: c5d209c4a37b4fa1af8b0c9dc6c8a101, type: 3}
+  solarPanelModulePrefab: {fileID: 1687058770715388412, guid: 9b5cd4f5e6f84c9f9041a2bd5aa6d2ce, type: 3}
   startingScrap: 1000
   startingAmmo: 100
   fuelPerScrap: 30
@@ -6008,14 +6010,16 @@ MonoBehaviour:
   maxExtraEngines: 7
   maxExtraFuelTanks: 7
   maxExtraLasers: 6
-  maxEnemyEngineCount: 12
-  maxEnemyFuelTankCount: 12
+  maxEnemyEngineCount: 10
+  maxEnemyFuelTankCount: 8
   maxEnemyLaserCount: 8
-  maxEnemyPowerPlantCount: 3
+  maxEnemyPowerPlantCount: 2
   maxEnemyRepairCount: 1
   maxEnemyRadiatorCount: 4
-  maxModuleUpgradeLevel: 10
-  maxLaserUpgradeLevel: 10
+  maxEnemyStructureCount: 12
+  maxEnemySolarPanelCount: 6
+  maxModuleUpgradeLevel: 3
+  maxLaserUpgradeLevel: 3
   extraEngineRollChance: 0.3
   extraLaserRollChance: 0.24
   extraFuelTankRollChance: 0.72

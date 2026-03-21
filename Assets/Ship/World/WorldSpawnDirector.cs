@@ -18,6 +18,8 @@ public class WorldSpawnDirector : MonoBehaviour
     public GameObject powerPlantModulePrefab;
     public GameObject repairModulePrefab;
     public GameObject radiatorModulePrefab;
+    public GameObject structureModulePrefab;
+    public GameObject solarPanelModulePrefab;
 
     [Header("Resource Economy")]
     public float startingScrap = DefaultStartingScrap;
@@ -74,6 +76,8 @@ public class WorldSpawnDirector : MonoBehaviour
     public int maxEnemyPowerPlantCount = 4;
     public int maxEnemyRepairCount = 2;
     public int maxEnemyRadiatorCount = 4;
+    public int maxEnemyStructureCount = 8;
+    public int maxEnemySolarPanelCount = 3;
     public int maxModuleUpgradeLevel = 9;
     public int maxLaserUpgradeLevel = 9;
     [Range(0f, 1f)] public float extraEngineRollChance = 0.32f;
@@ -205,6 +209,8 @@ public class WorldSpawnDirector : MonoBehaviour
             ModuleType.Weapon => laserModulePrefab,
             ModuleType.Radiator => radiatorModulePrefab,
             ModuleType.Repair => repairModulePrefab,
+            ModuleType.Structure => structureModulePrefab,
+            ModuleType.SolarPanel => solarPanelModulePrefab,
             _ => null
         };
     }
@@ -499,6 +505,8 @@ public class WorldSpawnDirector : MonoBehaviour
         int reactorBudget = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1.25f) / 1.9f), 0, maxEnemyPowerPlantCount);
         int repairBudget = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 2f) / 2.8f), 0, maxEnemyRepairCount);
         int radiatorBudget = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1f) / 1.55f), 0, maxEnemyRadiatorCount);
+        int structureBudget = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 0.75f) / 0.9f), 0, maxEnemyStructureCount);
+        int solarPanelBudget = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(0f, threat - 1.4f) / 2.1f), 0, maxEnemySolarPanelCount);
         int guaranteedFuelTanks = Mathf.Max(0, extraEngines / 2) + Mathf.Max(0, moduleUpgradeLevel / 3);
         int guaranteedEngines = Mathf.Max(0, moduleUpgradeLevel / 4);
         int guaranteedLasers = Mathf.Max(0, weaponUpgradeLevel / 5);
@@ -512,7 +520,9 @@ public class WorldSpawnDirector : MonoBehaviour
             weaponUpgradeLevel = weaponUpgradeLevel,
             powerPlantCount = powerPlantModulePrefab != null && reactorBudget > 0 ? Random.Range(1, reactorBudget + 1) : 0,
             repairCount = repairModulePrefab != null && repairBudget > 0 ? Random.Range(0, repairBudget + 1) : 0,
-            radiatorCount = radiatorModulePrefab != null && radiatorBudget > 0 ? Random.Range(1, radiatorBudget + 1) : 0
+            radiatorCount = radiatorModulePrefab != null && radiatorBudget > 0 ? Random.Range(1, radiatorBudget + 1) : 0,
+            structureCount = structureModulePrefab != null && structureBudget > 0 ? Random.Range(0, structureBudget + 1) : 0,
+            solarPanelCount = solarPanelModulePrefab != null && solarPanelBudget > 0 ? Random.Range(0, solarPanelBudget + 1) : 0
         };
     }
 
@@ -584,6 +594,8 @@ public class WorldSpawnDirector : MonoBehaviour
         AddRequests(requests, repairModulePrefab, ModuleType.Repair, loadout.repairCount, loadout.moduleUpgradeLevel);
         AddRequests(requests, radiatorModulePrefab, ModuleType.Radiator, loadout.radiatorCount, loadout.moduleUpgradeLevel);
         AddRequests(requests, fuelTankModulePrefab, ModuleType.FuelTank, loadout.fuelTankCount, loadout.moduleUpgradeLevel);
+        AddRequests(requests, structureModulePrefab, ModuleType.Structure, loadout.structureCount, loadout.moduleUpgradeLevel);
+        AddRequests(requests, solarPanelModulePrefab, ModuleType.SolarPanel, loadout.solarPanelCount, loadout.moduleUpgradeLevel);
         AddRequests(requests, engineModulePrefab, ModuleType.Engine, loadout.engineCount, loadout.moduleUpgradeLevel);
         AddRequests(requests, laserModulePrefab, ModuleType.Weapon, loadout.laserCount, Mathf.Clamp(loadout.weaponUpgradeLevel, 0, maxLaserUpgradeLevel));
         return requests;
@@ -591,6 +603,18 @@ public class WorldSpawnDirector : MonoBehaviour
 
     bool TryReduceLoadoutForAssembly(ref EnemyLoadout loadout)
     {
+        if (loadout.solarPanelCount > 0)
+        {
+            loadout.solarPanelCount--;
+            return true;
+        }
+
+        if (loadout.structureCount > 0)
+        {
+            loadout.structureCount--;
+            return true;
+        }
+
         if (loadout.fuelTankCount > 1)
         {
             loadout.fuelTankCount--;
@@ -653,7 +677,9 @@ public class WorldSpawnDirector : MonoBehaviour
             weaponUpgradeLevel = source.weaponUpgradeLevel,
             powerPlantCount = 0,
             repairCount = 0,
-            radiatorCount = 0
+            radiatorCount = 0,
+            structureCount = 0,
+            solarPanelCount = 0
         };
     }
 
@@ -864,6 +890,17 @@ public class WorldSpawnDirector : MonoBehaviour
                 score += -Mathf.Abs(gridPos.y) * 6f;
                 break;
 
+            case ModuleType.Structure:
+                score += (Mathf.Abs(gridPos.x) + Mathf.Abs(gridPos.y)) == 1 ? 90f : 0f;
+                score += -gridPos.sqrMagnitude * 5f;
+                break;
+
+            case ModuleType.SolarPanel:
+                score += anchorSide == Side.Up ? 58f : (anchorSide == Side.Down ? -42f : 22f);
+                score += gridPos.y * 4f;
+                score += -Mathf.Abs(gridPos.x) * 1.5f;
+                break;
+
             case ModuleType.Reactor:
             case ModuleType.Repair:
                 score += -gridPos.sqrMagnitude * 2f;
@@ -879,7 +916,9 @@ public class WorldSpawnDirector : MonoBehaviour
             type == ModuleType.FuelTank ||
             type == ModuleType.Reactor ||
             type == ModuleType.Repair ||
-            type == ModuleType.Radiator;
+            type == ModuleType.Radiator ||
+            type == ModuleType.Structure ||
+            type == ModuleType.SolarPanel;
         if (!isSupportModule)
             return 0f;
 
@@ -1178,6 +1217,8 @@ public class WorldSpawnDirector : MonoBehaviour
         public int powerPlantCount;
         public int repairCount;
         public int radiatorCount;
+        public int structureCount;
+        public int solarPanelCount;
     }
 
     struct EnemyModuleRequest
