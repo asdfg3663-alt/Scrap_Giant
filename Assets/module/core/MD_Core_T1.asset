@@ -25,7 +25,7 @@ MonoBehaviour:
   fuelSynthesisPerTierMultiplier: 1.25
   thrustPerTierMultiplier: 1.25
   massPerTierMultiplier: 1.12
-  scorePerTierMultiplier: 1
+  scorePerTierMultiplier: 1.5
   maxHeatPerTierMultiplier: 1.2
   heatDissipationPerTierMultiplier: 1.2
   repairPerTierMultiplier: 1.2

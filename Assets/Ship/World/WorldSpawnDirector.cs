@@ -58,6 +58,8 @@ public class WorldSpawnDirector : MonoBehaviour
     public float threatAccelerationScore = 900f;
     public float threatAccelerationScale = 0.012f;
     public float threatAccelerationExponent = 1.3f;
+    [Range(0f, 1f)] public float weakEnemyChance = 0.2f;
+    [Range(0f, 1f)] public float weakEnemyThreatMultiplier = 0.55f;
     public float extraEngineThreatStep = 1.35f;
     public float extraFuelTankThreatStep = 1.7f;
     public float extraLaserThreatStep = 1.1f;
@@ -333,7 +335,11 @@ public class WorldSpawnDirector : MonoBehaviour
             return false;
 
         float threat = EvaluateThreat(playerShip.totalScore);
-        EnemyLoadout loadout = BuildLoadout(threat);
+        float spawnThreat = ShouldSpawnWeakerEnemy()
+            ? Mathf.Lerp(Mathf.Max(0.1f, baseThreat), threat, Mathf.Clamp01(weakEnemyThreatMultiplier))
+            : threat;
+
+        EnemyLoadout loadout = BuildLoadout(spawnThreat);
         if (!TryCreateEnemyAssemblyWithFallback(loadout, out EnemyLoadout resolvedLoadout, out List<EnemyModulePlacement> assembly))
             return false;
 
@@ -354,7 +360,7 @@ public class WorldSpawnDirector : MonoBehaviour
 
         var runtime = root.AddComponent<EnemyShipRuntime>();
         var ai = root.AddComponent<EnemyShipAI>();
-        ai.Initialize(enemyDesiredRange, enemyAttackRange, enemyFireConeAngle, enemyMaxSpeed + threat + resolvedLoadout.moduleUpgradeLevel * 0.35f);
+        ai.Initialize(enemyDesiredRange, enemyAttackRange, enemyFireConeAngle, enemyMaxSpeed + spawnThreat + resolvedLoadout.moduleUpgradeLevel * 0.35f);
 
         var despawn = root.AddComponent<WorldDistanceDespawn>();
         despawn.axisLimit = despawnAxisDistance;
@@ -476,6 +482,11 @@ public class WorldSpawnDirector : MonoBehaviour
         }
 
         return Mathf.Max(0.1f, baseThreat) + Mathf.Max(0f, earlyThreat) + Mathf.Max(0f, lateThreat);
+    }
+
+    bool ShouldSpawnWeakerEnemy()
+    {
+        return Random.value < Mathf.Clamp01(weakEnemyChance);
     }
 
     EnemyLoadout BuildLoadout(float threat)

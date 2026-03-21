@@ -5970,7 +5970,7 @@ MonoBehaviour:
   powerPlantModulePrefab: {fileID: 7443228181453321000, guid: 3a0d8076997c0aa4887a7bccb0ec2b7f, type: 3}
   repairModulePrefab: {fileID: 7443228181453321000, guid: af1898e0e0430e949829da20ecb2f2c9, type: 3}
   radiatorModulePrefab: {fileID: 5628837094240442396, guid: a0a6c079d7374074f9dbb77782b5db54, type: 3}
-  startingScrap: 300
+  startingScrap: 1000
   startingAmmo: 100
   fuelPerScrap: 30
   initialFuelFillRatio: 1
@@ -5984,20 +5984,22 @@ MonoBehaviour:
   scrapMassFromPlayerMassMultiplier: 1
   scrapDriftImpulse: 1.25
   enemyDesiredRange: 30
-  enemyAttackRange: 25
+  enemyAttackRange: 22
   enemyFireConeAngle: 20
   enemyMaxSpeed: 15
   enemyOutlineColor: {r: 1, g: 0.2, b: 0.18, a: 0.95}
   enemyOutlinePixelSize: 15
   enemySaturationMultiplier: 0.8
-  threatScoreScale: 0.15
-  threatLogBase: 1
-  baseThreat: 0.4
+  threatScoreScale: 0.1
+  threatLogBase: 1.2
+  baseThreat: 0.2
   threatGraceScore: 50
   earlyThreatMultiplier: 0.3
   threatAccelerationScore: 500
   threatAccelerationScale: 0.012
   threatAccelerationExponent: 1.3
+  weakEnemyChance: 0.3
+  weakEnemyThreatMultiplier: 0.5
   extraEngineThreatStep: 1.35
   extraFuelTankThreatStep: 1.7
   extraLaserThreatStep: 1.1
@@ -6009,11 +6011,11 @@ MonoBehaviour:
   maxEnemyEngineCount: 12
   maxEnemyFuelTankCount: 12
   maxEnemyLaserCount: 8
-  maxEnemyPowerPlantCount: 2
+  maxEnemyPowerPlantCount: 3
   maxEnemyRepairCount: 1
   maxEnemyRadiatorCount: 4
-  maxModuleUpgradeLevel: 3
-  maxLaserUpgradeLevel: 3
+  maxModuleUpgradeLevel: 10
+  maxLaserUpgradeLevel: 10
   extraEngineRollChance: 0.3
   extraLaserRollChance: 0.24
   extraFuelTankRollChance: 0.72

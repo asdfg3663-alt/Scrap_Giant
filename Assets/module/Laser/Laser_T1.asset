@@ -29,7 +29,7 @@ MonoBehaviour:
   maxHeatPerTierMultiplier: 1.18
   heatDissipationPerTierMultiplier: 1.8
   repairPerTierMultiplier: 1.2
-  weaponDamagePerTierMultiplier: 1.3
+  weaponDamagePerTierMultiplier: 1.4
   weaponFireRatePerTierMultiplier: 1.08
   weaponPowerPerShotPerTierMultiplier: 1.08
   weaponHeatPerShotPerTierMultiplier: 1.1
