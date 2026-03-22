@@ -377,7 +377,7 @@ public class ModuleInstance : MonoBehaviour
 
         glowRenderer.enabled = true;
         glowRenderer.sprite = primaryRenderer.sprite;
-        glowRenderer.drawMode = primaryRenderer.drawMode;
+        glowRenderer.drawMode = SpriteDrawMode.Simple;
         glowRenderer.sortingLayerID = primaryRenderer.sortingLayerID;
         glowRenderer.sortingOrder = primaryRenderer.sortingOrder - 1;
         glowRenderer.maskInteraction = primaryRenderer.maskInteraction;
@@ -458,7 +458,7 @@ public class ModuleInstance : MonoBehaviour
 
             auraRenderer.enabled = true;
             auraRenderer.sprite = primaryRenderer.sprite;
-            auraRenderer.drawMode = primaryRenderer.drawMode;
+            auraRenderer.drawMode = SpriteDrawMode.Simple;
             auraRenderer.sortingLayerID = primaryRenderer.sortingLayerID;
             auraRenderer.sortingOrder = primaryRenderer.sortingOrder - 2;
             auraRenderer.maskInteraction = primaryRenderer.maskInteraction;

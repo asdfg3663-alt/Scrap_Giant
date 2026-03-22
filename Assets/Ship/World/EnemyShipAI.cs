@@ -62,6 +62,7 @@ public class EnemyShipAI : MonoBehaviour
     Transform player;
     ShipStats retaliationTarget;
     Vector2 steeringDirection = Vector2.up;
+    Vector2 engagementTargetPoint;
     float throttleCommand;
     float retaliationUntilTime;
     float nextBehaviorDecisionTime;
@@ -132,17 +133,30 @@ public class EnemyShipAI : MonoBehaviour
         playerStats = targetShip;
         playerMovement = targetShip.GetComponent<ShipMovement>();
 
-        Vector2 toTarget = target.position - transform.position;
+        engagementTargetPoint = targetShip.GetNearestModulePoint(transform.position);
+        Vector2 toTarget = engagementTargetPoint - (Vector2)transform.position;
         if (toTarget.sqrMagnitude <= 0.001f)
             return;
 
         ResetModuleOrientations();
 
         bool isRetaliating = retaliationTarget != null && targetShip == retaliationTarget;
-        EvaluateBehavior(toTarget, isRetaliating);
+        Vector2 targetDir = toTarget.normalized;
+        Vector2 weaponAimSteerDir = targetDir;
+        float engagementRange = Mathf.Max(attackRange, 1f);
+        bool canFireAtTarget = false;
+
+        if (TryGetBestWeaponAimSolution(engagementTargetPoint, out Vector2 solvedAimDir, out bool solvedCanFire, out float solvedRange))
+        {
+            weaponAimSteerDir = solvedAimDir;
+            canFireAtTarget = solvedCanFire;
+            engagementRange = Mathf.Max(1f, solvedRange);
+        }
+
+        EvaluateBehavior(toTarget, targetDir, weaponAimSteerDir, engagementRange, isRetaliating);
 
         bool mayAttack = isRetaliating || (activeBand == BehaviorBand.Close && closeRangeCanAttack);
-        wantsToFire = mayAttack && CanAnyLaserFireAt(target.position);
+        wantsToFire = mayAttack && canFireAtTarget;
     }
 
     void FixedUpdate()
@@ -263,24 +277,27 @@ public class EnemyShipAI : MonoBehaviour
             rb.angularVelocity = Mathf.MoveTowards(rb.angularVelocity, 0f, damping * Time.fixedDeltaTime);
     }
 
-    void EvaluateBehavior(Vector2 toTarget, bool isRetaliating)
+    void EvaluateBehavior(Vector2 toTarget, Vector2 targetDir, Vector2 weaponAimSteerDir, float engagementRange, bool isRetaliating)
     {
         float distance = toTarget.magnitude;
-        Vector2 targetDir = distance > 0.001f ? toTarget / distance : (Vector2)transform.up;
 
         if (isRetaliating)
         {
             activeBand = BehaviorBand.Close;
-            steeringDirection = targetDir;
+            steeringDirection = weaponAimSteerDir;
             prefersAimTurn = true;
-            shouldBrake = true;
+            shouldBrake = distance <= engagementRange * 0.95f;
+            throttleCommand = shouldBrake ? 0f : 0.45f;
             closeRangeCanAttack = true;
             return;
         }
 
-        BehaviorBand nextBand = distance <= closeRange
+        float desiredCloseRange = Mathf.Max(closeRange, engagementRange);
+        float desiredMidRange = Mathf.Max(mediumRange, desiredCloseRange + 8f);
+
+        BehaviorBand nextBand = distance <= desiredCloseRange
             ? BehaviorBand.Close
-            : (distance <= mediumRange ? BehaviorBand.Mid : BehaviorBand.Far);
+            : (distance <= desiredMidRange ? BehaviorBand.Mid : BehaviorBand.Far);
 
         if (nextBand != activeBand)
         {
@@ -293,20 +310,20 @@ public class EnemyShipAI : MonoBehaviour
         switch (activeBand)
         {
             case BehaviorBand.Far:
-                RunFarBehavior();
+                RunFarBehavior(targetDir, weaponAimSteerDir, engagementRange, distance);
                 break;
 
             case BehaviorBand.Mid:
-                RunMidBehavior(targetDir);
+                RunMidBehavior(targetDir, weaponAimSteerDir, engagementRange, distance);
                 break;
 
             default:
-                RunCloseBehavior(targetDir);
+                RunCloseBehavior(targetDir, weaponAimSteerDir, engagementRange, distance);
                 break;
         }
     }
 
-    void RunFarBehavior()
+    void RunFarBehavior(Vector2 targetDir, Vector2 weaponAimSteerDir, float engagementRange, float distance)
     {
         if (Time.time >= nextBehaviorDecisionTime)
         {
@@ -314,15 +331,18 @@ public class EnemyShipAI : MonoBehaviour
             nextBehaviorDecisionTime = Time.time + Mathf.Max(0.5f, decisionInterval);
         }
 
+        bool shouldUseAimLead = distance <= engagementRange * 1.5f;
         Vector2 wanderDir = HeadingToVector(wanderHeadingDegrees);
-        steeringDirection = Time.time < wanderTurnUntilTime ? wanderDir : (Vector2)transform.up;
-        throttleCommand = Time.time < wanderTurnUntilTime ? 0f : wanderForwardThrottle;
+        steeringDirection = shouldUseAimLead
+            ? weaponAimSteerDir
+            : (Time.time < wanderTurnUntilTime ? wanderDir : targetDir);
+        throttleCommand = Mathf.Max(wanderForwardThrottle, 0.6f);
         shouldBrake = false;
-        prefersAimTurn = false;
+        prefersAimTurn = shouldUseAimLead;
         closeRangeCanAttack = false;
     }
 
-    void RunMidBehavior(Vector2 targetDir)
+    void RunMidBehavior(Vector2 targetDir, Vector2 weaponAimSteerDir, float engagementRange, float distance)
     {
         if (Time.time >= nextBehaviorDecisionTime)
         {
@@ -335,16 +355,16 @@ public class EnemyShipAI : MonoBehaviour
 
         if (midRangeTracksPlayer)
         {
-            steeringDirection = targetDir;
-            throttleCommand = 0f;
-            shouldBrake = true;
+            steeringDirection = weaponAimSteerDir;
+            shouldBrake = distance <= engagementRange * 0.95f;
+            throttleCommand = shouldBrake ? 0f : 0.35f;
             prefersAimTurn = true;
         }
         else
         {
             Vector2 wanderDir = HeadingToVector(wanderHeadingDegrees);
-            steeringDirection = Time.time < wanderTurnUntilTime ? wanderDir : (Vector2)transform.up;
-            throttleCommand = Time.time < wanderTurnUntilTime ? 0f : wanderForwardThrottle;
+            steeringDirection = Time.time < wanderTurnUntilTime ? wanderDir : targetDir;
+            throttleCommand = Time.time < wanderTurnUntilTime ? 0f : 0.3f;
             shouldBrake = false;
             prefersAimTurn = false;
         }
@@ -352,7 +372,7 @@ public class EnemyShipAI : MonoBehaviour
         closeRangeCanAttack = false;
     }
 
-    void RunCloseBehavior(Vector2 targetDir)
+    void RunCloseBehavior(Vector2 targetDir, Vector2 weaponAimSteerDir, float engagementRange, float distance)
     {
         if (Time.time >= nextAttackRollTime)
         {
@@ -360,9 +380,10 @@ public class EnemyShipAI : MonoBehaviour
             nextAttackRollTime = Time.time + Mathf.Max(0.5f, decisionInterval);
         }
 
-        steeringDirection = targetDir;
-        throttleCommand = 0f;
-        shouldBrake = true;
+        steeringDirection = weaponAimSteerDir;
+        bool insideComfortRange = distance <= engagementRange * 0.9f;
+        throttleCommand = insideComfortRange ? 0f : 0.28f;
+        shouldBrake = insideComfortRange;
         prefersAimTurn = true;
     }
 
@@ -428,6 +449,61 @@ public class EnemyShipAI : MonoBehaviour
         }
 
         return false;
+    }
+
+    bool TryGetBestWeaponAimSolution(Vector2 targetPosition, out Vector2 desiredShipUpDirection, out bool canFire, out float preferredRange)
+    {
+        desiredShipUpDirection = transform.up;
+        canFire = false;
+        preferredRange = Mathf.Max(attackRange, 1f);
+
+        WeaponLaser[] weapons = GetComponentsInChildren<WeaponLaser>(true);
+        if (weapons == null || weapons.Length == 0)
+            return false;
+
+        float bestScore = float.NegativeInfinity;
+        bool found = false;
+
+        for (int i = 0; i < weapons.Length; i++)
+        {
+            WeaponLaser weapon = weapons[i];
+            if (weapon == null || !weapon.isActiveAndEnabled)
+                continue;
+
+            ModuleInstance weaponModule = weapon.GetComponent<ModuleInstance>();
+            if (weaponModule == null || weaponModule.data == null || weaponModule.data.weaponType != WeaponType.Laser)
+                continue;
+
+            if (weaponModule.hp <= 0 || weaponModule.GetWeaponFireRate() <= 0f)
+                continue;
+
+            Vector2 origin = weapon.GetMuzzleWorldPosition();
+            Vector2 toTarget = targetPosition - origin;
+            float distance = toTarget.magnitude;
+            if (distance <= 0.001f)
+                continue;
+
+            Vector2 targetDir = toTarget / distance;
+            Vector2 aimDir = weapon.GetAimDirection();
+            float angleToTarget = Vector2.Angle(aimDir, targetDir);
+            float weaponRange = Mathf.Max(attackRange, weapon.GetRange());
+            bool inRange = distance <= weaponRange;
+
+            float weaponOffsetFromShipUp = Vector2.SignedAngle((Vector2)transform.up, aimDir);
+            Vector2 shipUpForWeaponAim = Quaternion.Euler(0f, 0f, -weaponOffsetFromShipUp) * targetDir;
+
+            float score = (inRange ? 1000f : 0f) - angleToTarget * 4f - Mathf.Max(0f, distance - weaponRange) * 2f;
+            if (score <= bestScore)
+                continue;
+
+            bestScore = score;
+            desiredShipUpDirection = shipUpForWeaponAim.normalized;
+            canFire = inRange && angleToTarget <= fireConeAngle;
+            preferredRange = Mathf.Max(6f, weaponRange * 0.85f);
+            found = true;
+        }
+
+        return found;
     }
 
     void ResetModuleOrientations()

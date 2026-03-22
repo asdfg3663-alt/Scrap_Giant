@@ -349,6 +349,35 @@ public class ShipStats : MonoBehaviour
         return transform;
     }
 
+    public Vector2 GetNearestModulePoint(Vector2 fromPosition)
+    {
+        if (modules == null || modules.Length == 0)
+            modules = GetComponentsInChildren<ModuleInstance>(true);
+
+        Vector2 bestPoint = transform.position;
+        float bestDistanceSq = float.MaxValue;
+
+        for (int i = 0; i < modules.Length; i++)
+        {
+            ModuleInstance module = modules[i];
+            if (module == null || module.data == null)
+                continue;
+
+            if (!module.gameObject.activeInHierarchy || module.hp <= 0)
+                continue;
+
+            Vector2 point = module.transform.position;
+            float distanceSq = (point - fromPosition).sqrMagnitude;
+            if (distanceSq >= bestDistanceSq)
+                continue;
+
+            bestDistanceSq = distanceSq;
+            bestPoint = point;
+        }
+
+        return bestPoint;
+    }
+
     public bool HasOperationalModuleType(ModuleType moduleType)
     {
         modules = GetComponentsInChildren<ModuleInstance>(true);

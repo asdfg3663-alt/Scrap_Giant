@@ -322,8 +322,11 @@ public class ShipBuilder : MonoBehaviour
         if (moduleInstance != null)
             rb.mass = Mathf.Max(0.01f, moduleInstance.GetMass());
 
-        rb.bodyType = RigidbodyType2D.Kinematic;
+        rb.bodyType = RigidbodyType2D.Dynamic;
         rb.simulated = true;
+        rb.gravityScale = 0f;
+        rb.linearDamping = 0.05f;
+        rb.angularDamping = 0.05f;
 
         // 우주에 떠다니는 상태에서는 회전은 허용할지/금지할지 취향
         rb.constraints = RigidbodyConstraints2D.None;

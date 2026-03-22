@@ -53,7 +53,8 @@ public class ModuleSpriteFitter : MonoBehaviour
         if (scale <= 0f)
             return;
 
-        spriteRenderer.drawMode = SpriteDrawMode.Sliced;
-        spriteRenderer.size = spriteSize * scale;
+        spriteRenderer.drawMode = SpriteDrawMode.Simple;
+        Vector3 localScale = transform.localScale;
+        transform.localScale = new Vector3(scale, scale, localScale.z);
     }
 }
