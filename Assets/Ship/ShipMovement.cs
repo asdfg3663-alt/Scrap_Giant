@@ -12,6 +12,9 @@ public class ShipMovement : MonoBehaviour
     [Header("Physics Sync")]
     public bool syncRigidbodyMassWithShipStats = true;
     public float minRigidbodyMass = 0.01f;
+    public bool syncRigidbodyInertiaWithShipStats = true;
+    public float inertiaFromMassMultiplier = 0.05f;
+    public float minRigidbodyInertia = 0.1f;
 
     [Header("Brake / Reverse")]
     public float brakeForceOverride = 1f;
@@ -37,11 +40,13 @@ public class ShipMovement : MonoBehaviour
 
     ShipStats stats;
     Rigidbody2D rb;
+    float baseInertia;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         stats = GetComponent<ShipStats>();
+        baseInertia = rb != null ? rb.inertia : 0.1f;
 
         rb.linearDamping = 0f;
         rb.angularDamping = 0f;
@@ -70,6 +75,12 @@ public class ShipMovement : MonoBehaviour
 
         if (syncRigidbodyMassWithShipStats)
             rb.mass = mass;
+
+        if (syncRigidbodyInertiaWithShipStats)
+        {
+            float targetInertia = Mathf.Max(baseInertia, minRigidbodyInertia, mass * Mathf.Max(0f, inertiaFromMassMultiplier));
+            rb.inertia = targetInertia;
+        }
 
         float accelEst = (effectiveTotalThrust / mass) * accelMultiplier;
         float maxSpeed = Mathf.Max(0.1f, baseMaxSpeed + accelEst * maxSpeedFromAccelMultiplier);

@@ -202,6 +202,17 @@ public class ShipStats : MonoBehaviour
 
         if (isPlayerShip)
             EnsureFallbackLaser();
+
+        RefreshCollisionHull();
+    }
+
+    void RefreshCollisionHull()
+    {
+        ShipCollisionHull2D hull = GetComponent<ShipCollisionHull2D>();
+        if (hull == null)
+            hull = gameObject.AddComponent<ShipCollisionHull2D>();
+
+        hull.RebuildHull(modules);
     }
 
     public void RefreshHudNow()

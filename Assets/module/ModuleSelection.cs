@@ -40,9 +40,13 @@ public class ModuleSelection : MonoBehaviour
         Vector3 world = cam.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, -cam.transform.position.z));
         Vector2 p = new Vector2(world.x, world.y);
 
-        var hit = Physics2D.Raycast(p, Vector2.zero);
-        if (hit.collider != null)
+        var hits = Physics2D.RaycastAll(p, Vector2.zero);
+        for (int i = 0; i < hits.Length; i++)
         {
+            var hit = hits[i];
+            if (hit.collider == null || ShipCollisionHull2D.IsHullCollider(hit.collider))
+                continue;
+
             var module = hit.collider.GetComponentInParent<ModuleInstance>();
             if (module != null)
             {

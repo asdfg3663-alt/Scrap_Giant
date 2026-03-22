@@ -318,6 +318,10 @@ public class ShipBuilder : MonoBehaviour
     }
     else
     {
+        var moduleInstance = moduleTf.GetComponent<ModuleInstance>();
+        if (moduleInstance != null)
+            rb.mass = Mathf.Max(0.01f, moduleInstance.GetMass());
+
         rb.bodyType = RigidbodyType2D.Kinematic;
         rb.simulated = true;
 
@@ -572,15 +576,24 @@ public class ShipBuilder : MonoBehaviour
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             return null;
 
-        var hit = Physics2D.OverlapPoint(world, pickMask);
-        if (!hit) return null;
+        var hits = Physics2D.OverlapPointAll(world, pickMask);
+        if (hits == null || hits.Length == 0) return null;
 
         // 모듈 루트가 콜라이더 자식일 수도 있으니 Module 컴포넌트 있는 상위로 끌어올림
-        var m = hit.GetComponentInParent<Module>();
-        if (m != null && !CanManipulateModule(m.transform))
-            return null;
+        for (int i = 0; i < hits.Length; i++)
+        {
+            var hit = hits[i];
+            if (!hit || ShipCollisionHull2D.IsHullCollider(hit))
+                continue;
 
-        return m ? m.transform : hit.transform;
+            var m = hit.GetComponentInParent<Module>();
+            if (m != null && !CanManipulateModule(m.transform))
+                return null;
+
+            return m ? m.transform : hit.transform;
+        }
+
+        return null;
     }
 
     bool CanManipulateModule(Transform moduleTf)

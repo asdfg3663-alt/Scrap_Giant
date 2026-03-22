@@ -37,6 +37,11 @@ public class EnemyShipAI : MonoBehaviour
     [Range(0f, 1f)] public float engineDirectionThreshold = 0.75f;
     public bool useModuleCenterOfMass = true;
     public float minModuleMassForCOM = 0.001f;
+    public bool syncRigidbodyMassWithShipStats = true;
+    public float minRigidbodyMass = 0.01f;
+    public bool syncRigidbodyInertiaWithShipStats = true;
+    public float inertiaFromMassMultiplier = 0.015f;
+    public float minRigidbodyInertia = 0.1f;
 
     [Header("Behavior Timing")]
     public float decisionInterval = 5f;
@@ -69,6 +74,7 @@ public class EnemyShipAI : MonoBehaviour
     bool midRangeTracksPlayer;
     bool closeRangeCanAttack;
     BehaviorBand activeBand = BehaviorBand.Far;
+    float baseInertia;
 
     public bool WantsToFire => wantsToFire;
 
@@ -76,6 +82,7 @@ public class EnemyShipAI : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         stats = GetComponent<ShipStats>();
+        baseInertia = rb != null ? rb.inertia : 0.1f;
         wanderHeadingDegrees = rb != null ? rb.rotation : transform.eulerAngles.z;
     }
 
@@ -152,6 +159,15 @@ public class EnemyShipAI : MonoBehaviour
 
         if (rb == null || stats == null)
             return;
+
+        if (syncRigidbodyMassWithShipStats)
+            rb.mass = Mathf.Max(minRigidbodyMass, stats.totalMass);
+
+        if (syncRigidbodyInertiaWithShipStats)
+        {
+            float targetInertia = Mathf.Max(baseInertia, minRigidbodyInertia, rb.mass * Mathf.Max(0f, inertiaFromMassMultiplier));
+            rb.inertia = targetInertia;
+        }
 
         if (!stats.HasOperationalModuleType(ModuleType.Engine))
         {

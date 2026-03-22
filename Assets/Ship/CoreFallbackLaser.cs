@@ -82,6 +82,9 @@ public class CoreFallbackLaser : MonoBehaviour
             if (hit.collider == null)
                 continue;
 
+            if (ShipCollisionHull2D.IsHullCollider(hit.collider))
+                continue;
+
             if (hit.collider.transform.IsChildOf(ship.transform))
                 continue;
 
