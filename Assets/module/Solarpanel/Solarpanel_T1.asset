@@ -16,8 +16,8 @@ MonoBehaviour:
   localizationKey: module.solar_panel
   type: 9
   tier: 1
-  maxHP: 5
-  hpPerTierMultiplier: 1.5
+  maxHP: 4
+  hpPerTierMultiplier: 1.4
   powerGenPerTierMultiplier: 1.3
   powerUsePerTierMultiplier: 1.12
   energyPerTierMultiplier: 1.3
@@ -37,7 +37,7 @@ MonoBehaviour:
   dpsPerTierMultiplier: 1.25
   upgradeScrapCostMassMultiplier: 10
   upgradeScrapCostPerTierMultiplier: 1.6
-  powerGenPerSec: 2
+  powerGenPerSec: 1.5
   powerUsePerSec: 0
   maxEnergy: 0
   maxFuel: 0

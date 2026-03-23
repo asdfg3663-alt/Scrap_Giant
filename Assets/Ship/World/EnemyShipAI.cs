@@ -35,6 +35,7 @@ public class EnemyShipAI : MonoBehaviour
     public float idleBrake = 7f;
     public float retaliationDuration = 12f;
     [Range(0f, 1f)] public float engineDirectionThreshold = 0.75f;
+    [Range(0f, 30f)] public float maxEngineGimbalDegrees = 10f;
     public bool useModuleCenterOfMass = true;
     public float minModuleMassForCOM = 0.001f;
     public bool syncRigidbodyMassWithShipStats = true;
@@ -230,7 +231,9 @@ public class EnemyShipAI : MonoBehaviour
                     (Vector2)transform.up,
                     throttleCommand * drive,
                     engineDirectionThreshold,
-                    requestedThrust => requestedThrust);
+                    requestedThrust => requestedThrust,
+                    refreshEngineVfx: true,
+                    maxGimbalDegrees: maxEngineGimbalDegrees);
 
                 if (thrust.appliedThrust > 0f)
                 {

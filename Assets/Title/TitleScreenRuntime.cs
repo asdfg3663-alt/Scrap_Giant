@@ -84,7 +84,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
     RawImage startupLoadingBackgroundImage;
     Image startupLoadingBarFill;
     GameObject openingLogoOverlay;
-    Image openingLogoImage;
+    RawImage openingLogoImage;
     OpeningLogoSequenceAsset openingLogoSequence;
 
     TMP_Text highScoreLabel;
@@ -134,7 +134,6 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
     AudioClip buttonClickClip;
     bool isStartingGame;
     bool backgroundVideoReady;
-    bool backgroundVideoPreparing;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Bootstrap()
@@ -312,7 +311,6 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
     void PrepareBackgroundVideo()
     {
         backgroundVideoReady = false;
-        backgroundVideoPreparing = false;
 
         videoTexture = new RenderTexture(1920, 1080, 0, RenderTextureFormat.ARGB32);
         videoTexture.Create();
@@ -330,7 +328,6 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         string videoPath = ResolveMediaFilePath("Title", "Title.mp4");
         if (File.Exists(videoPath))
         {
-            backgroundVideoPreparing = true;
             videoPlayer.source = VideoSource.Url;
             videoPlayer.url = ToFileUri(videoPath);
             videoPlayer.prepareCompleted += HandleBackgroundVideoPrepared;
@@ -447,18 +444,12 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         background.raycastTarget = true;
 
         RectTransform logoRect = CreateRect("Logo", overlay);
-        SetAnchored(
-            logoRect,
-            new Vector2(0.5f, 0.5f),
-            new Vector2(0.5f, 0.5f),
-            new Vector2(0.5f, 0.5f),
-            Vector2.zero,
-            new Vector2(860f, 420f));
+        Stretch(logoRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
-        openingLogoImage = logoRect.gameObject.AddComponent<Image>();
-        openingLogoImage.preserveAspect = true;
+        openingLogoImage = logoRect.gameObject.AddComponent<RawImage>();
         openingLogoImage.raycastTarget = false;
         openingLogoImage.color = new Color(1f, 1f, 1f, 0f);
+        openingLogoImage.uvRect = new Rect(0f, 0f, 1f, 1f);
 
         openingLogoOverlay.SetActive(false);
     }
@@ -505,7 +496,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         AddBlockAccent(languageBlock);
         languageSectionLabel = CreateSectionLabel(languageBlock, "Language");
         languageModeLabel = CreateBodyText(languageBlock, string.Empty, 16f);
-        languageModeLabel.enableWordWrapping = true;
+        languageModeLabel.textWrappingMode = TextWrappingModes.Normal;
         languageModeLabel.alignment = TextAlignmentOptions.Left;
         SetAnchored(languageModeLabel.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(18f, -32f), new Vector2(-36f, 24f));
 
@@ -596,7 +587,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         Stretch(howToPreviewTitleLabel.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, 0f), new Vector2(-18f, -56f));
 
         howToPreviewBodyLabel = CreateText(textBlock, string.Empty, 18f, new Color(0.82f, 0.9f, 0.95f, 1f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
-        howToPreviewBodyLabel.enableWordWrapping = true;
+        howToPreviewBodyLabel.textWrappingMode = TextWrappingModes.Normal;
         Stretch(howToPreviewBodyLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(18f, 12f), new Vector2(-18f, -96f));
 
         RectTransform tabRow = CreateRect("HowToTabs", parent);
@@ -626,7 +617,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
     {
         RectTransform block = CreateBlock(parent, 260f);
         shopBodyLabel = CreateText(block, string.Empty, 20f, new Color(0.86f, 0.92f, 0.95f, 1f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
-        shopBodyLabel.enableWordWrapping = true;
+        shopBodyLabel.textWrappingMode = TextWrappingModes.Normal;
         Stretch(shopBodyLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0f, 0f), Vector2.zero);
     }
 
@@ -634,7 +625,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
     {
         RectTransform block = CreateBlock(parent, 300f);
         creditsBodyLabel = CreateText(block, string.Empty, 20f, new Color(0.86f, 0.92f, 0.95f, 1f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
-        creditsBodyLabel.enableWordWrapping = true;
+        creditsBodyLabel.textWrappingMode = TextWrappingModes.Normal;
         Stretch(creditsBodyLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
     }
 
@@ -802,7 +793,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         label.fontStyle = fontStyle;
         label.alignment = alignment;
         label.raycastTarget = false;
-        label.enableWordWrapping = false;
+        label.textWrappingMode = TextWrappingModes.NoWrap;
         return label;
     }
 
@@ -1081,7 +1072,6 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
     void ForceCompleteBackgroundPreload()
     {
-        backgroundVideoPreparing = false;
         backgroundVideoReady = true;
 
         if (loadingBackgroundTexture != null)
@@ -1099,14 +1089,12 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
 
     void HandleBackgroundVideoPrepared(VideoPlayer source)
     {
-        backgroundVideoPreparing = false;
         backgroundVideoReady = true;
         source.Play();
     }
 
     void HandleBackgroundVideoError(VideoPlayer source, string _)
     {
-        backgroundVideoPreparing = false;
         backgroundVideoReady = true;
 
         if (loadingBackgroundTexture != null)
@@ -1154,7 +1142,7 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
                 continue;
 
             displayedAnyLogo = true;
-            openingLogoImage.sprite = entry.logoSprite;
+            ApplyOpeningLogo(entry.logoSprite);
             SetOpeningLogoAlpha(0f);
 
             yield return FadeOpeningLogo(0f, 1f, entry.fadeInDuration);
@@ -1208,6 +1196,19 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         Color color = openingLogoImage.color;
         color.a = Mathf.Clamp01(alpha);
         openingLogoImage.color = color;
+    }
+
+    void ApplyOpeningLogo(Sprite logoSprite)
+    {
+        if (openingLogoImage == null || logoSprite == null)
+            return;
+
+        Texture2D texture = logoSprite.texture;
+        if (texture == null)
+            return;
+
+        openingLogoImage.texture = texture;
+        openingLogoImage.uvRect = new Rect(0f, 0f, 1f, 1f);
     }
 
     void SetTitleUiVisible(bool visible)

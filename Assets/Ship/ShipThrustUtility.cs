@@ -47,7 +47,8 @@ public static class ShipThrustUtility
         float throttle,
         float directionThreshold,
         Func<float, float> effectiveThrustResolver,
-        bool refreshEngineVfx = true)
+        bool refreshEngineVfx = true,
+        float maxGimbalDegrees = 0f)
     {
         DirectionalThrustResult result = default;
         if (modules == null || modules.Length == 0)
@@ -106,6 +107,14 @@ public static class ShipThrustUtility
             Vector2 engineDir = module.transform.up;
             if (Vector2.Dot(engineDir, desiredDir) < directionThreshold)
                 continue;
+
+            if (maxGimbalDegrees > 0f)
+            {
+                float maxDegreesDelta = Mathf.Max(0f, maxGimbalDegrees);
+                float signedAngle = Vector2.SignedAngle(engineDir, desiredDir);
+                float clampedAngle = Mathf.Clamp(signedAngle, -maxDegreesDelta, maxDegreesDelta);
+                engineDir = (Quaternion.Euler(0f, 0f, clampedAngle) * engineDir).normalized;
+            }
 
             float appliedThrust = moduleThrust * throttleAmount * appliedThrustScale;
             if (appliedThrust <= 0f)

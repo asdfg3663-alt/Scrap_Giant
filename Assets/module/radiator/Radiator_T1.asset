@@ -43,7 +43,7 @@ MonoBehaviour:
   maxFuel: 0
   fuelSynthesisPerSec: 0
   thrust: 0
-  mass: 10
+  mass: 12
   scoreMultiplier: 1
   maxHeat: 0
   heatDissipationPerSec: 2

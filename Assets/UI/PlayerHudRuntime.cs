@@ -615,7 +615,7 @@ public class PlayerHudRuntime : MonoBehaviour
             new Vector2(0f, -10f),
             new Vector2(0.5f, 0f),
             FontStyles.Bold);
-        overheatWarningText.enableWordWrapping = false;
+        overheatWarningText.textWrappingMode = TextWrappingModes.NoWrap;
         overheatWarningText.overflowMode = TextOverflowModes.Ellipsis;
         overheatWarningText.rectTransform.sizeDelta = new Vector2(380f, 22f);
         overheatWarningText.gameObject.SetActive(false);
@@ -690,7 +690,7 @@ public class PlayerHudRuntime : MonoBehaviour
         SetAnchored(detailRoot, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 8f), new Vector2(232f, 86f));
         CreateBackPlate(detailRoot, new Color(0.05f, 0.09f, 0.12f, 0.92f));
         inventoryDetailText = CreateLabel(detailRoot, LocalizationManager.Get("ui.inventory_empty", "Drag modules here."), 13f, new Color(0.76f, 0.84f, 0.9f, 1f), TextAlignmentOptions.TopLeft, new Vector2(12f, -10f), new Vector2(0f, 1f), FontStyles.Normal);
-        inventoryDetailText.enableWordWrapping = true;
+        inventoryDetailText.textWrappingMode = TextWrappingModes.Normal;
         inventoryDetailText.overflowMode = TextOverflowModes.Ellipsis;
         inventoryDetailText.rectTransform.sizeDelta = new Vector2(208f, 64f);
 

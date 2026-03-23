@@ -157,10 +157,13 @@ MonoBehaviour:
   accelMultiplier: 1
   syncRigidbodyMassWithShipStats: 1
   minRigidbodyMass: 0.01
+  syncRigidbodyInertiaWithShipStats: 1
+  inertiaFromMassMultiplier: 0.05
+  minRigidbodyInertia: 0.1
   brakeForceOverride: 1
   reverseMultiplier: 0.5
   stopSnapSpeed: 0.05
-  thrustToManualTurnTorque: 0.15
+  thrustToManualTurnTorque: 0.05
   baseManualTurnTorque: 0
   manualTurnTorqueScale: 0.5
   angularDamping: 0
@@ -5876,8 +5879,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ModuleInstance
   data: {fileID: 11400000, guid: 7b876c0dd20edc6419ee1b7098262a6b, type: 2}
-  hp: 15
-  maxHp: 15
+  hp: 10
+  maxHp: 10
   resetHpOnDataAssign: 1
   currentHeat: 0
   repairProgress: 0
@@ -5975,8 +5978,8 @@ MonoBehaviour:
   solarPanelModulePrefab: {fileID: 1687058770715388412, guid: 9b5cd4f5e6f84c9f9041a2bd5aa6d2ce, type: 3}
   startingScrap: 250
   startingAmmo: 100
-  fuelPerScrap: 30
-  initialFuelFillRatio: 1
+  fuelPerScrap: 50
+  initialFuelFillRatio: 0.5
   maxFloatingScraps: 10
   maxEnemyShips: 7
   spawnCheckInterval: 3
@@ -5993,9 +5996,9 @@ MonoBehaviour:
   enemyOutlineColor: {r: 1, g: 0.2, b: 0.18, a: 0.95}
   enemyOutlinePixelSize: 15
   enemySaturationMultiplier: 0.8
-  threatScoreScale: 0.1
-  threatLogBase: 1.5
-  baseThreat: 0.15
+  threatScoreScale: 0.12
+  threatLogBase: 1.6
+  baseThreat: 0.16
   threatGraceScore: 50
   earlyThreatMultiplier: 0.3
   threatAccelerationScore: 500
@@ -6022,11 +6025,11 @@ MonoBehaviour:
   maxModuleUpgradeLevel: 8
   maxLaserUpgradeLevel: 6
   extraEngineRollChance: 0.3
-  extraLaserRollChance: 0.24
+  extraLaserRollChance: 0.3
   extraFuelTankRollChance: 0.72
   baseStructureChance: 0.72
   baseFuelTankChance: 0.3
-  baseSolarPanelChance: 0.08
+  baseSolarPanelChance: 0.2
   symmetryPreference: 0.8
   mirrorOccupiedBonus: 90
   mirrorOpenSocketBonus: 42
