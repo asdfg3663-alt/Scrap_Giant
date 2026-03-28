@@ -1,0 +1,3 @@
+E:\2. AI Project\4. Game Dev\4. Scrap Giant\Scrap Giant\Library\Bee\Android\Prj\IL2CPP\Gradle\unityLibrary\src\main\cpp\CMakeLists.txt
+E:\2. AI Project\4. Game Dev\4. Scrap Giant\Scrap Giant\Library\Bee\Android\Prj\IL2CPP\Gradle\unityLibrary\src\main\cpp\FramePacing\CMakeLists.txt
+E:\2. AI Project\4. Game Dev\4. Scrap Giant\Scrap Giant\Library\Bee\Android\Prj\IL2CPP\Gradle\unityLibrary\src\main\cpp\GameActivity\CMakeLists.txt

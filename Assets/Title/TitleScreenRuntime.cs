@@ -12,6 +12,7 @@ using System.Collections;
 public sealed partial class TitleScreenRuntime : MonoBehaviour
 {
     const float StartupVideoPreloadTimeout = 12f;
+    const float MobileStartupVideoPreloadTimeout = 1.5f;
 
     sealed class HowToPage
     {
@@ -326,10 +327,10 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         videoPlayer.timeUpdateMode = VideoTimeUpdateMode.UnscaledGameTime;
 
         string videoPath = ResolveMediaFilePath("Title", "Title.mp4");
-        if (File.Exists(videoPath))
+        if (CanAttemptRuntimeMedia(videoPath))
         {
             videoPlayer.source = VideoSource.Url;
-            videoPlayer.url = ToFileUri(videoPath);
+            videoPlayer.url = ToMediaUrl(videoPath);
             videoPlayer.prepareCompleted += HandleBackgroundVideoPrepared;
             videoPlayer.errorReceived += HandleBackgroundVideoError;
             videoPlayer.Prepare();
@@ -1016,7 +1017,8 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
             float easedProgress = 0.12f + 0.78f * (1f - Mathf.Exp(-elapsed * 1.35f));
             SetStartupLoadingProgress(easedProgress);
 
-            if (elapsed >= StartupVideoPreloadTimeout)
+            float preloadTimeout = Application.isMobilePlatform ? MobileStartupVideoPreloadTimeout : StartupVideoPreloadTimeout;
+            if (elapsed >= preloadTimeout)
             {
                 ForceCompleteBackgroundPreload();
                 break;
@@ -1121,6 +1123,28 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
     static string ToFileUri(string filePath)
     {
         return new System.Uri(filePath).AbsoluteUri;
+    }
+
+    static bool CanAttemptRuntimeMedia(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+            return false;
+
+        if (File.Exists(filePath))
+            return true;
+
+        return filePath.Contains("://") || filePath.StartsWith("jar:");
+    }
+
+    static string ToMediaUrl(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+            return string.Empty;
+
+        if (filePath.Contains("://") || filePath.StartsWith("jar:"))
+            return filePath;
+
+        return ToFileUri(filePath);
     }
 
     IEnumerator PlayOpeningLogoSequence()

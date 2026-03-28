@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 [RequireComponent(typeof(Camera))]
 public class CameraFollow2D : MonoBehaviour
@@ -103,11 +104,8 @@ public class CameraFollow2D : MonoBehaviour
             userZoomMultiplier = Mathf.Clamp(userZoomMultiplier, minZoomMultiplier, maxZoomMultiplier);
         }
 
-        if (Input.touchCount < 2)
+        if (!TryGetPinchTouches(out Touch touch0, out Touch touch1))
             return;
-
-        Touch touch0 = Input.GetTouch(0);
-        Touch touch1 = Input.GetTouch(1);
         Vector2 previous0 = touch0.position - touch0.deltaPosition;
         Vector2 previous1 = touch1.position - touch1.deltaPosition;
 
@@ -119,6 +117,31 @@ public class CameraFollow2D : MonoBehaviour
         float pinchRatio = previousDistance / currentDistance;
         float pinchDelta = Mathf.Lerp(1f, pinchRatio, pinchZoomSensitivity * 100f);
         userZoomMultiplier = Mathf.Clamp(userZoomMultiplier * pinchDelta, minZoomMultiplier, maxZoomMultiplier);
+    }
+
+    bool TryGetPinchTouches(out Touch touch0, out Touch touch1)
+    {
+        touch0 = default;
+        touch1 = default;
+
+        int found = 0;
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            Touch touch = Input.GetTouch(i);
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(touch.fingerId))
+                continue;
+
+            if (found == 0)
+                touch0 = touch;
+            else if (found == 1)
+                touch1 = touch;
+
+            found++;
+            if (found >= 2)
+                return true;
+        }
+
+        return false;
     }
 
     void FitBackgroundToViewport()

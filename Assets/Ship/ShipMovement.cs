@@ -57,6 +57,7 @@ public class ShipMovement : MonoBehaviour
     {
         if (GameRuntimeState.GameplayBlocked)
         {
+            MobileShipInput.SetMoveVector(Vector2.zero);
             AudioRuntime.SetEngineLoopActive(false);
             return;
         }
@@ -67,8 +68,11 @@ public class ShipMovement : MonoBehaviour
             return;
         }
 
-        float thrustInput = Input.GetAxisRaw("Vertical");
-        float turnInput = Input.GetAxisRaw("Horizontal");
+        Vector2 mobileMove = MobileShipInput.MoveVector;
+        GetMobileDriveAxes(mobileMove, out float mobileThrustInput, out float mobileTurnInput);
+
+        float thrustInput = Mathf.Clamp(Input.GetAxisRaw("Vertical") + mobileThrustInput, -1f, 1f);
+        float turnInput = Mathf.Clamp(Input.GetAxisRaw("Horizontal") + mobileTurnInput, -1f, 1f);
 
         float mass = Mathf.Max(minRigidbodyMass, stats.totalMass);
         float effectiveTotalThrust = Mathf.Max(0f, stats.GetEffectiveTotalThrust());
@@ -178,5 +182,55 @@ public class ShipMovement : MonoBehaviour
             rb.angularVelocity = Mathf.Clamp(rb.angularVelocity, -maxAngularDegPerSec, maxAngularDegPerSec);
 
         AudioRuntime.SetEngineLoopActive(engineLoopActive);
+    }
+
+    static void GetMobileDriveAxes(Vector2 mobileMove, out float thrustInput, out float turnInput)
+    {
+        thrustInput = 0f;
+        turnInput = 0f;
+
+        if (mobileMove.sqrMagnitude <= 0.0001f)
+            return;
+
+        float magnitude = Mathf.Clamp01(mobileMove.magnitude);
+        float absAngleFromForward = Vector2.Angle(Vector2.up, mobileMove);
+        float absAngleFromBackward = Vector2.Angle(Vector2.down, mobileMove);
+        float turnSign = Mathf.Sign(mobileMove.x);
+
+        if (mobileMove.y >= 0f)
+        {
+            if (absAngleFromForward <= 25f)
+            {
+                thrustInput = magnitude;
+                return;
+            }
+
+            if (absAngleFromForward <= 35f)
+            {
+                float blend = Mathf.InverseLerp(25f, 35f, absAngleFromForward);
+                thrustInput = magnitude;
+                turnInput = turnSign * blend;
+                return;
+            }
+
+            turnInput = turnSign * magnitude;
+            return;
+        }
+
+        if (absAngleFromBackward <= 25f)
+        {
+            thrustInput = -magnitude;
+            return;
+        }
+
+        if (absAngleFromBackward <= 35f)
+        {
+            float blend = Mathf.InverseLerp(25f, 35f, absAngleFromBackward);
+            thrustInput = -magnitude;
+            turnInput = turnSign * blend;
+            return;
+        }
+
+        turnInput = turnSign * magnitude;
     }
 }

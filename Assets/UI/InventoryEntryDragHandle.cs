@@ -19,7 +19,8 @@ public class InventoryEntryDragHandle : MonoBehaviour, IBeginDragHandler, IDragH
         if (owner == null || string.IsNullOrWhiteSpace(entryId))
             return;
 
-        owner.TryBeginStoredModuleDrag(entryId, eventData.position);
+        eventData.useDragThreshold = false;
+        owner.TryBeginStoredModuleDrag(entryId, eventData.position, eventData.pointerId);
     }
 
     public void OnDrag(PointerEventData eventData)

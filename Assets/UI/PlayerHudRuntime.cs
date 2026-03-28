@@ -17,6 +17,7 @@ public class PlayerHudRuntime : MonoBehaviour
 
     static PlayerHudRuntime instance;
     static Sprite solidSprite;
+    static Sprite circleSprite;
     static float sessionBestScore;
 
     [Serializable]
@@ -90,6 +91,7 @@ public class PlayerHudRuntime : MonoBehaviour
     RectTransform inventoryListRoot;
     RectTransform inventoryPanel;
     RectTransform navigatorRoot;
+    RectTransform mobileControlsRoot;
 
     GameObject inventoryBody;
     GameObject inventoryEmptyState;
@@ -138,6 +140,10 @@ public class PlayerHudRuntime : MonoBehaviour
     readonly List<ValueRow> ammoRows = new();
     readonly List<InventoryRow> inventoryRows = new();
     readonly HashSet<int> storingModuleInstanceIds = new();
+
+    [Header("Mobile Controls")]
+    [SerializeField] bool showMobileControlsInEditor = true;
+    [SerializeField] bool showMobileControlsOnDesktop = false;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics()
@@ -399,7 +405,7 @@ public class PlayerHudRuntime : MonoBehaviour
         return true;
     }
 
-    public bool TryBeginStoredModuleDrag(string entryId, Vector2 screenPoint)
+    public bool TryBeginStoredModuleDrag(string entryId, Vector2 screenPoint, int pointerId = int.MinValue)
     {
         InventoryEntry entry = FindInventory(entryId);
         if (entry == null || entry.prefab == null)
@@ -411,7 +417,7 @@ public class PlayerHudRuntime : MonoBehaviour
         if (builder == null)
             return false;
 
-        if (!builder.BeginInventoryDrag(entry.prefab, entry.upgradeLevel, screenPoint))
+        if (!builder.BeginInventoryDrag(entry.prefab, entry.upgradeLevel, screenPoint, pointerId))
             return false;
 
         inventoryEntries.Remove(entry);
@@ -548,6 +554,7 @@ public class PlayerHudRuntime : MonoBehaviour
         CreateTopHud();
         CreateInventoryPanel();
         CreateNavigatorOverlay();
+        CreateMobileControls();
 
         hudBuilt = true;
         LocalizationFontManager.RefreshActiveTexts();
@@ -709,6 +716,78 @@ public class PlayerHudRuntime : MonoBehaviour
         scrapNavigatorArrow = CreateNavigatorArrow(navigatorRoot, "ScrapArrow", NavigatorScrapColor);
         enemyNavigatorArrow = CreateNavigatorArrow(navigatorRoot, "EnemyArrow", NavigatorEnemyColor);
         neutralModuleNavigatorArrow = CreateNavigatorArrow(navigatorRoot, "NeutralModuleArrow", NavigatorNeutralModuleColor);
+    }
+
+    void CreateMobileControls()
+    {
+        if (!ShouldShowMobileControls())
+            return;
+
+        mobileControlsRoot = CreateRect("MobileControls", hudRoot);
+        Stretch(mobileControlsRoot, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+        RectTransform touchpadRoot = CreateRect("Touchpad", mobileControlsRoot);
+        SetAnchored(touchpadRoot, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(36f, 36f), new Vector2(220f, 220f));
+        Image touchpadBg = touchpadRoot.gameObject.AddComponent<Image>();
+        touchpadBg.sprite = GetCircleSprite();
+        touchpadBg.type = Image.Type.Simple;
+        touchpadBg.color = new Color(0.07f, 0.12f, 0.16f, 0.42f);
+        touchpadBg.raycastTarget = true;
+
+        RectTransform touchpadRing = CreateRect("Ring", touchpadRoot);
+        Stretch(touchpadRing, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), Vector2.zero, Vector2.zero);
+        Image ringImage = touchpadRing.gameObject.AddComponent<Image>();
+        ringImage.sprite = GetCircleSprite();
+        ringImage.type = Image.Type.Simple;
+        ringImage.color = new Color(0.24f, 0.43f, 0.56f, 0.22f);
+        ringImage.raycastTarget = false;
+
+        RectTransform thumb = CreateRect("Thumb", touchpadRoot);
+        SetAnchored(thumb, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(82f, 82f));
+        Image thumbImage = thumb.gameObject.AddComponent<Image>();
+        thumbImage.sprite = GetCircleSprite();
+        thumbImage.type = Image.Type.Simple;
+        thumbImage.color = new Color(0.58f, 0.86f, 1f, 0.8f);
+        thumbImage.raycastTarget = false;
+
+        MobileTouchpadControl touchpadControl = touchpadRoot.gameObject.AddComponent<MobileTouchpadControl>();
+        touchpadControl.thumb = thumb;
+        touchpadControl.maxInputRadius = 82f;
+        touchpadControl.thumbTravelRadius = 58f;
+        touchpadControl.deadZone = 0.12f;
+
+        RectTransform fireButtonRoot = CreateRect("FireButton", mobileControlsRoot);
+        SetAnchored(fireButtonRoot, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-42f, 42f), new Vector2(160f, 160f));
+        Image fireButtonImage = fireButtonRoot.gameObject.AddComponent<Image>();
+        fireButtonImage.sprite = GetCircleSprite();
+        fireButtonImage.type = Image.Type.Simple;
+        fireButtonImage.color = new Color(0.78f, 0.18f, 0.18f, 0.72f);
+        fireButtonImage.raycastTarget = true;
+
+        RectTransform fireInner = CreateRect("Inner", fireButtonRoot);
+        Stretch(fireInner, new Vector2(0.2f, 0.2f), new Vector2(0.8f, 0.8f), Vector2.zero, Vector2.zero);
+        Image fireInnerImage = fireInner.gameObject.AddComponent<Image>();
+        fireInnerImage.sprite = GetCircleSprite();
+        fireInnerImage.type = Image.Type.Simple;
+        fireInnerImage.color = new Color(1f, 0.72f, 0.72f, 0.22f);
+        fireInnerImage.raycastTarget = false;
+
+        MobileFireButtonControl fireButtonControl = fireButtonRoot.gameObject.AddComponent<MobileFireButtonControl>();
+        fireButtonControl.targetImage = fireButtonImage;
+        fireButtonControl.normalColor = new Color(0.78f, 0.18f, 0.18f, 0.72f);
+        fireButtonControl.pressedColor = new Color(1f, 0.16f, 0.16f, 1f);
+    }
+
+    bool ShouldShowMobileControls()
+    {
+        if (Application.isMobilePlatform)
+            return true;
+
+#if UNITY_EDITOR
+        return showMobileControlsInEditor;
+#else
+        return showMobileControlsOnDesktop;
+#endif
     }
 
     void RefreshAll(bool force)
@@ -1369,6 +1448,35 @@ public class PlayerHudRuntime : MonoBehaviour
         solidSprite = Sprite.Create(tex, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f));
         solidSprite.name = "HUDSolidSprite";
         return solidSprite;
+    }
+
+    static Sprite GetCircleSprite()
+    {
+        if (circleSprite != null)
+            return circleSprite;
+
+        const int size = 128;
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        float radius = size * 0.5f - 2f;
+        float feather = 2.5f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float distance = Vector2.Distance(new Vector2(x, y), center);
+                float alpha = Mathf.Clamp01((radius - distance) / feather);
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+
+        tex.Apply();
+        circleSprite = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size);
+        circleSprite.name = "HUDCircleSprite";
+        return circleSprite;
     }
 }
 

@@ -5,6 +5,7 @@ using UnityEngine;
 public static class LocalizationFontManager
 {
     static TMP_FontAsset uiFontAsset;
+    static TMP_FontAsset resourceFallbackFontAsset;
     static readonly List<TMP_FontAsset> fallbackAssets = new();
     static bool initialized;
 
@@ -12,6 +13,7 @@ public static class LocalizationFontManager
     static void ResetStatics()
     {
         uiFontAsset = null;
+        resourceFallbackFontAsset = null;
         fallbackAssets.Clear();
         initialized = false;
     }
@@ -25,7 +27,13 @@ public static class LocalizationFontManager
     public static TMP_FontAsset GetUiFontAsset()
     {
         EnsureInitialized();
-        return uiFontAsset != null ? uiFontAsset : TMP_Settings.defaultFontAsset;
+        if (uiFontAsset != null)
+            return uiFontAsset;
+
+        if (resourceFallbackFontAsset != null)
+            return resourceFallbackFontAsset;
+
+        return TMP_Settings.defaultFontAsset;
     }
 
     public static void ApplyFont(TMP_Text text)
@@ -76,6 +84,7 @@ public static class LocalizationFontManager
 
         initialized = true;
 
+        resourceFallbackFontAsset = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
         uiFontAsset = CreateDynamicFontAsset(new[] { "Segoe UI", "Arial" }, "Localized_UI_Primary");
         TMP_FontAsset koreanFallback = CreateDynamicFontAsset(new[] { "Malgun Gothic" }, "Localized_Korean_Fallback");
         TMP_FontAsset japaneseFallback = CreateDynamicFontAsset(new[] { "Yu Gothic UI", "Yu Gothic", "MS Gothic" }, "Localized_Japanese_Fallback");
@@ -195,6 +204,8 @@ public static class LocalizationFontManager
     {
         if (uiFontAsset != null)
             TMP_Settings.defaultFontAsset = uiFontAsset;
+        else if (TMP_Settings.defaultFontAsset == null && resourceFallbackFontAsset != null)
+            TMP_Settings.defaultFontAsset = resourceFallbackFontAsset;
 
         TMP_FontAsset defaultFont = TMP_Settings.defaultFontAsset;
         AttachFallbackChain(defaultFont);

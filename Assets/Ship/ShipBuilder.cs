@@ -52,6 +52,8 @@ public class ShipBuilder : MonoBehaviour
 
     bool isDragging;
     bool wasAttachedAtDragStart;
+    int activeTouchPointerId = int.MinValue;
+    Vector2 activePointerScreen;
 
     // 그리드 점유(코어 기준)
     readonly Dictionary<Vector2Int, Module> occupied = new();
@@ -346,7 +348,7 @@ public class ShipBuilder : MonoBehaviour
         rb.simulated = false;
     }
 
-    public bool BeginInventoryDrag(GameObject modulePrefab, int upgradeLevel, Vector2 screenPosition)
+    public bool BeginInventoryDrag(GameObject modulePrefab, int upgradeLevel, Vector2 screenPosition, int pointerId = int.MinValue)
     {
         if (modulePrefab == null || cam == null || isDragging)
             return false;
@@ -368,6 +370,8 @@ public class ShipBuilder : MonoBehaviour
         pressT = longPressTime;
         dragOffset = Vector3.zero;
         pointerDown = true;
+        activeTouchPointerId = pointerId >= 0 ? pointerId : int.MinValue;
+        activePointerScreen = screenPosition;
         isDragging = true;
         wasAttachedAtDragStart = false;
         draggingTf = moduleTf;
@@ -716,47 +720,184 @@ bool IsOccupied(Vector2Int grid) => occupied.ContainsKey(grid);
 
     Vector2 MouseWorld()
     {
-#if ENABLE_INPUT_SYSTEM
-        if (Mouse.current != null)
-        {
-            Vector2 screen = Mouse.current.position.ReadValue();
-            return cam.ScreenToWorldPoint(screen);
-        }
-#endif
-        return cam.ScreenToWorldPoint(Input.mousePosition);
+        Vector2 screen = MouseScreen();
+        return cam.ScreenToWorldPoint(screen);
     }
 
     Vector2 MouseScreen()
     {
+        if (activeTouchPointerId != int.MinValue)
+        {
+            if (TryGetTouchPosition(activeTouchPointerId, out Vector2 touchScreen))
+            {
+                activePointerScreen = touchScreen;
+                return touchScreen;
+            }
+
+            if (Input.touchCount > 0)
+            {
+                activePointerScreen = Input.GetTouch(0).position;
+                return activePointerScreen;
+            }
+
+            return activePointerScreen;
+        }
+
 #if ENABLE_INPUT_SYSTEM
         if (Mouse.current != null)
-            return Mouse.current.position.ReadValue();
+        {
+            activePointerScreen = Mouse.current.position.ReadValue();
+            return activePointerScreen;
+        }
 #endif
-        return Input.mousePosition;
+        activePointerScreen = Input.mousePosition;
+        return activePointerScreen;
     }
 
     bool GetPointerDown()
     {
+        if (TryGetTouchBegan(out int touchPointerId, out Vector2 touchScreen))
+        {
+            activeTouchPointerId = touchPointerId;
+            activePointerScreen = touchScreen;
+            return true;
+        }
+
 #if ENABLE_INPUT_SYSTEM
-        if (Mouse.current != null) return Mouse.current.leftButton.wasPressedThisFrame;
+        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+        {
+            activeTouchPointerId = int.MinValue;
+            activePointerScreen = Mouse.current.position.ReadValue();
+            return true;
+        }
 #endif
-        return Input.GetMouseButtonDown(0);
+        if (Input.GetMouseButtonDown(0))
+        {
+            activeTouchPointerId = int.MinValue;
+            activePointerScreen = Input.mousePosition;
+            return true;
+        }
+
+        return false;
     }
 
     bool GetPointerHeld()
     {
+        if (activeTouchPointerId != int.MinValue)
+        {
+            if (TryGetTouchPosition(activeTouchPointerId, out Vector2 touchScreen))
+            {
+                activePointerScreen = touchScreen;
+                return true;
+            }
+
+            if (Input.touchCount > 0)
+            {
+                activePointerScreen = Input.GetTouch(0).position;
+                return true;
+            }
+
+            return false;
+        }
+
 #if ENABLE_INPUT_SYSTEM
-        if (Mouse.current != null) return Mouse.current.leftButton.isPressed;
+        if (Mouse.current != null)
+        {
+            activePointerScreen = Mouse.current.position.ReadValue();
+            return Mouse.current.leftButton.isPressed;
+        }
 #endif
+        activePointerScreen = Input.mousePosition;
         return Input.GetMouseButton(0);
     }
 
     bool GetPointerUp()
     {
+        if (activeTouchPointerId != int.MinValue)
+        {
+            if (TryGetTouchEnded(activeTouchPointerId, out Vector2 touchScreen))
+            {
+                activePointerScreen = touchScreen;
+                activeTouchPointerId = int.MinValue;
+                return true;
+            }
+
+            if (Input.touchCount == 0)
+            {
+                activeTouchPointerId = int.MinValue;
+                return true;
+            }
+
+            return false;
+        }
+
 #if ENABLE_INPUT_SYSTEM
-        if (Mouse.current != null) return Mouse.current.leftButton.wasReleasedThisFrame;
+        if (Mouse.current != null && Mouse.current.leftButton.wasReleasedThisFrame)
+            return true;
 #endif
         return Input.GetMouseButtonUp(0);
+    }
+
+    bool TryGetTouchBegan(out int pointerId, out Vector2 screenPosition)
+    {
+        pointerId = int.MinValue;
+        screenPosition = default;
+
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            Touch touch = Input.GetTouch(i);
+            if (touch.phase != UnityEngine.TouchPhase.Began)
+                continue;
+
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(touch.fingerId))
+                continue;
+
+            pointerId = touch.fingerId;
+            screenPosition = touch.position;
+            return true;
+        }
+
+        return false;
+    }
+
+    bool TryGetTouchPosition(int pointerId, out Vector2 screenPosition)
+    {
+        screenPosition = default;
+
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            Touch touch = Input.GetTouch(i);
+            if (touch.fingerId != pointerId)
+                continue;
+
+            if (touch.phase == UnityEngine.TouchPhase.Ended || touch.phase == UnityEngine.TouchPhase.Canceled)
+                return false;
+
+            screenPosition = touch.position;
+            return true;
+        }
+
+        return false;
+    }
+
+    bool TryGetTouchEnded(int pointerId, out Vector2 screenPosition)
+    {
+        screenPosition = default;
+
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            Touch touch = Input.GetTouch(i);
+            if (touch.fingerId != pointerId)
+                continue;
+
+            if (touch.phase != UnityEngine.TouchPhase.Ended && touch.phase != UnityEngine.TouchPhase.Canceled)
+                return false;
+
+            screenPosition = touch.position;
+            return true;
+        }
+
+        return false;
     }
 
     void OnDrawGizmosSelected()
