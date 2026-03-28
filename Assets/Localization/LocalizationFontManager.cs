@@ -4,7 +4,10 @@ using UnityEngine;
 
 public static class LocalizationFontManager
 {
-    static TMP_FontAsset uiFontAsset;
+    static TMP_FontAsset latinFontAsset;
+    static TMP_FontAsset koreanFontAsset;
+    static TMP_FontAsset japaneseFontAsset;
+    static TMP_FontAsset cyrillicFontAsset;
     static TMP_FontAsset resourceFallbackFontAsset;
     static readonly List<TMP_FontAsset> fallbackAssets = new();
     static bool initialized;
@@ -12,7 +15,10 @@ public static class LocalizationFontManager
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics()
     {
-        uiFontAsset = null;
+        latinFontAsset = null;
+        koreanFontAsset = null;
+        japaneseFontAsset = null;
+        cyrillicFontAsset = null;
         resourceFallbackFontAsset = null;
         fallbackAssets.Clear();
         initialized = false;
@@ -27,8 +33,10 @@ public static class LocalizationFontManager
     public static TMP_FontAsset GetUiFontAsset()
     {
         EnsureInitialized();
-        if (uiFontAsset != null)
-            return uiFontAsset;
+
+        TMP_FontAsset localized = GetPrimaryFontForLanguage(LocalizationManager.CurrentLanguage);
+        if (localized != null)
+            return localized;
 
         if (resourceFallbackFontAsset != null)
             return resourceFallbackFontAsset;
@@ -42,38 +50,42 @@ public static class LocalizationFontManager
             return;
 
         EnsureInitialized();
+
         TMP_FontAsset font = GetUiFontAsset();
-        if (font != null)
-        {
-            text.font = font;
-            text.havePropertiesChanged = true;
-            text.SetAllDirty();
-        }
+        if (font == null)
+            return;
+
+        AttachFallbackChain(font);
+        text.font = font;
+        text.havePropertiesChanged = true;
+        text.SetAllDirty();
     }
 
     public static void RefreshActiveTexts()
     {
         EnsureInitialized();
+        ApplyGlobalFallbacks();
 
         TMP_Text[] texts = Resources.FindObjectsOfTypeAll<TMP_Text>();
+        TMP_FontAsset activeFont = GetUiFontAsset();
+
         for (int i = 0; i < texts.Length; i++)
         {
             TMP_Text text = texts[i];
             if (text == null)
                 continue;
 
-            TMP_FontAsset currentFont = text.font;
-            if (uiFontAsset != null)
-                text.font = uiFontAsset;
-            else if (currentFont == null && TMP_Settings.defaultFontAsset != null)
-                text.font = TMP_Settings.defaultFontAsset;
+            TMP_FontAsset font = activeFont != null ? activeFont : text.font;
+            if (font == null)
+                font = TMP_Settings.defaultFontAsset;
 
-            if (text.font != null)
-            {
-                AttachFallbackChain(text.font);
-                text.havePropertiesChanged = true;
-                text.SetAllDirty();
-            }
+            if (font == null)
+                continue;
+
+            AttachFallbackChain(font);
+            text.font = font;
+            text.havePropertiesChanged = true;
+            text.SetAllDirty();
         }
     }
 
@@ -85,23 +97,35 @@ public static class LocalizationFontManager
         initialized = true;
 
         resourceFallbackFontAsset = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
-        uiFontAsset = CreateDynamicFontAsset(new[] { "Segoe UI", "Arial" }, "Localized_UI_Primary");
-        TMP_FontAsset koreanFallback = CreateDynamicFontAsset(new[] { "Malgun Gothic" }, "Localized_Korean_Fallback");
-        TMP_FontAsset japaneseFallback = CreateDynamicFontAsset(new[] { "Yu Gothic UI", "Yu Gothic", "MS Gothic" }, "Localized_Japanese_Fallback");
 
-        AddFallback(koreanFallback);
-        AddFallback(japaneseFallback);
+        latinFontAsset = CreateDynamicFontAsset(GetPrimaryUiFontNames(), "Localized_UI_Primary");
+        koreanFontAsset = CreateDynamicFontAsset(GetKoreanFontNames(), "Localized_Korean_Primary");
+        japaneseFontAsset = CreateDynamicFontAsset(GetJapaneseFontNames(), "Localized_Japanese_Primary");
+        cyrillicFontAsset = CreateDynamicFontAsset(GetCyrillicFontNames(), "Localized_Cyrillic_Primary");
 
-        AttachFallbackChain(TMP_Settings.defaultFontAsset);
+        AddFallback(resourceFallbackFontAsset);
+        AddFallback(koreanFontAsset);
+        AddFallback(japaneseFontAsset);
+        AddFallback(cyrillicFontAsset);
 
-        if (uiFontAsset == null)
-        {
-            ApplyGlobalFallbacks();
-            return;
-        }
+        AttachFallbackChain(resourceFallbackFontAsset);
+        AttachFallbackChain(latinFontAsset);
+        AttachFallbackChain(koreanFontAsset);
+        AttachFallbackChain(japaneseFontAsset);
+        AttachFallbackChain(cyrillicFontAsset);
 
-        AttachFallbackChain(uiFontAsset);
         ApplyGlobalFallbacks();
+    }
+
+    static TMP_FontAsset GetPrimaryFontForLanguage(GameLanguage language)
+    {
+        return language switch
+        {
+            GameLanguage.Korean => koreanFontAsset ?? latinFontAsset ?? resourceFallbackFontAsset,
+            GameLanguage.Japanese => japaneseFontAsset ?? latinFontAsset ?? resourceFallbackFontAsset,
+            GameLanguage.Russian => cyrillicFontAsset ?? latinFontAsset ?? resourceFallbackFontAsset,
+            _ => latinFontAsset ?? resourceFallbackFontAsset
+        };
     }
 
     static TMP_FontAsset CreateDynamicFontAsset(string[] fontNames, string assetName)
@@ -153,7 +177,6 @@ public static class LocalizationFontManager
                 }
                 catch
                 {
-                    // Try the next style / family combination.
                 }
             }
         }
@@ -202,25 +225,61 @@ public static class LocalizationFontManager
 
     static void ApplyGlobalFallbacks()
     {
-        if (uiFontAsset != null)
-            TMP_Settings.defaultFontAsset = uiFontAsset;
-        else if (TMP_Settings.defaultFontAsset == null && resourceFallbackFontAsset != null)
-            TMP_Settings.defaultFontAsset = resourceFallbackFontAsset;
+        TMP_FontAsset defaultFont = GetPrimaryFontForLanguage(LocalizationManager.CurrentLanguage);
+        if (defaultFont == null)
+            defaultFont = resourceFallbackFontAsset ?? TMP_Settings.defaultFontAsset;
 
-        TMP_FontAsset defaultFont = TMP_Settings.defaultFontAsset;
-        AttachFallbackChain(defaultFont);
-
-        AddFallbacksToTmpSettings();
-    }
-
-    static void AddFallbacksToTmpSettings()
-    {
-        if (fallbackAssets.Count == 0)
-            return;
+        if (defaultFont != null)
+        {
+            TMP_Settings.defaultFontAsset = defaultFont;
+            AttachFallbackChain(defaultFont);
+        }
 
         for (int i = 0; i < fallbackAssets.Count; i++)
-        {
             AddFallbackToSettings(fallbackAssets[i]);
-        }
+    }
+
+    static string[] GetPrimaryUiFontNames()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        return new[] { "sans-serif", "sans-serif-medium", "Roboto", "Droid Sans", "Noto Sans" };
+#elif UNITY_IOS && !UNITY_EDITOR
+        return new[] { "Arial Unicode MS", "Helvetica Neue", "Helvetica" };
+#else
+        return new[] { "Segoe UI", "Arial", "Liberation Sans" };
+#endif
+    }
+
+    static string[] GetKoreanFontNames()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        return new[] { "Noto Sans CJK KR", "Noto Sans KR", "SamsungOneKorean", "sans-serif" };
+#elif UNITY_IOS && !UNITY_EDITOR
+        return new[] { "Apple SD Gothic Neo", "Arial Unicode MS" };
+#else
+        return new[] { "Malgun Gothic", "Arial Unicode MS", "Segoe UI Symbol" };
+#endif
+    }
+
+    static string[] GetJapaneseFontNames()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        return new[] { "Noto Sans CJK JP", "Noto Sans JP", "Droid Sans Japanese", "sans-serif" };
+#elif UNITY_IOS && !UNITY_EDITOR
+        return new[] { "Hiragino Sans", "Arial Unicode MS" };
+#else
+        return new[] { "Yu Gothic UI", "Yu Gothic", "MS Gothic", "Arial Unicode MS" };
+#endif
+    }
+
+    static string[] GetCyrillicFontNames()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        return new[] { "sans-serif", "Roboto", "Droid Sans" };
+#elif UNITY_IOS && !UNITY_EDITOR
+        return new[] { "Arial Unicode MS", "Helvetica Neue" };
+#else
+        return new[] { "Segoe UI", "Arial", "Tahoma" };
+#endif
     }
 }

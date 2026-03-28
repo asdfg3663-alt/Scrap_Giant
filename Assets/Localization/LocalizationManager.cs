@@ -102,10 +102,10 @@ public class LocalizationManager : MonoBehaviour
     {
         return language switch
         {
-            GameLanguage.Korean => Get("language.korean", "한국어"),
-            GameLanguage.Japanese => Get("language.japanese", "日本語"),
-            GameLanguage.Spanish => Get("language.spanish", "Español"),
-            GameLanguage.Russian => Get("language.russian", "Русский"),
+            GameLanguage.Korean => Get("language.korean", "\uD55C\uAD6D\uC5B4"),
+            GameLanguage.Japanese => Get("language.japanese", "\u65E5\u672C\u8A9E"),
+            GameLanguage.Spanish => Get("language.spanish", "Espa\u00F1ol"),
+            GameLanguage.Russian => Get("language.russian", "\u0420\u0443\u0441\u0441\u043A\u0438\u0439"),
             _ => Get("language.english", "English")
         };
     }

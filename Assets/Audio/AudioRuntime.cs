@@ -7,6 +7,13 @@ using UnityEngine.Networking;
 [DisallowMultipleComponent]
 public sealed class AudioRuntime : MonoBehaviour
 {
+    static readonly string[] KnownGameplayTrackFiles =
+    {
+        "hetyati-ufo-299350.mp3",
+        "jean-paul-v-a-quiet-night-aboard-the-space-shuttle-309567.mp3",
+        "ribhavagrawal-hans-zimmer-inspired-space-ambience-part01-no-copyright-495107.mp3"
+    };
+
     enum MusicMode
     {
         None,
@@ -289,7 +296,7 @@ public sealed class AudioRuntime : MonoBehaviour
 
     IEnumerator LoadAudioLibrary()
     {
-        string customSfxFolder = ResolveMediaDirectory("Audio", "SFX");
+        string customSfxFolder = ResolveLocalMediaDirectory("Audio", "SFX");
         string attachOverridePath = FindFirstAudioFile(customSfxFolder, "ModuleAttach");
         if (!string.IsNullOrWhiteSpace(attachOverridePath))
             yield return LoadClip(attachOverridePath, clip => moduleAttachClip = clip ?? moduleAttachClip);
@@ -304,21 +311,21 @@ public sealed class AudioRuntime : MonoBehaviour
             });
         }
 
-        yield return LoadClip(ResolveMediaFilePath("Title", "Title_BGM1.mp3"), clip => titleBgmClip = clip);
-        yield return LoadClip(ResolveMediaFilePath("module", "Engine", "engine sound.mp3"), clip =>
+        yield return LoadStreamingAssetsClip(clip => titleBgmClip = clip, "Title", "Title_BGM1.mp3");
+        yield return LoadStreamingAssetsClip(clip =>
         {
-            engineLoopClip = clip;
+            engineLoopClip = clip ?? engineLoopClip;
             if (engineLoopClip != null)
                 engineLoopClip.name = "EngineLoop";
-        });
-        yield return LoadClip(ResolveMediaFilePath("module", "Laser", "Laser Sound.mp3"), clip =>
+        }, "module", "Engine", "engine sound.mp3");
+        yield return LoadStreamingAssetsClip(clip =>
         {
-            laserLoopClip = clip;
+            laserLoopClip = clip ?? laserLoopClip;
             if (laserLoopClip != null)
                 laserLoopClip.name = "LaserLoop";
-        });
+        }, "module", "Laser", "Laser Sound.mp3");
 
-        string soundtrackFolder = ResolveMediaDirectory("Sound Track");
+        string soundtrackFolder = ResolveLocalMediaDirectory("Sound Track");
         if (Directory.Exists(soundtrackFolder))
         {
             string[] playlistFiles = Directory.GetFiles(soundtrackFolder, "*.mp3", SearchOption.TopDirectoryOnly);
@@ -326,6 +333,17 @@ public sealed class AudioRuntime : MonoBehaviour
             {
                 AudioClip clip = null;
                 yield return LoadClip(playlistFiles[i], loaded => clip = loaded);
+                if (clip != null)
+                    gameplayPlaylist.Add(clip);
+            }
+        }
+        else
+        {
+            for (int i = 0; i < KnownGameplayTrackFiles.Length; i++)
+            {
+                string trackFile = KnownGameplayTrackFiles[i];
+                AudioClip clip = null;
+                yield return LoadStreamingAssetsClip(loaded => clip = loaded, "Sound Track", trackFile);
                 if (clip != null)
                     gameplayPlaylist.Add(clip);
             }
@@ -376,6 +394,37 @@ public sealed class AudioRuntime : MonoBehaviour
         onLoaded?.Invoke(clip);
     }
 
+    IEnumerator LoadStreamingAssetsClip(System.Action<AudioClip> onLoaded, params string[] relativeSegments)
+    {
+        string uri = BuildStreamingAssetsUri(relativeSegments);
+        yield return LoadClipFromUri(uri, GetClipName(relativeSegments), onLoaded);
+    }
+
+    IEnumerator LoadClipFromUri(string clipUri, string clipName, System.Action<AudioClip> onLoaded)
+    {
+        if (string.IsNullOrWhiteSpace(clipUri))
+        {
+            onLoaded?.Invoke(null);
+            yield break;
+        }
+
+        using UnityWebRequest request = UnityWebRequestMultimedia.GetAudioClip(clipUri, GuessAudioType(clipUri));
+        yield return request.SendWebRequest();
+
+        if (request.result != UnityWebRequest.Result.Success)
+        {
+            Debug.LogWarning($"Failed to load audio clip: {clipUri} ({request.error})");
+            onLoaded?.Invoke(null);
+            yield break;
+        }
+
+        AudioClip clip = DownloadHandlerAudioClip.GetContent(request);
+        if (clip != null && !string.IsNullOrWhiteSpace(clipName))
+            clip.name = clipName;
+
+        onLoaded?.Invoke(clip);
+    }
+
     static AudioType GuessAudioType(string filePath)
     {
         string ext = Path.GetExtension(filePath).ToLowerInvariant();
@@ -387,7 +436,7 @@ public sealed class AudioRuntime : MonoBehaviour
         };
     }
 
-    static string ResolveMediaDirectory(params string[] relativeSegments)
+    static string ResolveLocalMediaDirectory(params string[] relativeSegments)
     {
         string relativePath = Path.Combine(relativeSegments);
 
@@ -402,24 +451,57 @@ public sealed class AudioRuntime : MonoBehaviour
         return streamingAssetsPath;
     }
 
-    static string ResolveMediaFilePath(params string[] relativeSegments)
+    static string BuildStreamingAssetsUri(params string[] relativeSegments)
     {
-        string relativePath = Path.Combine(relativeSegments);
+        string basePath = Application.streamingAssetsPath.TrimEnd('/', '\\');
+        if (basePath.Contains("://"))
+        {
+            string relativeUri = string.Join("/", EncodeUriSegments(relativeSegments));
+            return string.IsNullOrWhiteSpace(relativeUri) ? basePath : $"{basePath}/{relativeUri}";
+        }
 
-        string streamingAssetsPath = Path.Combine(Application.streamingAssetsPath, relativePath);
-        if (File.Exists(streamingAssetsPath))
-            return streamingAssetsPath;
+        string fullPath = basePath;
+        if (relativeSegments != null)
+        {
+            for (int i = 0; i < relativeSegments.Length; i++)
+            {
+                string segment = relativeSegments[i];
+                if (string.IsNullOrWhiteSpace(segment))
+                    continue;
 
-        string projectAssetsPath = Path.Combine(Application.dataPath, relativePath);
-        if (File.Exists(projectAssetsPath))
-            return projectAssetsPath;
+                fullPath = Path.Combine(fullPath, segment);
+            }
+        }
 
-        return streamingAssetsPath;
+        return ToFileUri(fullPath);
     }
 
     static string ToFileUri(string filePath)
     {
         return new System.Uri(filePath).AbsoluteUri;
+    }
+
+    static IEnumerable<string> EncodeUriSegments(string[] relativeSegments)
+    {
+        if (relativeSegments == null)
+            yield break;
+
+        for (int i = 0; i < relativeSegments.Length; i++)
+        {
+            string segment = relativeSegments[i];
+            if (string.IsNullOrWhiteSpace(segment))
+                continue;
+
+            yield return UnityWebRequest.EscapeURL(segment.Trim('/', '\\'));
+        }
+    }
+
+    static string GetClipName(string[] relativeSegments)
+    {
+        if (relativeSegments == null || relativeSegments.Length == 0)
+            return string.Empty;
+
+        return Path.GetFileNameWithoutExtension(relativeSegments[relativeSegments.Length - 1]);
     }
 
     AudioClip CreateAttachThunkClip()

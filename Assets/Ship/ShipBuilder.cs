@@ -109,7 +109,7 @@ public class ShipBuilder : MonoBehaviour
         if (GameRuntimeState.GameplayBlocked)
             return;
 
-        pointerWorldNow = MouseWorld();
+        pointerWorldNow = ScreenToWorld(MouseScreen());
 
         HandlePointer();
         if (isDragging)
@@ -124,11 +124,12 @@ public class ShipBuilder : MonoBehaviour
 
         if (down)
         {
+            pointerWorldNow = ScreenToWorld(activePointerScreen);
             pointerDown = true;
             pressT = 0f;
             pressWorld = pointerWorldNow;
 
-            draggingTf = TryPickModule(pointerWorldNow);
+            draggingTf = TryPickModule(pointerWorldNow, activeTouchPointerId);
             draggingMod = draggingTf ? draggingTf.GetComponent<Module>() : null;
             draggingCol = draggingTf ? draggingTf.GetComponentInChildren<Collider2D>() : null;
 
@@ -145,6 +146,7 @@ public class ShipBuilder : MonoBehaviour
 
         if (pointerDown && held)
         {
+            pointerWorldNow = ScreenToWorld(activePointerScreen);
             pressT += Time.deltaTime;
 
             if (!isDragging && draggingTf)
@@ -169,6 +171,7 @@ public class ShipBuilder : MonoBehaviour
 
         if (pointerDown && up)
         {
+            pointerWorldNow = ScreenToWorld(activePointerScreen);
             bool dropped = false;
             if (isDragging)
             {
@@ -578,10 +581,16 @@ public class ShipBuilder : MonoBehaviour
     // Picking / Overlap
     // =========================
 
-    Transform TryPickModule(Vector2 world)
+    Transform TryPickModule(Vector2 world, int pointerId = int.MinValue)
     {
-        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
-            return null;
+        if (EventSystem.current != null)
+        {
+            bool pointerOverUi = pointerId != int.MinValue
+                ? EventSystem.current.IsPointerOverGameObject(pointerId)
+                : EventSystem.current.IsPointerOverGameObject();
+            if (pointerOverUi)
+                return null;
+        }
 
         var hits = Physics2D.OverlapPointAll(world, pickMask);
         if (hits == null || hits.Length == 0) return null;
@@ -721,7 +730,16 @@ bool IsOccupied(Vector2Int grid) => occupied.ContainsKey(grid);
     Vector2 MouseWorld()
     {
         Vector2 screen = MouseScreen();
-        return cam.ScreenToWorldPoint(screen);
+        return ScreenToWorld(screen);
+    }
+
+    Vector2 ScreenToWorld(Vector2 screen)
+    {
+        if (cam == null)
+            return screen;
+
+        Vector3 world = cam.ScreenToWorldPoint(screen);
+        return new Vector2(world.x, world.y);
     }
 
     Vector2 MouseScreen()
