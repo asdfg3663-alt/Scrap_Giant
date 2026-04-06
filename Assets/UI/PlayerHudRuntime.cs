@@ -920,23 +920,36 @@ public class PlayerHudRuntime : MonoBehaviour
         Stretch(mobileControlsRoot, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
         RectTransform touchpadRoot = CreateRect("Touchpad", mobileControlsRoot);
-        SetAnchored(touchpadRoot, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(36f, 36f), new Vector2(220f, 220f));
+        SetAnchored(touchpadRoot, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(36f, 36f), new Vector2(330f, 330f));
         Image touchpadBg = touchpadRoot.gameObject.AddComponent<Image>();
         touchpadBg.sprite = GetCircleSprite();
         touchpadBg.type = Image.Type.Simple;
-        touchpadBg.color = new Color(0.07f, 0.12f, 0.16f, 0.42f);
+        touchpadBg.color = new Color(0.05f, 0.09f, 0.13f, 0.52f);
         touchpadBg.raycastTarget = true;
+
+        CreateTouchpadZone(touchpadRoot, "ForwardZone", 0f, 50f, new Color(0.22f, 0.9f, 0.62f, 0.34f));
+        CreateTouchpadZone(touchpadRoot, "RightTurnZone", 90f, 130f, new Color(0.38f, 0.72f, 1f, 0.22f));
+        CreateTouchpadZone(touchpadRoot, "ReverseZone", 180f, 50f, new Color(1f, 0.34f, 0.34f, 0.32f));
+        CreateTouchpadZone(touchpadRoot, "LeftTurnZone", 270f, 130f, new Color(0.38f, 0.72f, 1f, 0.22f));
 
         RectTransform touchpadRing = CreateRect("Ring", touchpadRoot);
         Stretch(touchpadRing, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), Vector2.zero, Vector2.zero);
         Image ringImage = touchpadRing.gameObject.AddComponent<Image>();
         ringImage.sprite = GetCircleSprite();
         ringImage.type = Image.Type.Simple;
-        ringImage.color = new Color(0.24f, 0.43f, 0.56f, 0.22f);
+        ringImage.color = new Color(0.5f, 0.76f, 0.92f, 0.16f);
         ringImage.raycastTarget = false;
 
+        RectTransform touchpadCore = CreateRect("Core", touchpadRoot);
+        Stretch(touchpadCore, new Vector2(0.34f, 0.34f), new Vector2(0.66f, 0.66f), Vector2.zero, Vector2.zero);
+        Image coreImage = touchpadCore.gameObject.AddComponent<Image>();
+        coreImage.sprite = GetCircleSprite();
+        coreImage.type = Image.Type.Simple;
+        coreImage.color = new Color(0.1f, 0.16f, 0.2f, 0.86f);
+        coreImage.raycastTarget = false;
+
         RectTransform thumb = CreateRect("Thumb", touchpadRoot);
-        SetAnchored(thumb, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(82f, 82f));
+        SetAnchored(thumb, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(123f, 123f));
         Image thumbImage = thumb.gameObject.AddComponent<Image>();
         thumbImage.sprite = GetCircleSprite();
         thumbImage.type = Image.Type.Simple;
@@ -945,8 +958,8 @@ public class PlayerHudRuntime : MonoBehaviour
 
         MobileTouchpadControl touchpadControl = touchpadRoot.gameObject.AddComponent<MobileTouchpadControl>();
         touchpadControl.thumb = thumb;
-        touchpadControl.maxInputRadius = 82f;
-        touchpadControl.thumbTravelRadius = 58f;
+        touchpadControl.maxInputRadius = 123f;
+        touchpadControl.thumbTravelRadius = 87f;
         touchpadControl.deadZone = 0.12f;
 
         RectTransform fireButtonRoot = CreateRect("FireButton", mobileControlsRoot);
@@ -969,6 +982,25 @@ public class PlayerHudRuntime : MonoBehaviour
         fireButtonControl.targetImage = fireButtonImage;
         fireButtonControl.normalColor = new Color(0.78f, 0.18f, 0.18f, 0.72f);
         fireButtonControl.pressedColor = new Color(1f, 0.16f, 0.16f, 1f);
+    }
+
+    void CreateTouchpadZone(RectTransform parent, string name, float centerAngle, float arcDegrees, Color color)
+    {
+        RectTransform zone = CreateRect(name, parent);
+        Stretch(zone, new Vector2(0.05f, 0.05f), new Vector2(0.95f, 0.95f), Vector2.zero, Vector2.zero);
+
+        Image zoneImage = zone.gameObject.AddComponent<Image>();
+        zoneImage.sprite = GetCircleSprite();
+        zoneImage.type = Image.Type.Filled;
+        zoneImage.fillMethod = Image.FillMethod.Radial360;
+        zoneImage.fillOrigin = (int)Image.Origin360.Top;
+        zoneImage.fillAmount = Mathf.Clamp01(arcDegrees / 360f);
+        zoneImage.fillClockwise = true;
+        zoneImage.color = color;
+        zoneImage.raycastTarget = false;
+
+        float startAngle = centerAngle - arcDegrees * 0.5f;
+        zone.localRotation = Quaternion.Euler(0f, 0f, -startAngle);
     }
 
     bool ShouldShowMobileControls()
