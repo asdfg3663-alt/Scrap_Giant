@@ -22,6 +22,7 @@ public sealed class SavedGameData
     public float score;
     public float scrap;
     public int ammo;
+    public int assemblyPriorityMode;
     public float energyCurrent;
     public float fuelCurrent;
     public float playerPosX;
@@ -156,6 +157,7 @@ public static class GameSaveSystem
             score = Mathf.Max(0f, playerShip.totalScore),
             scrap = hud.GetResourceValue("scrap"),
             ammo = hud.GetAmmoAmount("ammo"),
+            assemblyPriorityMode = (int)playerShip.CurrentAssemblyPriorityMode,
             energyCurrent = playerShip.energyCurrent,
             fuelCurrent = playerShip.fuelCurrent,
             playerPosX = playerShip.transform.position.x,
@@ -266,6 +268,10 @@ public static class GameSaveSystem
         }
 
         playerShip.Rebuild();
+        playerShip.SetAssemblyPriorityMode((AssemblyPriorityMode)Mathf.Clamp(
+            data.assemblyPriorityMode,
+            (int)AssemblyPriorityMode.FuelFirst,
+            (int)AssemblyPriorityMode.AmmoFirst));
         playerShip.energyCurrent = Mathf.Clamp(data.energyCurrent, 0f, playerShip.energyMax);
         playerShip.fuelCurrent = Mathf.Clamp(data.fuelCurrent, 0f, playerShip.fuelMax);
         playerShip.RefreshHudNow();

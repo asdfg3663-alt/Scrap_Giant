@@ -95,11 +95,21 @@
     { "key": "assembly.low_fuel_need_scrap", "en": "Low fuel: need Scrap", "ko": "연료 부족: 스크랩 필요", "ja": "燃料不足: スクラップが必要", "es": "Poco combustible: necesitas chatarra", "ru": "Мало топлива: нужен лом" },
     { "key": "assembly.fuel_active", "en": "Fuel synthesis active", "ko": "연료 생산 중", "ja": "燃料生成中", "es": "Síntesis de combustible activa", "ru": "Синтез топлива активен" },
     { "key": "assembly.fuel_ready", "en": "Fuel synthesis ready", "ko": "연료 생산 준비 완료", "ja": "燃料生成準備完了", "es": "Síntesis de combustible lista", "ru": "Синтез топлива готов" },
+    { "key": "assembly.ammo_active", "en": "Ammo production active", "ko": "탄약 생산 중", "ja": "弾薬生産中", "es": "Producción de munición activa", "ru": "Производство боеприпасов активно" },
+    { "key": "assembly.ammo_ready", "en": "Ammo reserve ready", "ko": "탄약 비축 준비 완료", "ja": "弾薬備蓄準備完了", "es": "Reserva de munición lista", "ru": "Запас боеприпасов готов" },
     { "key": "assembly.install_repair_module", "en": "Install repair module", "ko": "수리 모듈 설치 필요", "ja": "修理モジュールを設置", "es": "Instala un módulo de reparación", "ru": "Установите ремонтный модуль" },
     { "key": "assembly.need_scrap", "en": "Need Scrap", "ko": "스크랩 필요", "ja": "スクラップが必要", "es": "Necesitas chatarra", "ru": "Нужен лом" },
     { "key": "assembly.scrap_to_fuel", "en": "1 Scrap -> {0} Fuel", "ko": "스크랩 1 -> 연료 {0}", "ja": "スクラップ 1 -> 燃料 {0}", "es": "1 chatarra -> {0} combustible", "ru": "1 лом -> {0} топлива" },
+    { "key": "assembly.scrap_to_ammo", "en": "1 Scrap -> {0} Ammo", "ko": "스크랩 1 -> 탄약 {0}", "ja": "スクラップ 1 -> 弾薬 {0}", "es": "1 chatarra -> {0} munición", "ru": "1 лом -> {0} боеприпасов" },
     { "key": "assembly.fuel_rate", "en": "{0} fuel/sec", "ko": "초당 연료 {0}", "ja": "毎秒燃料 {0}", "es": "{0} combustible/s", "ru": "{0} топлива/с" },
+    { "key": "assembly.ammo_status", "en": "Ammo {0} / {1}", "ko": "탄약 {0} / {1}", "ja": "弾薬 {0} / {1}", "es": "Munición {0} / {1}", "ru": "Боезапас {0} / {1}" },
+    { "key": "assembly.mode.fuel", "en": "Fuel First", "ko": "연료생산 우선", "ja": "燃料優先", "es": "Combustible primero", "ru": "Топливо в приоритете" },
+    { "key": "assembly.mode.repair", "en": "Repair First", "ko": "수리 우선", "ja": "修理優先", "es": "Reparación primero", "ru": "Ремонт в приоритете" },
+    { "key": "assembly.mode.ammo", "en": "Ammo First", "ko": "탄약생산 우선", "ja": "弾薬優先", "es": "Munición primero", "ru": "Боеприпасы в приоритете" },
     { "key": "assembly.complete_percent", "en": "{0:0}% complete", "ko": "{0:0}% 완료", "ja": "{0:0}% 完了", "es": "{0:0}% completado", "ru": "{0:0}% завершено" },
+    { "key": "ui.production_mode", "en": "PRODUCTION PRIORITY", "ko": "생산 우선순위", "ja": "生産優先順位", "es": "PRIORIDAD DE PRODUCCIÓN", "ru": "ПРИОРИТЕТ ПРОИЗВОДСТВА" },
+    { "key": "ui.quit", "en": "Quit", "ko": "종료", "ja": "終了", "es": "Salir", "ru": "Выход" },
+    { "key": "warning.ship_unbalanced", "en": "Ship is imbalanced", "ko": "함선이 불균형합니다", "ja": "艦が不安定です", "es": "La nave está desequilibrada", "ru": "Корабль разбалансирован" },
     { "key": "warning.overheat_modules", "en": "[Modules are overheating and losing efficiency. (Radiator needed)]", "ko": "[\ubaa8\ub4c8\uc774 \uacfc\uc5f4\ub418\uc5b4 \ud6a8\uc728\uc774 \uc800\ud558\ub429\ub2c8\ub2e4. (\ub77c\ub514\uc5d0\uc774\ud130 \ud544\uc694)]", "ja": "[\u30e2\u30b8\u30e5\u30fc\u30eb\u304c\u904e\u71b1\u3057\u3001\u52b9\u7387\u304c\u4f4e\u4e0b\u3057\u3066\u3044\u307e\u3059\u3002 (\u30e9\u30b8\u30a8\u30fc\u30bf\u30fc\u304c\u5fc5\u8981)]", "es": "[Los modulos se estan sobrecalentando y pierden eficiencia. (Se necesita radiador)]", "ru": "[\u041c\u043e\u0434\u0443\u043b\u0438 \u043f\u0435\u0440\u0435\u0433\u0440\u0435\u0442\u044b \u0438 \u0442\u0435\u0440\u044f\u044e\u0442 \u044d\u0444\u0444\u0435\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c. (\u041d\u0443\u0436\u0435\u043d \u0440\u0430\u0434\u0438\u0430\u0442\u043e\u0440)]" }
   ]
 }

@@ -1,9 +1,17 @@
 using UnityEngine;
 using System.Collections.Generic;
 
+public enum AssemblyPriorityMode
+{
+    FuelFirst,
+    RepairFirst,
+    AmmoFirst
+}
+
 public class ShipStats : MonoBehaviour
 {
     static readonly Color FuelColor = new Color(0.38f, 0.85f, 0.95f, 1f);
+    static readonly Color AmmoColor = new Color(0.96f, 0.32f, 0.24f, 1f);
     const float BaseHeatDissipationPerSecond = 1f;
     const float PowerPlantCriticalHeatThreshold = 0.96f;
     const float PowerPlantOverheatDamagePerSecond = 0.1f;
@@ -45,6 +53,13 @@ public class ShipStats : MonoBehaviour
     public float totalRepairPerSecond;
     public float repairScrapCostPerHp = 0.1f;
 
+    [Header("Assembly Automation")]
+    public AssemblyPriorityMode assemblyPriorityMode = AssemblyPriorityMode.FuelFirst;
+    public float ammoSynthesisPerSec = 8f;
+    public float ammoPerScrap = 12f;
+    public int baseAmmoReserveTarget = 120;
+    public int ammoReservePerWeapon = 40;
+
     [Header("Combat (MVP)")]
     public float totalDps;
     public float weaponPowerPerSecPotential;
@@ -54,6 +69,7 @@ public class ShipStats : MonoBehaviour
     ModuleInstance[] modules;
     bool rebuildQueued;
     float synthesisScrapProgress;
+    float ammoSynthesisScrapProgress;
     bool fuelSynthesisActive;
     bool hasInitializedFuelReserve;
     bool weaponBatteryLocked;
@@ -66,6 +82,8 @@ public class ShipStats : MonoBehaviour
         Vector2Int.left,
         Vector2Int.right
     };
+
+    public AssemblyPriorityMode CurrentAssemblyPriorityMode => assemblyPriorityMode;
 
     void Awake()
     {
@@ -120,6 +138,11 @@ public class ShipStats : MonoBehaviour
     public void ScheduleRebuild()
     {
         rebuildQueued = true;
+    }
+
+    public void SetAssemblyPriorityMode(AssemblyPriorityMode mode)
+    {
+        assemblyPriorityMode = mode;
     }
 
     public void Rebuild()
@@ -194,6 +217,7 @@ public class ShipStats : MonoBehaviour
             fuelCurrent = Mathf.Clamp(previousFuelCurrent, 0f, fuelMax);
         }
         synthesisScrapProgress = Mathf.Clamp(synthesisScrapProgress, 0f, 1f);
+        ammoSynthesisScrapProgress = Mathf.Clamp(ammoSynthesisScrapProgress, 0f, 1f);
 
         if (fuelMax <= 0f)
             fuelSynthesisActive = false;
@@ -466,96 +490,186 @@ public class ShipStats : MonoBehaviour
         return count;
     }
 
+    public int GetDesiredAmmoReserve()
+    {
+        return Mathf.Max(0, baseAmmoReserveTarget + GetOperationalWeaponCount() * ammoReservePerWeapon);
+    }
+
     public string GetFuelAssemblyPrimaryText()
     {
+        var hud = PlayerHudRuntime.Instance;
         ModuleInstance repairTarget = GetNextRepairTarget();
-        if (repairTarget != null)
-        {
-            if (totalRepairPerSecond > 0f)
-                return LocalizationManager.Format("assembly.repairing", "Repairing {0}", repairTarget.DisplayName);
+        bool fuelWanted = WantsFuelSynthesis(hud);
+        bool ammoWanted = WantsAmmoProduction(hud);
 
-            return LocalizationManager.Format("assembly.repair_queued", "Repair queued: {0}", repairTarget.DisplayName);
+        switch (assemblyPriorityMode)
+        {
+            case AssemblyPriorityMode.RepairFirst:
+                if (repairTarget != null)
+                {
+                    if (totalRepairPerSecond > 0f)
+                        return LocalizationManager.Format("assembly.repairing", "Repairing {0}", repairTarget.DisplayName);
+
+                    return LocalizationManager.Format("assembly.repair_queued", "Repair queued: {0}", repairTarget.DisplayName);
+                }
+
+                if (fuelWanted)
+                    return GetFuelStatusPrimaryText(hud);
+
+                if (ammoWanted)
+                    return GetAmmoStatusPrimaryText(hud);
+                break;
+
+            case AssemblyPriorityMode.AmmoFirst:
+                if (ammoWanted)
+                    return GetAmmoStatusPrimaryText(hud);
+
+                if (fuelWanted)
+                    return GetFuelStatusPrimaryText(hud);
+
+                if (repairTarget != null)
+                {
+                    if (totalRepairPerSecond > 0f)
+                        return LocalizationManager.Format("assembly.repairing", "Repairing {0}", repairTarget.DisplayName);
+
+                    return LocalizationManager.Format("assembly.repair_queued", "Repair queued: {0}", repairTarget.DisplayName);
+                }
+                break;
+
+            default:
+                if (fuelWanted)
+                    return GetFuelStatusPrimaryText(hud);
+
+                if (repairTarget != null)
+                {
+                    if (totalRepairPerSecond > 0f)
+                        return LocalizationManager.Format("assembly.repairing", "Repairing {0}", repairTarget.DisplayName);
+
+                    return LocalizationManager.Format("assembly.repair_queued", "Repair queued: {0}", repairTarget.DisplayName);
+                }
+
+                if (ammoWanted)
+                    return GetAmmoStatusPrimaryText(hud);
+                break;
         }
 
         if (!HasFuelSystem())
             return LocalizationManager.Get("assembly.install_fuel_tank", "Install a fuel tank");
 
-        if (fuelSynthesisActive && fuelCurrent < fuelMax)
-        {
-            var hud = PlayerHudRuntime.Instance;
-            if (hud == null || !hud.HasResource("scrap", 1f))
-                return LocalizationManager.Get("assembly.low_fuel_need_scrap", "Low fuel: need Scrap");
+        if (repairTarget != null && totalRepairPerSecond <= 0f)
+            return LocalizationManager.Get("assembly.install_repair_module", "Install repair module");
 
-            return LocalizationManager.Get("assembly.fuel_active", "Fuel synthesis active");
-        }
+        if (ammoWanted)
+            return LocalizationManager.Get("assembly.ammo_ready", "Ammo reserve ready");
 
         return LocalizationManager.Get("assembly.fuel_ready", "Fuel synthesis ready");
     }
 
     public string GetFuelAssemblySecondaryText()
     {
+        var hud = PlayerHudRuntime.Instance;
         ModuleInstance repairTarget = GetNextRepairTarget();
-        if (repairTarget != null)
+        bool fuelWanted = WantsFuelSynthesis(hud);
+        bool ammoWanted = WantsAmmoProduction(hud);
+
+        switch (assemblyPriorityMode)
         {
-            var hud = PlayerHudRuntime.Instance;
-            if (totalRepairPerSecond <= 0f)
-                return LocalizationManager.Get("assembly.install_repair_module", "Install repair module");
+            case AssemblyPriorityMode.RepairFirst:
+                if (repairTarget != null)
+                {
+                    if (totalRepairPerSecond <= 0f)
+                        return LocalizationManager.Get("assembly.install_repair_module", "Install repair module");
 
-            if (hud == null || !hud.HasResource("scrap", repairScrapCostPerHp))
-                return LocalizationManager.Get("assembly.need_scrap", "Need Scrap");
+                    if (hud == null || !hud.HasResource("scrap", repairScrapCostPerHp))
+                        return LocalizationManager.Get("assembly.need_scrap", "Need Scrap");
 
-            float repairHp = Mathf.Clamp(repairTarget.hp + repairTarget.repairProgress, 0f, repairTarget.maxHp);
-            return LocalizationManager.Format("info.hp", "HP: {0} / {1}", repairHp.ToString("0.#"), repairTarget.maxHp);
-        }
+                    float repairHp = Mathf.Clamp(repairTarget.hp + repairTarget.repairProgress, 0f, repairTarget.maxHp);
+                    return LocalizationManager.Format("info.hp", "HP: {0} / {1}", repairHp.ToString("0.#"), repairTarget.maxHp);
+                }
 
-        if (!HasFuelSystem())
-            return string.Empty;
+                if (fuelWanted)
+                    return GetFuelStatusSecondaryText(hud);
 
-        if (fuelSynthesisActive && fuelCurrent < fuelMax)
-        {
-            var hud = PlayerHudRuntime.Instance;
-            float fuelPerScrap = WorldSpawnDirector.GetFuelPerScrap();
-            if (hud == null || !hud.HasResource("scrap", 1f))
-                return LocalizationManager.Format("assembly.scrap_to_fuel", "1 Scrap -> {0} Fuel", fuelPerScrap.ToString("0.#"));
+                if (ammoWanted)
+                    return GetAmmoStatusSecondaryText(hud);
+                break;
 
-            return LocalizationManager.Format("assembly.fuel_rate", "{0} fuel/sec", fuelSynthesisPerSec.ToString("0.#"));
+            case AssemblyPriorityMode.AmmoFirst:
+                if (ammoWanted)
+                    return GetAmmoStatusSecondaryText(hud);
+
+                if (fuelWanted)
+                    return GetFuelStatusSecondaryText(hud);
+
+                if (repairTarget != null)
+                {
+                    if (totalRepairPerSecond <= 0f)
+                        return LocalizationManager.Get("assembly.install_repair_module", "Install repair module");
+
+                    if (hud == null || !hud.HasResource("scrap", repairScrapCostPerHp))
+                        return LocalizationManager.Get("assembly.need_scrap", "Need Scrap");
+
+                    float repairHp = Mathf.Clamp(repairTarget.hp + repairTarget.repairProgress, 0f, repairTarget.maxHp);
+                    return LocalizationManager.Format("info.hp", "HP: {0} / {1}", repairHp.ToString("0.#"), repairTarget.maxHp);
+                }
+                break;
+
+            default:
+                if (fuelWanted)
+                    return GetFuelStatusSecondaryText(hud);
+
+                if (repairTarget != null)
+                {
+                    if (totalRepairPerSecond <= 0f)
+                        return LocalizationManager.Get("assembly.install_repair_module", "Install repair module");
+
+                    if (hud == null || !hud.HasResource("scrap", repairScrapCostPerHp))
+                        return LocalizationManager.Get("assembly.need_scrap", "Need Scrap");
+
+                    float repairHp = Mathf.Clamp(repairTarget.hp + repairTarget.repairProgress, 0f, repairTarget.maxHp);
+                    return LocalizationManager.Format("info.hp", "HP: {0} / {1}", repairHp.ToString("0.#"), repairTarget.maxHp);
+                }
+
+                if (ammoWanted)
+                    return GetAmmoStatusSecondaryText(hud);
+                break;
         }
 
         return string.Empty;
     }
 
-    void UpdateFuelSynthesis(float deltaTime)
+    bool TryUpdateFuelSynthesis(float deltaTime)
     {
         if (!isPlayerShip || deltaTime <= 0f || fuelMax <= 0f || fuelSynthesisPerSec <= 0f)
-            return;
+            return false;
 
         if (!fuelSynthesisActive && fuelCurrent < fuelMax * lowFuelSynthesisThreshold)
             fuelSynthesisActive = true;
 
         if (!fuelSynthesisActive)
-            return;
+            return false;
 
         if (fuelCurrent >= fuelMax)
         {
             fuelSynthesisActive = false;
             synthesisScrapProgress = 0f;
-            return;
+            return false;
         }
 
         var hud = PlayerHudRuntime.Instance;
         if (hud == null)
-            return;
+            return false;
 
         float missingFuel = fuelMax - fuelCurrent;
         if (missingFuel <= 0f)
         {
             synthesisScrapProgress = 0f;
-            return;
+            return false;
         }
 
         int availableScrap = hud.GetResourceAmount("scrap");
         if (availableScrap <= 0)
-            return;
+            return false;
 
         float fuelPerScrap = WorldSpawnDirector.GetFuelPerScrap();
         synthesisScrapProgress = Mathf.Min(
@@ -564,22 +678,177 @@ public class ShipStats : MonoBehaviour
 
         int scrapToSpend = Mathf.Min(availableScrap, Mathf.FloorToInt(synthesisScrapProgress));
         if (scrapToSpend <= 0)
-            return;
+            return false;
 
         if (!hud.TryConsumeResource("scrap", scrapToSpend))
-            return;
+            return false;
 
         float fuelToAdd = Mathf.Min(missingFuel, scrapToSpend * fuelPerScrap);
         fuelCurrent = Mathf.Clamp(fuelCurrent + fuelToAdd, 0f, fuelMax);
         synthesisScrapProgress = Mathf.Max(0f, synthesisScrapProgress - scrapToSpend);
+        return fuelToAdd > 0f;
+    }
+
+    bool TryProduceAmmo(float deltaTime)
+    {
+        if (!isPlayerShip || deltaTime <= 0f || ammoPerScrap <= 0f || ammoSynthesisPerSec <= 0f)
+            return false;
+
+        var hud = PlayerHudRuntime.Instance;
+        if (!WantsAmmoProduction(hud) || hud == null)
+            return false;
+
+        int currentAmmo = hud.GetAmmoAmount("ammo");
+        int ammoTarget = GetDesiredAmmoReserve();
+        int missingAmmo = Mathf.Max(0, ammoTarget - currentAmmo);
+        if (missingAmmo <= 0)
+        {
+            ammoSynthesisScrapProgress = 0f;
+            return false;
+        }
+
+        int availableScrap = hud.GetResourceAmount("scrap");
+        if (availableScrap <= 0)
+            return false;
+
+        ammoSynthesisScrapProgress = Mathf.Min(
+            ammoSynthesisScrapProgress + (ammoSynthesisPerSec * deltaTime) / ammoPerScrap,
+            availableScrap);
+
+        int maxScrapNeeded = Mathf.Max(1, Mathf.CeilToInt(missingAmmo / ammoPerScrap));
+        int scrapToSpend = Mathf.Min(availableScrap, Mathf.FloorToInt(ammoSynthesisScrapProgress), maxScrapNeeded);
+        if (scrapToSpend <= 0)
+            return false;
+
+        if (!hud.TryConsumeResource("scrap", scrapToSpend))
+            return false;
+
+        int ammoToAdd = Mathf.Min(missingAmmo, Mathf.RoundToInt(scrapToSpend * ammoPerScrap));
+        if (ammoToAdd <= 0)
+            return false;
+
+        hud.SetAmmo(
+            "ammo",
+            LocalizationManager.Get("resource.ammo", "Ammo"),
+            currentAmmo + ammoToAdd,
+            AmmoColor);
+        ammoSynthesisScrapProgress = Mathf.Max(0f, ammoSynthesisScrapProgress - scrapToSpend);
+        return true;
+    }
+
+    bool WantsFuelSynthesis(PlayerHudRuntime hud)
+    {
+        if (!HasFuelSystem() || fuelSynthesisPerSec <= 0f || fuelCurrent >= fuelMax)
+            return false;
+
+        if (!fuelSynthesisActive && fuelCurrent < fuelMax * lowFuelSynthesisThreshold)
+            fuelSynthesisActive = true;
+
+        if (!fuelSynthesisActive)
+            return false;
+
+        return true;
+    }
+
+    bool WantsAmmoProduction(PlayerHudRuntime hud)
+    {
+        if (hud == null || ammoPerScrap <= 0f || ammoSynthesisPerSec <= 0f)
+            return false;
+
+        return hud.GetAmmoAmount("ammo") < GetDesiredAmmoReserve();
+    }
+
+    string GetFuelStatusSecondaryText(PlayerHudRuntime hud)
+    {
+        float fuelPerScrap = WorldSpawnDirector.GetFuelPerScrap();
+        if (hud == null || !hud.HasResource("scrap", 1f))
+            return LocalizationManager.Format("assembly.scrap_to_fuel", "1 Scrap -> {0} Fuel", fuelPerScrap.ToString("0.#"));
+
+        return LocalizationManager.Format("assembly.fuel_rate", "{0} fuel/sec", fuelSynthesisPerSec.ToString("0.#"));
+    }
+
+    string GetFuelStatusPrimaryText(PlayerHudRuntime hud)
+    {
+        if (hud == null || !hud.HasResource("scrap", 1f))
+            return LocalizationManager.Get("assembly.low_fuel_need_scrap", "Low fuel: need Scrap");
+
+        return LocalizationManager.Get("assembly.fuel_active", "Fuel synthesis active");
+    }
+
+    string GetAmmoStatusSecondaryText(PlayerHudRuntime hud)
+    {
+        int targetAmmo = GetDesiredAmmoReserve();
+        int currentAmmo = hud != null ? hud.GetAmmoAmount("ammo") : 0;
+        if (hud == null || !hud.HasResource("scrap", 1f))
+            return LocalizationManager.Format("assembly.scrap_to_ammo", "1 Scrap -> {0} Ammo", ammoPerScrap.ToString("0.#"));
+
+        return LocalizationManager.Format("assembly.ammo_status", "Ammo {0} / {1}", currentAmmo, targetAmmo);
+    }
+
+    string GetAmmoStatusPrimaryText(PlayerHudRuntime hud)
+    {
+        if (hud == null || !hud.HasResource("scrap", 1f))
+            return LocalizationManager.Get("assembly.need_scrap", "Need Scrap");
+
+        return LocalizationManager.Get("assembly.ammo_active", "Ammo production active");
+    }
+
+    int GetOperationalWeaponCount()
+    {
+        if (modules == null || modules.Length == 0)
+            modules = GetComponentsInChildren<ModuleInstance>(true);
+
+        int count = 0;
+        for (int i = 0; i < modules.Length; i++)
+        {
+            ModuleInstance module = modules[i];
+            if (module == null || module.data == null)
+                continue;
+
+            bool isWeapon =
+                module.data.type == ModuleType.Weapon ||
+                module.data.weaponType != WeaponType.None ||
+                module.data.dps > 0f;
+            if (!isWeapon)
+                continue;
+
+            if (!module.gameObject.activeInHierarchy || module.hp <= 0)
+                continue;
+
+            count++;
+        }
+
+        return count;
     }
 
     void ProcessAssemblyQueue(float deltaTime)
     {
-        if (TryProcessRepairQueue(deltaTime))
-            return;
+        switch (assemblyPriorityMode)
+        {
+            case AssemblyPriorityMode.RepairFirst:
+                if (TryProcessRepairQueue(deltaTime))
+                    return;
+                if (TryUpdateFuelSynthesis(deltaTime))
+                    return;
+                TryProduceAmmo(deltaTime);
+                return;
 
-        UpdateFuelSynthesis(deltaTime);
+            case AssemblyPriorityMode.AmmoFirst:
+                if (TryProduceAmmo(deltaTime))
+                    return;
+                if (TryUpdateFuelSynthesis(deltaTime))
+                    return;
+                TryProcessRepairQueue(deltaTime);
+                return;
+
+            default:
+                if (TryUpdateFuelSynthesis(deltaTime))
+                    return;
+                if (TryProcessRepairQueue(deltaTime))
+                    return;
+                TryProduceAmmo(deltaTime);
+                return;
+        }
     }
 
     void EnsureFallbackLaser()

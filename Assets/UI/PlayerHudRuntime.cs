@@ -92,9 +92,11 @@ public class PlayerHudRuntime : MonoBehaviour
     RectTransform inventoryPanel;
     RectTransform navigatorRoot;
     RectTransform mobileControlsRoot;
+    RectTransform productionModePanel;
 
     GameObject inventoryBody;
     GameObject inventoryEmptyState;
+    GameObject productionModeOptionsRoot;
 
     Image assemblyPreviewImage;
     TMP_Text statusTitleText;
@@ -102,6 +104,7 @@ public class PlayerHudRuntime : MonoBehaviour
     TMP_Text bestValueText;
     TMP_Text currentScoreText;
     TMP_Text overheatWarningText;
+    TMP_Text balanceWarningText;
     TMP_Text assemblyTitleText;
     TMP_Text assemblyPrimaryText;
     TMP_Text assemblySecondaryText;
@@ -113,6 +116,10 @@ public class PlayerHudRuntime : MonoBehaviour
     TMP_Text scrapNavigatorArrow;
     TMP_Text enemyNavigatorArrow;
     TMP_Text neutralModuleNavigatorArrow;
+    TMP_Text productionModeTitleText;
+    TMP_Text productionModeButtonText;
+    TMP_Text quitButtonLabel;
+    readonly List<TMP_Text> productionModeOptionLabels = new();
 
     [SerializeField] int inventoryCapacity = 2;
     int nextInventoryEntrySerial = 1;
@@ -126,6 +133,7 @@ public class PlayerHudRuntime : MonoBehaviour
     bool resourceUiDirty;
     bool ammoUiDirty;
     bool inventoryUiDirty;
+    bool productionModeOptionsVisible;
     float navigatorRadius = 72f;
 
     string assemblyPrimaryLabel = "Fuel synthesis ready";
@@ -292,6 +300,24 @@ public class PlayerHudRuntime : MonoBehaviour
         ammoUiDirty = true;
     }
 
+    public void AddAmmo(string id, string label, int amount, Color color)
+    {
+        if (string.IsNullOrWhiteSpace(id) || amount <= 0)
+            return;
+
+        var entry = FindResource(ammoEntries, id);
+        if (entry == null)
+            ammoEntries.Add(new ResourceEntry(id, string.IsNullOrWhiteSpace(label) ? LocalizationManager.Get("resource.ammo", "Ammo") : label, amount, color));
+        else
+        {
+            entry.label = string.IsNullOrWhiteSpace(label) ? entry.label : label;
+            entry.amount += amount;
+            entry.color = color;
+        }
+
+        ammoUiDirty = true;
+    }
+
     public void SetAssemblyState(bool active, string primary, string secondary, Sprite sprite = null)
     {
         assemblyActive = active;
@@ -447,6 +473,17 @@ public class PlayerHudRuntime : MonoBehaviour
         ApplyInventoryState();
     }
 
+    public void SetShipBalanceWarning(bool visible, string message)
+    {
+        if (balanceWarningText == null)
+            return;
+
+        balanceWarningText.text = visible
+            ? (string.IsNullOrWhiteSpace(message) ? LocalizationManager.Get("warning.ship_unbalanced", "Ship is imbalanced") : message)
+            : string.Empty;
+        balanceWarningText.gameObject.SetActive(visible);
+    }
+
     void Awake()
     {
         if (instance != null && instance != this)
@@ -553,8 +590,10 @@ public class PlayerHudRuntime : MonoBehaviour
 
         CreateTopHud();
         CreateInventoryPanel();
+        CreateProductionModePanel();
         CreateNavigatorOverlay();
         CreateMobileControls();
+        CreateQuitButton();
 
         hudBuilt = true;
         LocalizationFontManager.RefreshActiveTexts();
@@ -581,6 +620,20 @@ public class PlayerHudRuntime : MonoBehaviour
         SetAnchored(assemblyPanel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(360f, 0f), new Vector2(340f, 82f));
         CreateBackPlate(assemblyPanel, new Color(0.05f, 0.1f, 0.12f, 0.9f));
         BuildAssemblyPanel(assemblyPanel);
+
+        balanceWarningText = CreateLabel(
+            topRoot,
+            string.Empty,
+            14f,
+            new Color(1f, 0.74f, 0.24f, 1f),
+            TextAlignmentOptions.Center,
+            new Vector2(0f, -104f),
+            new Vector2(0.5f, 1f),
+            FontStyles.Bold);
+        balanceWarningText.textWrappingMode = TextWrappingModes.NoWrap;
+        balanceWarningText.overflowMode = TextOverflowModes.Ellipsis;
+        balanceWarningText.rectTransform.sizeDelta = new Vector2(560f, 24f);
+        balanceWarningText.gameObject.SetActive(false);
     }
 
     void BuildResourcePanel(RectTransform panel)
@@ -708,6 +761,146 @@ public class PlayerHudRuntime : MonoBehaviour
         ApplyInventoryState();
     }
 
+    void CreateProductionModePanel()
+    {
+        productionModePanel = CreateRect("ProductionModePanel", hudRoot);
+        SetAnchored(productionModePanel, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -562f), new Vector2(ExpandedInventoryWidth, 116f));
+        CreateBackPlate(productionModePanel, new Color(0.03f, 0.06f, 0.09f, 0.9f));
+
+        productionModeTitleText = CreateLabel(
+            productionModePanel,
+            LocalizationManager.Get("ui.production_mode", "PRODUCTION PRIORITY"),
+            15f,
+            new Color(0.78f, 0.88f, 0.93f, 1f),
+            TextAlignmentOptions.TopLeft,
+            new Vector2(18f, -12f),
+            new Vector2(0f, 1f),
+            FontStyles.Bold);
+
+        Button selectorButton = CreateHudButton(
+            productionModePanel,
+            "ModeSelector",
+            new Vector2(0.5f, 0f),
+            new Vector2(0.5f, 0f),
+            new Vector2(0.5f, 0f),
+            new Vector2(0f, 14f),
+            new Vector2(232f, 44f),
+            new Color(0.08f, 0.15f, 0.19f, 0.98f),
+            new Color(0.13f, 0.23f, 0.28f, 1f),
+            new Color(0.18f, 0.31f, 0.37f, 1f),
+            out productionModeButtonText);
+        selectorButton.onClick.AddListener(ToggleProductionModeOptions);
+
+        RectTransform optionsRect = CreateRect("ModeOptions", productionModePanel);
+        SetAnchored(optionsRect, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(232f, 150f));
+        CreateBackPlate(optionsRect, new Color(0.05f, 0.09f, 0.12f, 0.98f));
+        productionModeOptionsRoot = optionsRect.gameObject;
+        productionModeOptionsRoot.SetActive(false);
+
+        productionModeOptionLabels.Clear();
+        CreateProductionModeOption(optionsRect, new Vector2(0f, 104f), AssemblyPriorityMode.FuelFirst);
+        CreateProductionModeOption(optionsRect, new Vector2(0f, 56f), AssemblyPriorityMode.RepairFirst);
+        CreateProductionModeOption(optionsRect, new Vector2(0f, 8f), AssemblyPriorityMode.AmmoFirst);
+
+        RefreshProductionModeUi();
+        ApplyInventoryState();
+    }
+
+    void CreateProductionModeOption(RectTransform parent, Vector2 anchoredPosition, AssemblyPriorityMode mode)
+    {
+        Button optionButton = CreateHudButton(
+            parent,
+            mode.ToString(),
+            new Vector2(0.5f, 0f),
+            new Vector2(0.5f, 0f),
+            new Vector2(0.5f, 0f),
+            anchoredPosition,
+            new Vector2(208f, 40f),
+            new Color(0.07f, 0.13f, 0.17f, 0.98f),
+            new Color(0.12f, 0.22f, 0.27f, 1f),
+            new Color(0.18f, 0.3f, 0.36f, 1f),
+            out TMP_Text optionLabel);
+        optionButton.onClick.AddListener(() => SetProductionMode(mode));
+        productionModeOptionLabels.Add(optionLabel);
+    }
+
+    void ToggleProductionModeOptions()
+    {
+        productionModeOptionsVisible = !productionModeOptionsVisible;
+        if (productionModeOptionsRoot != null)
+            productionModeOptionsRoot.SetActive(productionModeOptionsVisible && inventoryExpanded);
+    }
+
+    void SetProductionMode(AssemblyPriorityMode mode)
+    {
+        if (trackedShip != null)
+            trackedShip.SetAssemblyPriorityMode(mode);
+
+        productionModeOptionsVisible = false;
+        if (productionModeOptionsRoot != null)
+            productionModeOptionsRoot.SetActive(false);
+
+        RefreshProductionModeUi();
+        RefreshAssemblyPanel();
+    }
+
+    void RefreshProductionModeUi()
+    {
+        if (productionModeButtonText != null)
+            productionModeButtonText.text = GetProductionModeLabel();
+
+        if (productionModeTitleText != null)
+            productionModeTitleText.text = LocalizationManager.Get("ui.production_mode", "PRODUCTION PRIORITY");
+
+        for (int i = 0; i < productionModeOptionLabels.Count; i++)
+        {
+            AssemblyPriorityMode mode = (AssemblyPriorityMode)i;
+            productionModeOptionLabels[i].text = GetProductionModeLabel(mode);
+        }
+    }
+
+    string GetProductionModeLabel()
+    {
+        AssemblyPriorityMode mode = trackedShip != null
+            ? trackedShip.CurrentAssemblyPriorityMode
+            : AssemblyPriorityMode.FuelFirst;
+        return GetProductionModeLabel(mode);
+    }
+
+    string GetProductionModeLabel(AssemblyPriorityMode mode)
+    {
+        return mode switch
+        {
+            AssemblyPriorityMode.RepairFirst => LocalizationManager.Get("assembly.mode.repair", "Repair First"),
+            AssemblyPriorityMode.AmmoFirst => LocalizationManager.Get("assembly.mode.ammo", "Ammo First"),
+            _ => LocalizationManager.Get("assembly.mode.fuel", "Fuel First")
+        };
+    }
+
+    void CreateQuitButton()
+    {
+        Button quitButton = CreateHudButton(
+            hudRoot,
+            "QuitButton",
+            new Vector2(1f, 1f),
+            new Vector2(1f, 1f),
+            new Vector2(1f, 1f),
+            new Vector2(-16f, -16f),
+            new Vector2(120f, 40f),
+            new Color(0.42f, 0.08f, 0.08f, 0.96f),
+            new Color(0.58f, 0.12f, 0.12f, 1f),
+            new Color(0.72f, 0.18f, 0.18f, 1f),
+            out quitButtonLabel);
+        quitButtonLabel.text = LocalizationManager.Get("ui.quit", "Quit");
+        quitButton.onClick.AddListener(QuitGame);
+    }
+
+    void QuitGame()
+    {
+        GameSaveSystem.SaveCurrentGame(force: true);
+        Application.Quit();
+    }
+
     void CreateNavigatorOverlay()
     {
         navigatorRoot = CreateRect("NavigatorOverlay", hudRoot);
@@ -804,6 +997,7 @@ public class PlayerHudRuntime : MonoBehaviour
         RefreshResourceRows();
         RefreshAmmoRows();
         RefreshInventoryRows();
+        RefreshProductionModeUi();
         RefreshNavigator();
     }
 
@@ -1041,6 +1235,11 @@ public class PlayerHudRuntime : MonoBehaviour
         if (inventoryDetailText != null && string.IsNullOrWhiteSpace(selectedInventoryEntryId))
             inventoryDetailText.text = LocalizationManager.Get("ui.inventory_empty", "Drag modules here.");
 
+        if (quitButtonLabel != null)
+            quitButtonLabel.text = LocalizationManager.Get("ui.quit", "Quit");
+
+        RefreshProductionModeUi();
+
         RefreshOverheatWarning();
 
         var scrapEntry = FindResource(resources, "scrap");
@@ -1212,6 +1411,11 @@ public class PlayerHudRuntime : MonoBehaviour
         if (inventoryBody != null) inventoryBody.SetActive(inventoryExpanded);
         if (inventoryCountText != null) inventoryCountText.gameObject.SetActive(inventoryExpanded);
         if (inventoryButtonText != null) inventoryButtonText.text = inventoryExpanded ? ">" : "<";
+        if (productionModePanel != null) productionModePanel.gameObject.SetActive(inventoryExpanded);
+        if (!inventoryExpanded)
+            productionModeOptionsVisible = false;
+        if (productionModeOptionsRoot != null)
+            productionModeOptionsRoot.SetActive(inventoryExpanded && productionModeOptionsVisible);
     }
 
     ResourceEntry FindResource(List<ResourceEntry> source, string id)
@@ -1371,6 +1575,40 @@ public class PlayerHudRuntime : MonoBehaviour
     void CreateBackPlate(RectTransform parent, Color color)
     {
         CreateImage(parent, color);
+    }
+
+    Button CreateHudButton(
+        Transform parent,
+        string name,
+        Vector2 anchorMin,
+        Vector2 anchorMax,
+        Vector2 pivot,
+        Vector2 anchoredPosition,
+        Vector2 size,
+        Color normalColor,
+        Color highlightedColor,
+        Color pressedColor,
+        out TMP_Text label)
+    {
+        RectTransform buttonRect = CreateRect(name, parent);
+        SetAnchored(buttonRect, anchorMin, anchorMax, pivot, anchoredPosition, size);
+        Image image = CreateImage(buttonRect, normalColor);
+        image.raycastTarget = true;
+
+        Button button = buttonRect.gameObject.AddComponent<Button>();
+        var colors = button.colors;
+        colors.normalColor = normalColor;
+        colors.highlightedColor = highlightedColor;
+        colors.pressedColor = pressedColor;
+        colors.selectedColor = highlightedColor;
+        colors.disabledColor = new Color(normalColor.r, normalColor.g, normalColor.b, normalColor.a * 0.45f);
+        button.colors = colors;
+
+        label = CreateLabel(buttonRect, string.Empty, 16f, Color.white, TextAlignmentOptions.Center, Vector2.zero, new Vector2(0.5f, 0.5f), FontStyles.Bold);
+        label.rectTransform.sizeDelta = size - new Vector2(16f, 8f);
+        label.overflowMode = TextOverflowModes.Ellipsis;
+        label.textWrappingMode = TextWrappingModes.NoWrap;
+        return button;
     }
 
     TMP_Text CreateLabel(Transform parent, string text, float fontSize, Color color, TextAlignmentOptions alignment, Vector2 anchoredPosition, Vector2 pivot, FontStyles style)

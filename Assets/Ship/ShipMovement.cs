@@ -38,6 +38,12 @@ public class ShipMovement : MonoBehaviour
     [Header("Rotation Limit (RPM)")]
     public float maxRPM = 30f;
 
+    [Header("Player SAS Balance Assist")]
+    public bool enablePlayerBalanceSas = true;
+    [Range(0.02f, 0.5f)] public float balanceAssistTolerance = 0.1f;
+    public float balanceAssistMaxTorque = 18f;
+    public float balanceAssistAngularDamping = 3.5f;
+
     ShipStats stats;
     Rigidbody2D rb;
     float baseInertia;
@@ -59,12 +65,14 @@ public class ShipMovement : MonoBehaviour
         {
             MobileShipInput.SetMoveVector(Vector2.zero);
             AudioRuntime.SetEngineLoopActive(false);
+            PlayerHudRuntime.Instance?.SetShipBalanceWarning(false, null);
             return;
         }
 
         if (stats == null || !stats.isPlayerShip)
         {
             AudioRuntime.SetEngineLoopActive(false);
+            PlayerHudRuntime.Instance?.SetShipBalanceWarning(false, null);
             return;
         }
 
@@ -93,6 +101,17 @@ public class ShipMovement : MonoBehaviour
         Vector2 com = useModuleCenterOfMass
             ? ShipThrustUtility.ComputeModuleCenterOfMass(modules, rb.worldCenterOfMass, minModuleMassForCOM)
             : rb.worldCenterOfMass;
+        float forwardImbalance = EvaluateForwardImbalance(modules, com, (Vector2)transform.up);
+        bool canUseBalanceAssist = enablePlayerBalanceSas && forwardImbalance <= Mathf.Clamp01(balanceAssistTolerance);
+
+        PlayerHudRuntime hud = PlayerHudRuntime.Instance;
+        if (hud != null)
+        {
+            bool showImbalanceWarning = enablePlayerBalanceSas && forwardImbalance > Mathf.Clamp01(balanceAssistTolerance);
+            hud.SetShipBalanceWarning(
+                showImbalanceWarning,
+                LocalizationManager.Get("warning.ship_unbalanced", "Ship is imbalanced"));
+        }
 
         bool engineLoopActive = false;
 
@@ -110,6 +129,14 @@ public class ShipMovement : MonoBehaviour
                 stats.ConsumeFuelForThrust(forwardThrust.appliedThrust, Time.fixedDeltaTime);
                 rb.AddForce(forwardThrust.force, ForceMode2D.Force);
                 rb.AddTorque(forwardThrust.torque, ForceMode2D.Force);
+
+                if (canUseBalanceAssist)
+                {
+                    float assistTorque = -forwardThrust.torque - rb.angularVelocity * Mathf.Max(0f, balanceAssistAngularDamping);
+                    assistTorque = Mathf.Clamp(assistTorque, -Mathf.Abs(balanceAssistMaxTorque), Mathf.Abs(balanceAssistMaxTorque));
+                    rb.AddTorque(assistTorque, ForceMode2D.Force);
+                }
+
                 engineLoopActive = forwardThrust.hasActiveEngines;
             }
         }
@@ -232,5 +259,27 @@ public class ShipMovement : MonoBehaviour
         }
 
         turnInput = turnSign * magnitude;
+    }
+
+    float EvaluateForwardImbalance(ModuleInstance[] modules, Vector2 centerOfMass, Vector2 forwardDirection)
+    {
+        if (!ShipThrustUtility.TryComputeDirectionalThrustCenter(
+                modules,
+                forwardDirection,
+                engineDirectionThreshold,
+                out Vector2 thrustCenter,
+                out _))
+            return 0f;
+
+        Vector2 right = new Vector2(forwardDirection.y, -forwardDirection.x).normalized;
+        if (right.sqrMagnitude <= 0.0001f)
+            right = Vector2.right;
+
+        float lateralOffset = Mathf.Abs(Vector2.Dot(thrustCenter - centerOfMass, right));
+        float hullRadius = ShipThrustUtility.ComputeModuleBoundsRadius(modules, centerOfMass, 1f);
+        if (hullRadius <= 0.0001f)
+            return 0f;
+
+        return lateralOffset / hullRadius;
     }
 }

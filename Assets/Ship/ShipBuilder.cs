@@ -177,7 +177,7 @@ public class ShipBuilder : MonoBehaviour
             {
                 dropped = TryDrop();
                 if (!dropped)
-                    dropped = TryStoreDraggedModule();
+                    dropped = TryStoreDraggedModule(activePointerScreen);
             }
 
             if (isDragging && draggingTf && !dropped)
@@ -225,13 +225,13 @@ public class ShipBuilder : MonoBehaviour
         return true;
     }
 
-    bool TryStoreDraggedModule()
+    bool TryStoreDraggedModule(Vector2 screenPoint)
     {
         if (!draggingTf)
             return false;
 
         var hud = PlayerHudRuntime.Instance;
-        if (hud == null || !hud.TryStoreDetachedModule(draggingTf, MouseScreen()))
+        if (hud == null || !hud.TryStoreDetachedModule(draggingTf, screenPoint))
             return false;
 
         AudioRuntime.EndModuleDrag();

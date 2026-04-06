@@ -40,6 +40,69 @@ public static class ShipThrustUtility
         return weightedSum / totalModuleMass;
     }
 
+    public static bool TryComputeDirectionalThrustCenter(
+        ModuleInstance[] modules,
+        Vector2 desiredDirection,
+        float directionThreshold,
+        out Vector2 thrustCenter,
+        out float totalDirectionalThrust)
+    {
+        thrustCenter = Vector2.zero;
+        totalDirectionalThrust = 0f;
+
+        if (modules == null || modules.Length == 0)
+            return false;
+
+        Vector2 desiredDir = desiredDirection.sqrMagnitude > 0.0001f
+            ? desiredDirection.normalized
+            : Vector2.up;
+
+        Vector2 weightedSum = Vector2.zero;
+        for (int i = 0; i < modules.Length; i++)
+        {
+            ModuleInstance module = modules[i];
+            if (module == null || module.data == null)
+                continue;
+
+            float moduleThrust = module.GetThrust();
+            if (moduleThrust <= 0f)
+                continue;
+
+            Vector2 engineDir = module.transform.up;
+            if (Vector2.Dot(engineDir, desiredDir) < directionThreshold)
+                continue;
+
+            weightedSum += (Vector2)module.transform.position * moduleThrust;
+            totalDirectionalThrust += moduleThrust;
+        }
+
+        if (totalDirectionalThrust <= 0.0001f)
+            return false;
+
+        thrustCenter = weightedSum / totalDirectionalThrust;
+        return true;
+    }
+
+    public static float ComputeModuleBoundsRadius(ModuleInstance[] modules, Vector2 center, float fallbackRadius = 1f)
+    {
+        if (modules == null || modules.Length == 0)
+            return Mathf.Max(0.5f, fallbackRadius);
+
+        float radius = 0f;
+        for (int i = 0; i < modules.Length; i++)
+        {
+            ModuleInstance module = modules[i];
+            if (module == null || module.data == null)
+                continue;
+
+            float distance = Vector2.Distance(center, module.transform.position) + 0.5f;
+            if (distance > radius)
+                radius = distance;
+        }
+
+        return Mathf.Max(0.5f, radius, fallbackRadius);
+    }
+
     public static DirectionalThrustResult BuildDirectionalThrust(
         ModuleInstance[] modules,
         Vector2 centerOfMass,
