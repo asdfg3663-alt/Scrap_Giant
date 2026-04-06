@@ -8,9 +8,20 @@ public class MobileTouchpadControl : MonoBehaviour, IPointerDownHandler, IDragHa
     public float maxInputRadius = 72f;
     public float thumbTravelRadius = 52f;
     [Range(0f, 1f)] public float deadZone = 0.12f;
+    public float logicalRotationDegrees;
 
     RectTransform rectTransform;
     int activePointerId = int.MinValue;
+    Vector2 currentScreenNormalized;
+    bool hasActiveInput;
+
+    void Update()
+    {
+        if (!hasActiveInput)
+            return;
+
+        ApplyCurrentInput();
+    }
 
     void Awake()
     {
@@ -61,22 +72,33 @@ public class MobileTouchpadControl : MonoBehaviour, IPointerDownHandler, IDragHa
         Vector2 centerOffset = rectTransform.rect.center;
         Vector2 centeredPoint = localPoint - centerOffset;
 
-        Vector2 normalized = maxInputRadius > 0.001f
+        currentScreenNormalized = maxInputRadius > 0.001f
             ? Vector2.ClampMagnitude(centeredPoint / maxInputRadius, 1f)
             : Vector2.zero;
+        hasActiveInput = true;
 
-        if (normalized.magnitude < deadZone)
-            normalized = Vector2.zero;
+        ApplyCurrentInput();
+    }
 
-        MobileShipInput.SetMoveVector(normalized);
+    void ApplyCurrentInput()
+    {
+        Vector2 logicalNormalized = Quaternion.Euler(0f, 0f, -logicalRotationDegrees) * currentScreenNormalized;
+        logicalNormalized = Vector2.ClampMagnitude(logicalNormalized, 1f);
+
+        if (logicalNormalized.magnitude < deadZone)
+            logicalNormalized = Vector2.zero;
+
+        MobileShipInput.SetMoveVector(logicalNormalized);
 
         if (thumb != null)
-            thumb.anchoredPosition = normalized * thumbTravelRadius;
+            thumb.anchoredPosition = currentScreenNormalized * thumbTravelRadius;
     }
 
     void ResetInput()
     {
         activePointerId = int.MinValue;
+        currentScreenNormalized = Vector2.zero;
+        hasActiveInput = false;
         MobileShipInput.SetMoveVector(Vector2.zero);
 
         if (thumb != null)

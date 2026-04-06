@@ -92,6 +92,8 @@ public class PlayerHudRuntime : MonoBehaviour
     RectTransform inventoryPanel;
     RectTransform navigatorRoot;
     RectTransform mobileControlsRoot;
+    RectTransform mobileTouchpadRoot;
+    RectTransform mobileTouchpadVisualRoot;
     RectTransform productionModePanel;
 
     GameObject inventoryBody;
@@ -148,6 +150,7 @@ public class PlayerHudRuntime : MonoBehaviour
     readonly List<ValueRow> ammoRows = new();
     readonly List<InventoryRow> inventoryRows = new();
     readonly HashSet<int> storingModuleInstanceIds = new();
+    MobileTouchpadControl mobileTouchpadControl;
 
     [Header("Mobile Controls")]
     [SerializeField] bool showMobileControlsInEditor = true;
@@ -528,6 +531,7 @@ public class PlayerHudRuntime : MonoBehaviour
         RefreshScore(force: false);
         RefreshOverheatWarning();
         RefreshNavigator();
+        RefreshMobileControlOrientation();
 
         if (resourceUiDirty) RefreshResourceRows();
         if (ammoUiDirty) RefreshAmmoRows();
@@ -919,20 +923,30 @@ public class PlayerHudRuntime : MonoBehaviour
         mobileControlsRoot = CreateRect("MobileControls", hudRoot);
         Stretch(mobileControlsRoot, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
-        RectTransform touchpadRoot = CreateRect("Touchpad", mobileControlsRoot);
-        SetAnchored(touchpadRoot, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(36f, 36f), new Vector2(330f, 330f));
-        Image touchpadBg = touchpadRoot.gameObject.AddComponent<Image>();
+        mobileTouchpadRoot = CreateRect("Touchpad", mobileControlsRoot);
+        SetAnchored(mobileTouchpadRoot, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0.5f, 0.5f), new Vector2(201f, 201f), new Vector2(330f, 330f));
+        RectTransform touchpadRoot = mobileTouchpadRoot;
+        Image touchpadHitbox = touchpadRoot.gameObject.AddComponent<Image>();
+        touchpadHitbox.sprite = GetCircleSprite();
+        touchpadHitbox.type = Image.Type.Simple;
+        touchpadHitbox.color = new Color(1f, 1f, 1f, 0.001f);
+        touchpadHitbox.raycastTarget = true;
+
+        mobileTouchpadVisualRoot = CreateRect("Visual", touchpadRoot);
+        Stretch(mobileTouchpadVisualRoot, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+        Image touchpadBg = mobileTouchpadVisualRoot.gameObject.AddComponent<Image>();
         touchpadBg.sprite = GetCircleSprite();
         touchpadBg.type = Image.Type.Simple;
         touchpadBg.color = new Color(0.05f, 0.09f, 0.13f, 0.52f);
-        touchpadBg.raycastTarget = true;
+        touchpadBg.raycastTarget = false;
 
-        CreateTouchpadZone(touchpadRoot, "ForwardZone", 0f, 50f, new Color(0.22f, 0.9f, 0.62f, 0.34f));
-        CreateTouchpadZone(touchpadRoot, "RightTurnZone", 90f, 130f, new Color(0.38f, 0.72f, 1f, 0.22f));
-        CreateTouchpadZone(touchpadRoot, "ReverseZone", 180f, 50f, new Color(1f, 0.34f, 0.34f, 0.32f));
-        CreateTouchpadZone(touchpadRoot, "LeftTurnZone", 270f, 130f, new Color(0.38f, 0.72f, 1f, 0.22f));
+        CreateTouchpadZone(mobileTouchpadVisualRoot, "ForwardZone", 0f, 50f, new Color(0.22f, 0.9f, 0.62f, 0.34f));
+        CreateTouchpadZone(mobileTouchpadVisualRoot, "RightTurnZone", 90f, 130f, new Color(0.38f, 0.72f, 1f, 0.22f));
+        CreateTouchpadZone(mobileTouchpadVisualRoot, "ReverseZone", 180f, 50f, new Color(1f, 0.34f, 0.34f, 0.32f));
+        CreateTouchpadZone(mobileTouchpadVisualRoot, "LeftTurnZone", 270f, 130f, new Color(0.38f, 0.72f, 1f, 0.22f));
 
-        RectTransform touchpadRing = CreateRect("Ring", touchpadRoot);
+        RectTransform touchpadRing = CreateRect("Ring", mobileTouchpadVisualRoot);
         Stretch(touchpadRing, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), Vector2.zero, Vector2.zero);
         Image ringImage = touchpadRing.gameObject.AddComponent<Image>();
         ringImage.sprite = GetCircleSprite();
@@ -940,7 +954,7 @@ public class PlayerHudRuntime : MonoBehaviour
         ringImage.color = new Color(0.5f, 0.76f, 0.92f, 0.16f);
         ringImage.raycastTarget = false;
 
-        RectTransform touchpadCore = CreateRect("Core", touchpadRoot);
+        RectTransform touchpadCore = CreateRect("Core", mobileTouchpadVisualRoot);
         Stretch(touchpadCore, new Vector2(0.34f, 0.34f), new Vector2(0.66f, 0.66f), Vector2.zero, Vector2.zero);
         Image coreImage = touchpadCore.gameObject.AddComponent<Image>();
         coreImage.sprite = GetCircleSprite();
@@ -956,11 +970,11 @@ public class PlayerHudRuntime : MonoBehaviour
         thumbImage.color = new Color(0.58f, 0.86f, 1f, 0.8f);
         thumbImage.raycastTarget = false;
 
-        MobileTouchpadControl touchpadControl = touchpadRoot.gameObject.AddComponent<MobileTouchpadControl>();
-        touchpadControl.thumb = thumb;
-        touchpadControl.maxInputRadius = 123f;
-        touchpadControl.thumbTravelRadius = 87f;
-        touchpadControl.deadZone = 0.12f;
+        mobileTouchpadControl = touchpadRoot.gameObject.AddComponent<MobileTouchpadControl>();
+        mobileTouchpadControl.thumb = thumb;
+        mobileTouchpadControl.maxInputRadius = 123f;
+        mobileTouchpadControl.thumbTravelRadius = 87f;
+        mobileTouchpadControl.deadZone = 0.12f;
 
         RectTransform fireButtonRoot = CreateRect("FireButton", mobileControlsRoot);
         SetAnchored(fireButtonRoot, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-42f, 42f), new Vector2(160f, 160f));
@@ -1001,6 +1015,20 @@ public class PlayerHudRuntime : MonoBehaviour
 
         float startAngle = centerAngle - arcDegrees * 0.5f;
         zone.localRotation = Quaternion.Euler(0f, 0f, -startAngle);
+    }
+
+    void RefreshMobileControlOrientation()
+    {
+        if (mobileTouchpadRoot == null)
+            return;
+
+        Transform coreTransform = trackedShip != null ? trackedShip.GetCoreTransform() : null;
+        float zRotation = coreTransform != null ? coreTransform.eulerAngles.z : 0f;
+        if (mobileTouchpadVisualRoot != null)
+            mobileTouchpadVisualRoot.localRotation = Quaternion.Euler(0f, 0f, zRotation);
+
+        if (mobileTouchpadControl != null)
+            mobileTouchpadControl.logicalRotationDegrees = zRotation;
     }
 
     bool ShouldShowMobileControls()

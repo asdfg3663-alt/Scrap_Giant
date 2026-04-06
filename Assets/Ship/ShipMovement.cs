@@ -41,6 +41,7 @@ public class ShipMovement : MonoBehaviour
     [Header("Player SAS Balance Assist")]
     public bool enablePlayerBalanceSas = true;
     [Range(0.02f, 0.5f)] public float balanceAssistTolerance = 0.1f;
+    [Range(0.01f, 0.5f)] public float balanceAssistTurnDeadZone = 0.08f;
     public float balanceAssistMaxTorque = 18f;
     public float balanceAssistAngularDamping = 3.5f;
 
@@ -102,7 +103,10 @@ public class ShipMovement : MonoBehaviour
             ? ShipThrustUtility.ComputeModuleCenterOfMass(modules, rb.worldCenterOfMass, minModuleMassForCOM)
             : rb.worldCenterOfMass;
         float forwardImbalance = EvaluateForwardImbalance(modules, com, (Vector2)transform.up);
-        bool canUseBalanceAssist = enablePlayerBalanceSas && forwardImbalance <= Mathf.Clamp01(balanceAssistTolerance);
+        bool hasManualTurnInput = Mathf.Abs(turnInput) > Mathf.Clamp(balanceAssistTurnDeadZone, 0.01f, 0.5f);
+        bool canUseBalanceAssist = enablePlayerBalanceSas
+            && !hasManualTurnInput
+            && forwardImbalance <= Mathf.Clamp01(balanceAssistTolerance);
 
         PlayerHudRuntime hud = PlayerHudRuntime.Instance;
         if (hud != null)
@@ -132,7 +136,14 @@ public class ShipMovement : MonoBehaviour
 
                 if (canUseBalanceAssist)
                 {
-                    float assistTorque = -forwardThrust.torque - rb.angularVelocity * Mathf.Max(0f, balanceAssistAngularDamping);
+                    float assistTorque = -forwardThrust.torque;
+                    if (Mathf.Abs(forwardThrust.torque) > 0.0001f)
+                    {
+                        float imbalanceAngularVelocity = rb.angularVelocity * Mathf.Sign(forwardThrust.torque);
+                        if (imbalanceAngularVelocity > 0f)
+                            assistTorque -= imbalanceAngularVelocity * Mathf.Max(0f, balanceAssistAngularDamping);
+                    }
+
                     assistTorque = Mathf.Clamp(assistTorque, -Mathf.Abs(balanceAssistMaxTorque), Mathf.Abs(balanceAssistMaxTorque));
                     rb.AddTorque(assistTorque, ForceMode2D.Force);
                 }
@@ -219,46 +230,30 @@ public class ShipMovement : MonoBehaviour
         if (mobileMove.sqrMagnitude <= 0.0001f)
             return;
 
-        float magnitude = Mathf.Clamp01(mobileMove.magnitude);
         float absAngleFromForward = Vector2.Angle(Vector2.up, mobileMove);
         float absAngleFromBackward = Vector2.Angle(Vector2.down, mobileMove);
-        float turnSign = Mathf.Sign(mobileMove.x);
+        float clampedHorizontal = Mathf.Clamp(mobileMove.x, -1f, 1f);
+        float clampedVertical = Mathf.Clamp(mobileMove.y, -1f, 1f);
 
         if (mobileMove.y >= 0f)
         {
             if (absAngleFromForward <= 25f)
             {
-                thrustInput = magnitude;
+                thrustInput = Mathf.Max(0f, clampedVertical);
                 return;
             }
 
-            if (absAngleFromForward <= 35f)
-            {
-                float blend = Mathf.InverseLerp(25f, 35f, absAngleFromForward);
-                thrustInput = magnitude;
-                turnInput = turnSign * blend;
-                return;
-            }
-
-            turnInput = turnSign * magnitude;
+            turnInput = clampedHorizontal;
             return;
         }
 
         if (absAngleFromBackward <= 25f)
         {
-            thrustInput = -magnitude;
+            thrustInput = Mathf.Min(0f, clampedVertical);
             return;
         }
 
-        if (absAngleFromBackward <= 35f)
-        {
-            float blend = Mathf.InverseLerp(25f, 35f, absAngleFromBackward);
-            thrustInput = -magnitude;
-            turnInput = turnSign * blend;
-            return;
-        }
-
-        turnInput = turnSign * magnitude;
+        turnInput = clampedHorizontal;
     }
 
     float EvaluateForwardImbalance(ModuleInstance[] modules, Vector2 centerOfMass, Vector2 forwardDirection)
