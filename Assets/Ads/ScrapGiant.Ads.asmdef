@@ -1,0 +1,20 @@
+{
+  "name": "ScrapGiant.Ads",
+  "rootNamespace": "",
+  "references": [],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [
+    {
+      "name": "com.google.ads.mobile",
+      "expression": "0.0.0",
+      "define": "SCRAP_GIANT_ADMOB"
+    }
+  ],
+  "noEngineReferences": false
+}

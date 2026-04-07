@@ -1,0 +1,12 @@
+{
+  "enabled": true,
+  "preloadOnStartup": true,
+  "showOnPlayStart": true,
+  "showOnGameOver": true,
+  "showInEditor": false,
+  "useTestAdUnits": true,
+  "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+  "iosAppId": "ca-app-pub-3940256099942544~1458002511",
+  "androidInterstitialAdUnitId": "ca-app-pub-3940256099942544/1033173712",
+  "iosInterstitialAdUnitId": "ca-app-pub-3940256099942544/4411468910"
+}

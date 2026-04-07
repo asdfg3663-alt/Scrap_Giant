@@ -43,7 +43,7 @@ public sealed class GameOverRuntime : MonoBehaviour
             return;
 
         isShowing = false;
-        TitleInterstitialAdService.ShowIfAvailable(ReturnToTitle);
+        TitleInterstitialAdService.ShowIfAvailable(TitleInterstitialPlacement.GameOver, ReturnToTitle);
     }
 
     public static void TriggerPlayerGameOver()

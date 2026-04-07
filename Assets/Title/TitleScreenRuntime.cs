@@ -958,12 +958,12 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         if (isStartingGame)
             return;
 
-        StartCoroutine(BeginGameWithLoading());
+        isStartingGame = true;
+        TitleInterstitialAdService.ShowIfAvailable(TitleInterstitialPlacement.PlayStart, () => StartCoroutine(BeginGameWithLoading()));
     }
 
     IEnumerator BeginGameWithLoading()
     {
-        isStartingGame = true;
         HidePanels();
 
         if (loadingOverlay != null)

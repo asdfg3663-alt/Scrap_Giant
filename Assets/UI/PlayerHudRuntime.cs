@@ -1024,11 +1024,11 @@ public class PlayerHudRuntime : MonoBehaviour
 
         Transform coreTransform = trackedShip != null ? trackedShip.GetCoreTransform() : null;
         float zRotation = coreTransform != null ? coreTransform.eulerAngles.z : 0f;
-        if (mobileTouchpadVisualRoot != null)
-            mobileTouchpadVisualRoot.localRotation = Quaternion.Euler(0f, 0f, zRotation);
-
         if (mobileTouchpadControl != null)
             mobileTouchpadControl.logicalRotationDegrees = zRotation;
+
+        if (mobileTouchpadVisualRoot != null)
+            mobileTouchpadVisualRoot.localRotation = Quaternion.Euler(0f, 0f, zRotation);
     }
 
     bool ShouldShowMobileControls()
