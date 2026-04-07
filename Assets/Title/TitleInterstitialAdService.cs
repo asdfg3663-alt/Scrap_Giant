@@ -14,12 +14,15 @@ public sealed class TitleInterstitialAdSettingsData
     public bool preloadOnStartup = true;
     public bool showOnPlayStart = true;
     public bool showOnGameOver = true;
+    public bool showOnRewardedSaveQuit = true;
     public bool showInEditor = false;
     public bool useTestAdUnits = true;
     public string androidAppId = "ca-app-pub-3940256099942544~3347511713";
     public string iosAppId = "ca-app-pub-3940256099942544~1458002511";
     public string androidInterstitialAdUnitId = "ca-app-pub-3940256099942544/1033173712";
     public string iosInterstitialAdUnitId = "ca-app-pub-3940256099942544/4411468910";
+    public string androidRewardedAdUnitId = "ca-app-pub-3940256099942544/5224354917";
+    public string iosRewardedAdUnitId = "ca-app-pub-3940256099942544/1712485313";
 }
 
 public static class TitleInterstitialAdService

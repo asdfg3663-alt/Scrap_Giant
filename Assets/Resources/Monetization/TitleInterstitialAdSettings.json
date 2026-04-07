@@ -3,10 +3,13 @@
   "preloadOnStartup": true,
   "showOnPlayStart": true,
   "showOnGameOver": true,
+  "showOnRewardedSaveQuit": true,
   "showInEditor": false,
   "useTestAdUnits": true,
   "androidAppId": "ca-app-pub-3940256099942544~3347511713",
   "iosAppId": "ca-app-pub-3940256099942544~1458002511",
   "androidInterstitialAdUnitId": "ca-app-pub-3940256099942544/1033173712",
-  "iosInterstitialAdUnitId": "ca-app-pub-3940256099942544/4411468910"
+  "iosInterstitialAdUnitId": "ca-app-pub-3940256099942544/4411468910",
+  "androidRewardedAdUnitId": "ca-app-pub-3940256099942544/5224354917",
+  "iosRewardedAdUnitId": "ca-app-pub-3940256099942544/1712485313"
 }

@@ -37,14 +37,17 @@ public static class GameSaveSystem
     static readonly Color ScrapColor = new Color(0.97f, 0.63f, 0.22f, 1f);
     static readonly Color AmmoColor = new Color(0.96f, 0.32f, 0.24f, 1f);
     static bool sessionStarted;
+    static bool rewardedQuitPending;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics()
     {
         sessionStarted = false;
+        rewardedQuitPending = false;
     }
 
     public static bool HasStartedSession => sessionStarted;
+    public static bool RewardedQuitPending => rewardedQuitPending;
     public static string SavePath => Path.Combine(Application.persistentDataPath, SaveFileName);
 
     public static void MarkSessionStarted()
@@ -56,8 +59,33 @@ public static class GameSaveSystem
     public static void EndSession(bool deleteSave = true)
     {
         sessionStarted = false;
+        rewardedQuitPending = false;
         if (deleteSave)
             DeleteSave();
+    }
+
+    public static void BeginRewardedQuitFlow()
+    {
+        rewardedQuitPending = true;
+        DeleteSave();
+    }
+
+    public static bool CompleteRewardedQuitWithSave()
+    {
+        bool saved = SaveCurrentGame(force: true);
+        rewardedQuitPending = false;
+        sessionStarted = false;
+
+        if (!saved)
+            DeleteSave();
+
+        return saved;
+    }
+
+    public static void CompleteRewardedQuitWithoutSave()
+    {
+        rewardedQuitPending = false;
+        EndSession(deleteSave: true);
     }
 
     public static bool HasSaveFile()
@@ -78,6 +106,9 @@ public static class GameSaveSystem
 
     public static bool SaveCurrentGame(bool force = false)
     {
+        if (!force && rewardedQuitPending)
+            return false;
+
         if (!force && !sessionStarted)
             return false;
 
@@ -422,12 +453,13 @@ public sealed class GameSaveRuntime : MonoBehaviour
 
     void OnApplicationPause(bool pauseStatus)
     {
-        if (pauseStatus)
+        if (pauseStatus && !GameSaveSystem.RewardedQuitPending)
             GameSaveSystem.SaveCurrentGame();
     }
 
     void OnApplicationQuit()
     {
-        GameSaveSystem.SaveCurrentGame();
+        if (!GameSaveSystem.RewardedQuitPending)
+            GameSaveSystem.SaveCurrentGame();
     }
 }

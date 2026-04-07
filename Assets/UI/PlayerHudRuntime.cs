@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
 
 [DisallowMultipleComponent]
 public class PlayerHudRuntime : MonoBehaviour
@@ -121,7 +122,24 @@ public class PlayerHudRuntime : MonoBehaviour
     TMP_Text productionModeTitleText;
     TMP_Text productionModeButtonText;
     TMP_Text quitButtonLabel;
+    TMP_Text pauseMenuTitleText;
+    TMP_Text continueButtonLabel;
+    TMP_Text optionsButtonInPauseLabel;
+    TMP_Text saveQuitButtonLabel;
+    TMP_Text sessionResetButtonLabel;
+    TMP_Text pauseOptionsTitleText;
+    TMP_Text pauseOptionsBackLabel;
+    TMP_Text pauseLanguageSectionLabel;
+    TMP_Text pauseLanguageModeLabel;
+    TMP_Text pauseAudioSectionLabel;
+    TMP_Text pauseMasterVolumeLabel;
+    TMP_Text pauseBgmVolumeLabel;
+    TMP_Text pauseSfxVolumeLabel;
+    TMP_Text pauseDisplaySectionLabel;
+    TMP_Text pauseFullscreenValueLabel;
     readonly List<TMP_Text> productionModeOptionLabels = new();
+    readonly List<Button> pauseLanguageButtons = new();
+    readonly List<TMP_Text> pauseLanguageButtonLabels = new();
 
     [SerializeField] int inventoryCapacity = 2;
     int nextInventoryEntrySerial = 1;
@@ -136,6 +154,9 @@ public class PlayerHudRuntime : MonoBehaviour
     bool ammoUiDirty;
     bool inventoryUiDirty;
     bool productionModeOptionsVisible;
+    bool pauseMenuVisible;
+    bool pauseOptionsVisible;
+    bool saveQuitFlowInProgress;
     float navigatorRadius = 72f;
 
     string assemblyPrimaryLabel = "Fuel synthesis ready";
@@ -151,6 +172,13 @@ public class PlayerHudRuntime : MonoBehaviour
     readonly List<InventoryRow> inventoryRows = new();
     readonly HashSet<int> storingModuleInstanceIds = new();
     MobileTouchpadControl mobileTouchpadControl;
+    GameObject pauseDimmerRoot;
+    GameObject pauseMenuRoot;
+    GameObject pauseOptionsRoot;
+    Slider pauseMasterSlider;
+    Slider pauseBgmSlider;
+    Slider pauseSfxSlider;
+    Button pauseFullscreenButton;
 
     [Header("Mobile Controls")]
     [SerializeField] bool showMobileControlsInEditor = true;
@@ -518,6 +546,9 @@ public class PlayerHudRuntime : MonoBehaviour
 
     void Update()
     {
+        if (Input.GetKeyDown(KeyCode.Escape) && trackedShip != null)
+            TogglePauseMenu();
+
         if (Input.GetKeyDown(KeyCode.I))
             ToggleInventory();
 
@@ -597,7 +628,8 @@ public class PlayerHudRuntime : MonoBehaviour
         CreateProductionModePanel();
         CreateNavigatorOverlay();
         CreateMobileControls();
-        CreateQuitButton();
+        CreatePauseMenuButton();
+        CreatePauseOverlay();
 
         hudBuilt = true;
         LocalizationFontManager.RefreshActiveTexts();
@@ -881,28 +913,372 @@ public class PlayerHudRuntime : MonoBehaviour
         };
     }
 
-    void CreateQuitButton()
+    void CreatePauseMenuButton()
     {
-        Button quitButton = CreateHudButton(
+        Button menuButton = CreateHudButton(
             hudRoot,
-            "QuitButton",
+            "PauseMenuButton",
             new Vector2(1f, 1f),
             new Vector2(1f, 1f),
             new Vector2(1f, 1f),
             new Vector2(-16f, -16f),
-            new Vector2(120f, 40f),
-            new Color(0.42f, 0.08f, 0.08f, 0.96f),
-            new Color(0.58f, 0.12f, 0.12f, 1f),
-            new Color(0.72f, 0.18f, 0.18f, 1f),
+            new Vector2(56f, 44f),
+            new Color(0.08f, 0.12f, 0.16f, 0.96f),
+            new Color(0.14f, 0.21f, 0.27f, 1f),
+            new Color(0.19f, 0.29f, 0.36f, 1f),
             out quitButtonLabel);
-        quitButtonLabel.text = LocalizationManager.Get("ui.quit", "Quit");
-        quitButton.onClick.AddListener(QuitGame);
+        quitButtonLabel.fontSize = 24f;
+        menuButton.onClick.AddListener(TogglePauseMenu);
     }
 
-    void QuitGame()
+    void CreatePauseOverlay()
     {
-        GameSaveSystem.SaveCurrentGame(force: true);
+        RectTransform dimmerRect = CreateRect("PauseDimmer", hudRoot);
+        Stretch(dimmerRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        Image dimmerImage = CreateImage(dimmerRect, new Color(0.01f, 0.03f, 0.05f, 0.72f));
+        dimmerImage.raycastTarget = true;
+        Button dimmerButton = dimmerRect.gameObject.AddComponent<Button>();
+        dimmerButton.transition = Selectable.Transition.None;
+        dimmerButton.onClick.AddListener(ResumeGameplayFromMenu);
+        pauseDimmerRoot = dimmerRect.gameObject;
+        pauseDimmerRoot.SetActive(false);
+
+        RectTransform menuRect = CreateRect("PauseMenuPanel", dimmerRect);
+        SetAnchored(menuRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(420f, 356f));
+        CreateBackPlate(menuRect, new Color(0.03f, 0.07f, 0.1f, 0.98f));
+        pauseMenuRoot = menuRect.gameObject;
+
+        pauseMenuTitleText = CreateLabel(menuRect, string.Empty, 24f, Color.white, TextAlignmentOptions.TopLeft, new Vector2(24f, -22f), new Vector2(0f, 1f), FontStyles.Bold);
+
+        Button continueButton = CreateHudButton(
+            menuRect,
+            "ContinueButton",
+            new Vector2(0.5f, 1f),
+            new Vector2(0.5f, 1f),
+            new Vector2(0.5f, 1f),
+            new Vector2(0f, -92f),
+            new Vector2(320f, 48f),
+            new Color(0.12f, 0.46f, 0.22f, 0.98f),
+            new Color(0.18f, 0.58f, 0.28f, 1f),
+            new Color(0.24f, 0.68f, 0.34f, 1f),
+            out continueButtonLabel);
+        continueButton.onClick.AddListener(ResumeGameplayFromMenu);
+
+        Button optionsButton = CreateHudButton(
+            menuRect,
+            "OptionsButton",
+            new Vector2(0.5f, 1f),
+            new Vector2(0.5f, 1f),
+            new Vector2(0.5f, 1f),
+            new Vector2(0f, -148f),
+            new Vector2(320f, 48f),
+            new Color(0.08f, 0.15f, 0.19f, 0.98f),
+            new Color(0.13f, 0.23f, 0.28f, 1f),
+            new Color(0.18f, 0.31f, 0.37f, 1f),
+            out optionsButtonInPauseLabel);
+        optionsButton.onClick.AddListener(OpenPauseOptions);
+
+        Button saveQuitButton = CreateHudButton(
+            menuRect,
+            "SaveQuitButton",
+            new Vector2(0.5f, 1f),
+            new Vector2(0.5f, 1f),
+            new Vector2(0.5f, 1f),
+            new Vector2(0f, -204f),
+            new Vector2(320f, 48f),
+            new Color(0.42f, 0.22f, 0.08f, 0.98f),
+            new Color(0.56f, 0.31f, 0.12f, 1f),
+            new Color(0.68f, 0.38f, 0.16f, 1f),
+            out saveQuitButtonLabel);
+        saveQuitButton.onClick.AddListener(BeginSaveQuitFlow);
+
+        Button sessionResetButton = CreateHudButton(
+            menuRect,
+            "SessionResetButton",
+            new Vector2(0.5f, 1f),
+            new Vector2(0.5f, 1f),
+            new Vector2(0.5f, 1f),
+            new Vector2(0f, -260f),
+            new Vector2(320f, 48f),
+            new Color(0.42f, 0.08f, 0.08f, 0.98f),
+            new Color(0.58f, 0.12f, 0.12f, 1f),
+            new Color(0.72f, 0.18f, 0.18f, 1f),
+            out sessionResetButtonLabel);
+        sessionResetButton.onClick.AddListener(ReturnToTitleWithoutSave);
+
+        RectTransform optionsRect = CreateRect("PauseOptionsPanel", dimmerRect);
+        SetAnchored(optionsRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -8f), new Vector2(1040f, 620f));
+        CreateBackPlate(optionsRect, new Color(0.03f, 0.07f, 0.1f, 0.98f));
+        pauseOptionsRoot = optionsRect.gameObject;
+        pauseOptionsRoot.SetActive(false);
+
+        pauseOptionsTitleText = CreateLabel(optionsRect, string.Empty, 28f, Color.white, TextAlignmentOptions.TopLeft, new Vector2(28f, -20f), new Vector2(0f, 1f), FontStyles.Bold);
+
+        Button optionsBackButton = CreateHudButton(
+            optionsRect,
+            "OptionsBackButton",
+            new Vector2(1f, 1f),
+            new Vector2(1f, 1f),
+            new Vector2(1f, 1f),
+            new Vector2(-24f, -20f),
+            new Vector2(96f, 42f),
+            new Color(0.08f, 0.16f, 0.2f, 0.94f),
+            new Color(0.16f, 0.29f, 0.34f, 1f),
+            new Color(0.28f, 0.44f, 0.49f, 1f),
+            out pauseOptionsBackLabel);
+        optionsBackButton.onClick.AddListener(OpenPauseMenu);
+
+        BuildPauseOptions(optionsRect);
+        RefreshPauseMenuUi();
+        RefreshPauseOptionsUi();
+    }
+
+    void BuildPauseOptions(RectTransform root)
+    {
+        RectTransform languageBlock = CreateRect("LanguageBlock", root);
+        SetAnchored(languageBlock, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -90f), new Vector2(964f, 172f));
+        CreateBackPlate(languageBlock, new Color(0.05f, 0.11f, 0.14f, 0.92f));
+        pauseLanguageSectionLabel = CreateLabel(languageBlock, string.Empty, 20f, Color.white, TextAlignmentOptions.TopLeft, new Vector2(18f, -18f), new Vector2(0f, 1f), FontStyles.Bold);
+        pauseLanguageModeLabel = CreateLabel(languageBlock, string.Empty, 16f, new Color(0.82f, 0.9f, 0.95f, 1f), TextAlignmentOptions.TopLeft, new Vector2(18f, -48f), new Vector2(0f, 1f), FontStyles.Normal);
+        pauseLanguageModeLabel.textWrappingMode = TextWrappingModes.Normal;
+        pauseLanguageModeLabel.rectTransform.sizeDelta = new Vector2(900f, 28f);
+
+        RectTransform langRow = CreateRect("LanguageRow", languageBlock);
+        SetAnchored(langRow, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 18f), new Vector2(-36f, 82f));
+        GridLayoutGroup langLayout = langRow.gameObject.AddComponent<GridLayoutGroup>();
+        langLayout.cellSize = new Vector2(170f, 38f);
+        langLayout.spacing = new Vector2(10f, 8f);
+        langLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        langLayout.constraintCount = 3;
+        langLayout.childAlignment = TextAnchor.UpperLeft;
+
+        pauseLanguageButtons.Clear();
+        pauseLanguageButtonLabels.Clear();
+        IReadOnlyList<GameLanguage> languages = LocalizationManager.GetSupportedLanguages();
+        for (int i = 0; i < languages.Count; i++)
+        {
+            GameLanguage language = languages[i];
+            Button button = CreateHudButton(
+                langRow,
+                $"PauseLang{language}",
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                Vector2.zero,
+                new Vector2(170f, 38f),
+                new Color(0.08f, 0.16f, 0.2f, 0.94f),
+                new Color(0.16f, 0.29f, 0.34f, 1f),
+                new Color(0.28f, 0.44f, 0.49f, 1f),
+                out TMP_Text buttonLabel);
+            button.onClick.AddListener(() => SetPauseLanguage(language));
+            pauseLanguageButtons.Add(button);
+            pauseLanguageButtonLabels.Add(buttonLabel);
+        }
+
+        RectTransform audioBlock = CreateRect("AudioBlock", root);
+        SetAnchored(audioBlock, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -278f), new Vector2(964f, 196f));
+        CreateBackPlate(audioBlock, new Color(0.05f, 0.11f, 0.14f, 0.92f));
+        pauseAudioSectionLabel = CreateLabel(audioBlock, string.Empty, 20f, Color.white, TextAlignmentOptions.TopLeft, new Vector2(18f, -18f), new Vector2(0f, 1f), FontStyles.Bold);
+
+        pauseMasterVolumeLabel = CreateLabel(audioBlock, string.Empty, 18f, new Color(0.82f, 0.9f, 0.95f, 1f), TextAlignmentOptions.Left, new Vector2(48f, -70f), new Vector2(0f, 0.5f), FontStyles.Normal);
+        pauseMasterSlider = CreatePauseSlider(audioBlock, new Vector2(300f, -70f), value => GameOptions.MasterVolume = value);
+
+        pauseBgmVolumeLabel = CreateLabel(audioBlock, string.Empty, 16f, new Color(0.82f, 0.9f, 0.95f, 1f), TextAlignmentOptions.Left, new Vector2(48f, -122f), new Vector2(0f, 0.5f), FontStyles.Normal);
+        pauseBgmSlider = CreatePauseSlider(audioBlock, new Vector2(300f, -122f), value => GameOptions.BgmVolume = value);
+
+        pauseSfxVolumeLabel = CreateLabel(audioBlock, string.Empty, 16f, new Color(0.82f, 0.9f, 0.95f, 1f), TextAlignmentOptions.Left, new Vector2(48f, -174f), new Vector2(0f, 0.5f), FontStyles.Normal);
+        pauseSfxSlider = CreatePauseSlider(audioBlock, new Vector2(300f, -174f), value => GameOptions.SfxVolume = value);
+
+        RectTransform displayBlock = CreateRect("DisplayBlock", root);
+        SetAnchored(displayBlock, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -494f), new Vector2(964f, 92f));
+        CreateBackPlate(displayBlock, new Color(0.05f, 0.11f, 0.14f, 0.92f));
+        pauseDisplaySectionLabel = CreateLabel(displayBlock, string.Empty, 20f, Color.white, TextAlignmentOptions.TopLeft, new Vector2(18f, -18f), new Vector2(0f, 1f), FontStyles.Bold);
+
+        pauseFullscreenButton = CreateHudButton(
+            displayBlock,
+            "PauseFullscreenButton",
+            new Vector2(0f, 0f),
+            new Vector2(0f, 0f),
+            new Vector2(0f, 0f),
+            new Vector2(18f, 18f),
+            new Vector2(310f, 48f),
+            new Color(0.08f, 0.16f, 0.2f, 0.94f),
+            new Color(0.16f, 0.29f, 0.34f, 1f),
+            new Color(0.28f, 0.44f, 0.49f, 1f),
+            out pauseFullscreenValueLabel);
+        pauseFullscreenButton.onClick.AddListener(TogglePauseFullscreen);
+    }
+
+    Slider CreatePauseSlider(Transform parent, Vector2 anchoredPosition, UnityEngine.Events.UnityAction<float> onChanged)
+    {
+        RectTransform root = CreateRect("PauseSlider", parent);
+        SetAnchored(root, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), anchoredPosition, new Vector2(560f, 32f));
+
+        Image background = CreateImage(root, new Color(0.07f, 0.13f, 0.18f, 0.96f));
+        background.raycastTarget = true;
+
+        Slider slider = root.gameObject.AddComponent<Slider>();
+        slider.direction = Slider.Direction.LeftToRight;
+        slider.minValue = 0f;
+        slider.maxValue = 1f;
+
+        RectTransform fillArea = CreateRect("FillArea", root);
+        Stretch(fillArea, Vector2.zero, Vector2.one, new Vector2(8f, 8f), new Vector2(-8f, -8f));
+
+        RectTransform fill = CreateRect("Fill", fillArea);
+        fill.anchorMin = new Vector2(0f, 0f);
+        fill.anchorMax = new Vector2(1f, 1f);
+        fill.pivot = new Vector2(0f, 0.5f);
+        Image fillImage = CreateImage(fill, new Color(0.86f, 0.93f, 0.38f, 1f));
+        fillImage.raycastTarget = false;
+
+        RectTransform handleArea = CreateRect("HandleArea", root);
+        Stretch(handleArea, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        RectTransform handle = CreateRect("Handle", handleArea);
+        handle.sizeDelta = new Vector2(18f, 32f);
+        Image handleImage = CreateImage(handle, Color.white);
+        handleImage.raycastTarget = true;
+
+        slider.targetGraphic = background;
+        slider.fillRect = fill;
+        slider.handleRect = handle;
+        slider.onValueChanged.AddListener(onChanged);
+        return slider;
+    }
+
+    void TogglePauseMenu()
+    {
+        if (saveQuitFlowInProgress)
+            return;
+
+        if (pauseMenuVisible || pauseOptionsVisible)
+            ResumeGameplayFromMenu();
+        else
+            OpenPauseMenu();
+    }
+
+    void OpenPauseMenu()
+    {
+        pauseMenuVisible = true;
+        pauseOptionsVisible = false;
+        ApplyPauseState(true);
+        RefreshPauseMenuUi();
+        RefreshPauseOptionsUi();
+
+        if (pauseDimmerRoot != null)
+            pauseDimmerRoot.SetActive(true);
+        if (pauseMenuRoot != null)
+            pauseMenuRoot.SetActive(true);
+        if (pauseOptionsRoot != null)
+            pauseOptionsRoot.SetActive(false);
+    }
+
+    void OpenPauseOptions()
+    {
+        pauseMenuVisible = false;
+        pauseOptionsVisible = true;
+        ApplyPauseState(true);
+        RefreshPauseOptionsUi();
+
+        if (pauseDimmerRoot != null)
+            pauseDimmerRoot.SetActive(true);
+        if (pauseMenuRoot != null)
+            pauseMenuRoot.SetActive(false);
+        if (pauseOptionsRoot != null)
+            pauseOptionsRoot.SetActive(true);
+    }
+
+    void ResumeGameplayFromMenu()
+    {
+        if (saveQuitFlowInProgress)
+            return;
+
+        pauseMenuVisible = false;
+        pauseOptionsVisible = false;
+        ApplyPauseState(false);
+
+        if (pauseDimmerRoot != null)
+            pauseDimmerRoot.SetActive(false);
+        if (pauseMenuRoot != null)
+            pauseMenuRoot.SetActive(false);
+        if (pauseOptionsRoot != null)
+            pauseOptionsRoot.SetActive(false);
+    }
+
+    void ApplyPauseState(bool paused)
+    {
+        Time.timeScale = paused ? 0f : 1f;
+        GameRuntimeState.SetGameplayBlocked(paused);
+    }
+
+    void BeginSaveQuitFlow()
+    {
+        if (saveQuitFlowInProgress)
+            return;
+
+        saveQuitFlowInProgress = true;
+        pauseMenuVisible = false;
+        pauseOptionsVisible = false;
+        ApplyPauseState(true);
+
+        if (pauseMenuRoot != null)
+            pauseMenuRoot.SetActive(false);
+        if (pauseOptionsRoot != null)
+            pauseOptionsRoot.SetActive(false);
+        if (pauseDimmerRoot != null)
+            pauseDimmerRoot.SetActive(true);
+
+        GameSaveSystem.BeginRewardedQuitFlow();
+        RewardedQuitAdService.ShowSaveQuitAd(HandleSaveQuitAdFinished);
+    }
+
+    void HandleSaveQuitAdFinished(bool earnedReward)
+    {
+        saveQuitFlowInProgress = false;
+
+        if (earnedReward)
+            GameSaveSystem.CompleteRewardedQuitWithSave();
+        else
+            GameSaveSystem.CompleteRewardedQuitWithoutSave();
+
+        RequestApplicationQuit();
+    }
+
+    void ReturnToTitleWithoutSave()
+    {
+        GameSaveSystem.EndSession(deleteSave: true);
+        pauseMenuVisible = false;
+        pauseOptionsVisible = false;
+
+        if (pauseDimmerRoot != null)
+            pauseDimmerRoot.SetActive(false);
+
+        Time.timeScale = 1f;
+        GameRuntimeState.SetGameplayBlocked(false);
+        SceneManager.sceneLoaded += HandleReturnToTitleSceneLoaded;
+        SceneManager.LoadScene("SampleScene", LoadSceneMode.Single);
+    }
+
+    void HandleReturnToTitleSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        SceneManager.sceneLoaded -= HandleReturnToTitleSceneLoaded;
+        if (!scene.IsValid() || scene.name != "SampleScene")
+            return;
+
+        Time.timeScale = 1f;
+        GameRuntimeState.SetGameplayBlocked(false);
+        TitleScreenRuntime.EnsureVisible();
+    }
+
+    void RequestApplicationQuit()
+    {
+        Time.timeScale = 1f;
+        GameRuntimeState.SetGameplayBlocked(false);
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
         Application.Quit();
+#endif
     }
 
     void CreateNavigatorOverlay()
@@ -1296,9 +1672,11 @@ public class PlayerHudRuntime : MonoBehaviour
             inventoryDetailText.text = LocalizationManager.Get("ui.inventory_empty", "Drag modules here.");
 
         if (quitButtonLabel != null)
-            quitButtonLabel.text = LocalizationManager.Get("ui.quit", "Quit");
+            quitButtonLabel.text = LocalizationManager.Get("ui.menu_icon", "≡");
 
         RefreshProductionModeUi();
+        RefreshPauseMenuUi();
+        RefreshPauseOptionsUi();
 
         RefreshOverheatWarning();
 
@@ -1333,6 +1711,100 @@ public class PlayerHudRuntime : MonoBehaviour
         inventoryUiDirty = true;
         RefreshScore(force: true);
         RefreshAssemblyPanel();
+    }
+
+    void RefreshPauseMenuUi()
+    {
+        if (pauseMenuTitleText != null)
+            pauseMenuTitleText.text = LocalizationManager.Get("ui.pause_menu", "Pause Menu");
+
+        if (continueButtonLabel != null)
+            continueButtonLabel.text = LocalizationManager.Get("ui.continue", "Continue");
+
+        if (optionsButtonInPauseLabel != null)
+            optionsButtonInPauseLabel.text = LocalizationManager.Get("title.options", "Options");
+
+        if (saveQuitButtonLabel != null)
+            saveQuitButtonLabel.text = LocalizationManager.Get("ui.save_quit", "Save And Quit");
+
+        if (sessionResetButtonLabel != null)
+            sessionResetButtonLabel.text = LocalizationManager.Get("ui.session_game_over", "Game Over");
+    }
+
+    void RefreshPauseOptionsUi()
+    {
+        if (pauseOptionsTitleText != null)
+            pauseOptionsTitleText.text = LocalizationManager.Get("title.options", "Options");
+
+        if (pauseOptionsBackLabel != null)
+            pauseOptionsBackLabel.text = LocalizationManager.Get("ui.back", "Back");
+
+        if (pauseLanguageSectionLabel != null)
+            pauseLanguageSectionLabel.text = LocalizationManager.Get("title.options.language", "Language");
+
+        bool hasSavedLanguage = LocalizationManager.HasSavedLanguagePreference();
+        if (pauseLanguageModeLabel != null)
+        {
+            pauseLanguageModeLabel.text = hasSavedLanguage
+                ? LocalizationManager.Get("title.options.language_saved", "Saved language preference is active.")
+                : LocalizationManager.Format("title.options.language_auto", "Language auto-detected: {0}", LocalizationManager.GetLanguageLabel(LocalizationManager.CurrentLanguage));
+        }
+
+        if (pauseAudioSectionLabel != null)
+            pauseAudioSectionLabel.text = LocalizationManager.Get("title.options.audio", "Audio");
+        if (pauseMasterVolumeLabel != null)
+            pauseMasterVolumeLabel.text = LocalizationManager.Get("title.options.master_volume", "Master Volume");
+        if (pauseBgmVolumeLabel != null)
+            pauseBgmVolumeLabel.text = LocalizationManager.Get("title.options.bgm_volume", "BGM Volume");
+        if (pauseSfxVolumeLabel != null)
+            pauseSfxVolumeLabel.text = LocalizationManager.Get("title.options.sfx_volume", "SFX Volume");
+        if (pauseDisplaySectionLabel != null)
+            pauseDisplaySectionLabel.text = LocalizationManager.Get("title.options.display", "Display");
+        if (pauseFullscreenValueLabel != null)
+        {
+            pauseFullscreenValueLabel.text = GameOptions.Fullscreen
+                ? LocalizationManager.Get("title.options.fullscreen_on", "Fullscreen: ON")
+                : LocalizationManager.Get("title.options.fullscreen_off", "Fullscreen: OFF");
+        }
+
+        if (pauseMasterSlider != null)
+            pauseMasterSlider.SetValueWithoutNotify(GameOptions.MasterVolume);
+        if (pauseBgmSlider != null)
+            pauseBgmSlider.SetValueWithoutNotify(GameOptions.BgmVolume);
+        if (pauseSfxSlider != null)
+            pauseSfxSlider.SetValueWithoutNotify(GameOptions.SfxVolume);
+
+        IReadOnlyList<GameLanguage> languages = LocalizationManager.GetSupportedLanguages();
+        for (int i = 0; i < pauseLanguageButtonLabels.Count; i++)
+        {
+            if (i < languages.Count)
+                pauseLanguageButtonLabels[i].text = LocalizationManager.GetLanguageLabel(languages[i]);
+        }
+
+        for (int i = 0; i < pauseLanguageButtons.Count; i++)
+        {
+            if (i >= languages.Count)
+                continue;
+
+            Color targetColor = languages[i] == LocalizationManager.CurrentLanguage
+                ? new Color(0.23f, 0.48f, 0.58f, 1f)
+                : new Color(0.08f, 0.16f, 0.2f, 0.94f);
+
+            Image image = pauseLanguageButtons[i].GetComponent<Image>();
+            if (image != null)
+                image.color = targetColor;
+        }
+    }
+
+    void SetPauseLanguage(GameLanguage language)
+    {
+        LocalizationManager.SetLanguage(language);
+    }
+
+    void TogglePauseFullscreen()
+    {
+        GameOptions.Fullscreen = !GameOptions.Fullscreen;
+        RefreshPauseOptionsUi();
     }
 
     void UpdateNavigatorArrow(TMP_Text arrow, Vector3 originWorld, Vector3 originScreen, Component target)
