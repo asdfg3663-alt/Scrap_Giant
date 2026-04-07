@@ -293,6 +293,8 @@ public class ShipStats : MonoBehaviour
         if (!isPlayerShip || destroyedTransform == null)
             return;
 
+        ShipBuilder shipBuilder = GetComponent<ShipBuilder>();
+
         ModuleAttachment destroyedAttachment = destroyedTransform.GetComponent<ModuleAttachment>();
         if (destroyedAttachment != null)
         {
@@ -303,13 +305,17 @@ public class ShipStats : MonoBehaviour
 
         DisableModuleForRemoval(destroyedTransform);
         destroyedTransform.SetParent(null, true);
+        Physics2D.SyncTransforms();
         AudioRuntime.PlayPlayerModuleBreak();
 
         if (destroyedModule != null && destroyedModule.data != null && destroyedModule.data.type != ModuleType.Core)
             DetachDisconnectedModules(destroyedModule, hitPoint, hitNormal);
 
+        shipBuilder?.RefreshOccupiedMapNow();
+
         rebuildQueued = false;
         Rebuild();
+        Physics2D.SyncTransforms();
         RefreshHudFuel();
     }
 

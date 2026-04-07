@@ -156,15 +156,12 @@ public class ShipBuilder : MonoBehaviour
                 // NOTE: 현재 UX = 롱프레스 + 이동 => 드래그 시작 (원하면 dist 조건 제거 가능)
                 if (pressT >= longPressTime && dist >= dragStartDistance)
                 {
+                    if (wasAttachedAtDragStart)
+                        DetachModule(draggingTf);
+
                     isDragging = true;
                     BeginDragPreview(draggingTf);
                     AudioRuntime.BeginModuleDrag();
-
-                    if (wasAttachedAtDragStart)
-                    {
-                        DetachModule(draggingTf);
-                        BeginDragPreview(draggingTf);
-                    }
                 }
             }
         }
@@ -215,7 +212,6 @@ public class ShipBuilder : MonoBehaviour
 
         // 겹침 체크
         if (IsOccupied(cand.grid)) return false;
-        if (WouldOverlapAt(cand.grid, cand.rot90, draggingTf)) return false;
 
         // TODO: 여기서 모듈별 룰(엔진은 뒤만, 코어 1개 등)을 추가 가능
 
@@ -289,6 +285,14 @@ public class ShipBuilder : MonoBehaviour
     IgnoreCollisionsWithShip(moduleTf, false);
     RestoreShipBodyStates(shipBodies);
 
+    var attachment = moduleTf.GetComponent<ModuleAttachment>();
+    if (attachment != null)
+    {
+        attachment.shipRoot = null;
+        attachment.gridPos = default;
+        attachment.rot90 = 0;
+    }
+
     var mod = moduleTf.GetComponent<Module>();
     if (mod == null) return;
 
@@ -299,8 +303,9 @@ public class ShipBuilder : MonoBehaviour
     for (int i = 0; i < removeKeys.Count; i++)
         occupied.Remove(removeKeys[i]);
 
+    RefreshShipStateAfterStructureChange();
+
     // 🔥 이 줄 추가
-    if (shipStats) shipStats.Rebuild();
 }
 
     void SetModulePhysics(Transform moduleTf, bool attachedToShip)
@@ -508,7 +513,6 @@ public class ShipBuilder : MonoBehaviour
                 return;
 
             if (IsOccupied(targetGrid)) return;
-            if (WouldOverlapAt(targetGrid, rot90, moduleTf)) return;
 
             if (d < bestDist)
             {
@@ -644,6 +648,9 @@ public class ShipBuilder : MonoBehaviour
             // 드래그 중인 자신의 콜라이더는 무시
             if (draggingCol != null && h == draggingCol) continue;
             if (moduleTf != null && h.transform.IsChildOf(moduleTf)) continue;
+            if (!h.enabled) continue;
+            if (ShipCollisionHull2D.IsHullCollider(h)) continue;
+            if (ShouldIgnoreCurrentShipCollider(h, moduleTf)) continue;
 
             // 함선에 붙어있는 모듈이랑 겹치면 true
             return true;
@@ -723,6 +730,19 @@ bool IsOccupied(Vector2Int grid) => occupied.ContainsKey(grid);
         }
     }
 
+    public void RefreshOccupiedMapNow()
+    {
+        RebuildOccupiedMap();
+        Physics2D.SyncTransforms();
+    }
+
+    void RefreshShipStateAfterStructureChange()
+    {
+        RebuildOccupiedMap();
+        Physics2D.SyncTransforms();
+        if (shipStats) shipStats.Rebuild();
+    }
+
     // =========================
     // Input helpers
     // =========================
@@ -797,6 +817,21 @@ bool IsOccupied(Vector2Int grid) => occupied.ContainsKey(grid);
         }
 
         return false;
+    }
+
+    bool ShouldIgnoreCurrentShipCollider(Collider2D collider, Transform moduleTf)
+    {
+        if (collider == null || shipRoot == null)
+            return false;
+
+        if (moduleTf != null && collider.transform.IsChildOf(moduleTf))
+            return true;
+
+        ShipStats ownerShip = collider.GetComponentInParent<ShipStats>();
+        if (ownerShip == null || shipStats == null || ownerShip != shipStats)
+            return false;
+
+        return true;
     }
 
     bool GetPointerHeld()

@@ -174,7 +174,16 @@ public class ShipMovement : MonoBehaviour
         }
         else
         {
+            float angularSpeedRpm = Mathf.Abs(rb.angularVelocity) * 60f / 360f;
             float damping = angularDamping;
+            float sasAssistThresholdRpm = Mathf.Max(lowAngularStopStartRPM, lowAngularStopStartRPM * Mathf.Max(1f, sasAssistRangeMultiplier));
+
+            if (angularSpeedRpm <= sasAssistThresholdRpm && lowAngularStopDamping > 0f)
+            {
+                float assistBlend = 1f - Mathf.InverseLerp(lowAngularStopStartRPM, sasAssistThresholdRpm, angularSpeedRpm);
+                float assistedDamping = Mathf.Lerp(lowAngularStopDamping * 0.5f, lowAngularStopDamping, Mathf.Clamp01(assistBlend));
+                damping = Mathf.Max(damping, assistedDamping);
+            }
 
             if (damping > 0f)
                 rb.angularVelocity = Mathf.MoveTowards(rb.angularVelocity, 0f, damping * Time.fixedDeltaTime);

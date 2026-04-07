@@ -98,6 +98,10 @@ public class ShipCollisionHull2D : MonoBehaviour
             if (collider == null)
                 continue;
 
+            collider.enabled = false;
+            collider.size = Vector2.zero;
+            collider.offset = Vector2.zero;
+
             if (Application.isPlaying)
                 Destroy(collider);
             else

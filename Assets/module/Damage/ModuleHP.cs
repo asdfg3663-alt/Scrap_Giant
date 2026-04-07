@@ -116,6 +116,9 @@ public class ModuleHP : MonoBehaviour, IDamageable
     void OnDestroy()
     {
         if (parentShip != null)
+        {
+            parentShip.GetComponent<ShipBuilder>()?.RefreshOccupiedMapNow();
             parentShip.ScheduleRebuild();
+        }
     }
 }
