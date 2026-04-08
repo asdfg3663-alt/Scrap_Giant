@@ -135,8 +135,6 @@ public class PlayerHudRuntime : MonoBehaviour
     TMP_Text pauseMasterVolumeLabel;
     TMP_Text pauseBgmVolumeLabel;
     TMP_Text pauseSfxVolumeLabel;
-    TMP_Text pauseDisplaySectionLabel;
-    TMP_Text pauseFullscreenValueLabel;
     readonly List<TMP_Text> productionModeOptionLabels = new();
     readonly List<Button> pauseLanguageButtons = new();
     readonly List<TMP_Text> pauseLanguageButtonLabels = new();
@@ -178,7 +176,6 @@ public class PlayerHudRuntime : MonoBehaviour
     Slider pauseMasterSlider;
     Slider pauseBgmSlider;
     Slider pauseSfxSlider;
-    Button pauseFullscreenButton;
 
     [Header("Mobile Controls")]
     [SerializeField] bool showMobileControlsInEditor = true;
@@ -1076,59 +1073,64 @@ public class PlayerHudRuntime : MonoBehaviour
         }
 
         RectTransform audioBlock = CreateRect("AudioBlock", root);
-        SetAnchored(audioBlock, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -278f), new Vector2(964f, 196f));
+        SetAnchored(audioBlock, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -278f), new Vector2(964f, 220f));
         CreateBackPlate(audioBlock, new Color(0.05f, 0.11f, 0.14f, 0.92f));
         pauseAudioSectionLabel = CreateLabel(audioBlock, string.Empty, 20f, Color.white, TextAlignmentOptions.TopLeft, new Vector2(18f, -18f), new Vector2(0f, 1f), FontStyles.Bold);
 
-        pauseMasterVolumeLabel = CreateLabel(audioBlock, string.Empty, 18f, new Color(0.82f, 0.9f, 0.95f, 1f), TextAlignmentOptions.Left, new Vector2(48f, -70f), new Vector2(0f, 0.5f), FontStyles.Normal);
-        pauseMasterSlider = CreatePauseSlider(audioBlock, new Vector2(300f, -70f), value => GameOptions.MasterVolume = value);
+        pauseMasterVolumeLabel = CreateLabel(audioBlock, string.Empty, 18f, new Color(0.82f, 0.9f, 0.95f, 1f), TextAlignmentOptions.Left, Vector2.zero, new Vector2(0f, 0.5f), FontStyles.Normal);
+        pauseMasterVolumeLabel.rectTransform.anchorMin = new Vector2(0f, 1f);
+        pauseMasterVolumeLabel.rectTransform.anchorMax = new Vector2(0f, 1f);
+        pauseMasterVolumeLabel.rectTransform.pivot = new Vector2(0f, 0.5f);
+        pauseMasterVolumeLabel.rectTransform.anchoredPosition = new Vector2(48f, -78f);
+        pauseMasterVolumeLabel.rectTransform.sizeDelta = new Vector2(220f, 28f);
+        pauseMasterSlider = CreatePauseSlider(audioBlock, 78f, value => GameOptions.MasterVolume = value);
 
-        pauseBgmVolumeLabel = CreateLabel(audioBlock, string.Empty, 16f, new Color(0.82f, 0.9f, 0.95f, 1f), TextAlignmentOptions.Left, new Vector2(48f, -122f), new Vector2(0f, 0.5f), FontStyles.Normal);
-        pauseBgmSlider = CreatePauseSlider(audioBlock, new Vector2(300f, -122f), value => GameOptions.BgmVolume = value);
+        pauseBgmVolumeLabel = CreateLabel(audioBlock, string.Empty, 16f, new Color(0.82f, 0.9f, 0.95f, 1f), TextAlignmentOptions.Left, Vector2.zero, new Vector2(0f, 0.5f), FontStyles.Normal);
+        pauseBgmVolumeLabel.rectTransform.anchorMin = new Vector2(0f, 1f);
+        pauseBgmVolumeLabel.rectTransform.anchorMax = new Vector2(0f, 1f);
+        pauseBgmVolumeLabel.rectTransform.pivot = new Vector2(0f, 0.5f);
+        pauseBgmVolumeLabel.rectTransform.anchoredPosition = new Vector2(48f, -130f);
+        pauseBgmVolumeLabel.rectTransform.sizeDelta = new Vector2(220f, 28f);
+        pauseBgmSlider = CreatePauseSlider(audioBlock, 130f, value => GameOptions.BgmVolume = value);
 
-        pauseSfxVolumeLabel = CreateLabel(audioBlock, string.Empty, 16f, new Color(0.82f, 0.9f, 0.95f, 1f), TextAlignmentOptions.Left, new Vector2(48f, -174f), new Vector2(0f, 0.5f), FontStyles.Normal);
-        pauseSfxSlider = CreatePauseSlider(audioBlock, new Vector2(300f, -174f), value => GameOptions.SfxVolume = value);
-
-        RectTransform displayBlock = CreateRect("DisplayBlock", root);
-        SetAnchored(displayBlock, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -494f), new Vector2(964f, 92f));
-        CreateBackPlate(displayBlock, new Color(0.05f, 0.11f, 0.14f, 0.92f));
-        pauseDisplaySectionLabel = CreateLabel(displayBlock, string.Empty, 20f, Color.white, TextAlignmentOptions.TopLeft, new Vector2(18f, -18f), new Vector2(0f, 1f), FontStyles.Bold);
-
-        pauseFullscreenButton = CreateHudButton(
-            displayBlock,
-            "PauseFullscreenButton",
-            new Vector2(0f, 0f),
-            new Vector2(0f, 0f),
-            new Vector2(0f, 0f),
-            new Vector2(18f, 18f),
-            new Vector2(310f, 48f),
-            new Color(0.08f, 0.16f, 0.2f, 0.94f),
-            new Color(0.16f, 0.29f, 0.34f, 1f),
-            new Color(0.28f, 0.44f, 0.49f, 1f),
-            out pauseFullscreenValueLabel);
-        pauseFullscreenButton.onClick.AddListener(TogglePauseFullscreen);
+        pauseSfxVolumeLabel = CreateLabel(audioBlock, string.Empty, 16f, new Color(0.82f, 0.9f, 0.95f, 1f), TextAlignmentOptions.Left, Vector2.zero, new Vector2(0f, 0.5f), FontStyles.Normal);
+        pauseSfxVolumeLabel.rectTransform.anchorMin = new Vector2(0f, 1f);
+        pauseSfxVolumeLabel.rectTransform.anchorMax = new Vector2(0f, 1f);
+        pauseSfxVolumeLabel.rectTransform.pivot = new Vector2(0f, 0.5f);
+        pauseSfxVolumeLabel.rectTransform.anchoredPosition = new Vector2(48f, -182f);
+        pauseSfxVolumeLabel.rectTransform.sizeDelta = new Vector2(220f, 28f);
+        pauseSfxSlider = CreatePauseSlider(audioBlock, 182f, value => GameOptions.SfxVolume = value);
     }
 
-    Slider CreatePauseSlider(Transform parent, Vector2 anchoredPosition, UnityEngine.Events.UnityAction<float> onChanged)
+    Slider CreatePauseSlider(Transform parent, float topOffset, UnityEngine.Events.UnityAction<float> onChanged)
     {
         RectTransform root = CreateRect("PauseSlider", parent);
-        SetAnchored(root, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), anchoredPosition, new Vector2(560f, 32f));
+        root.anchorMin = new Vector2(0f, 1f);
+        root.anchorMax = new Vector2(1f, 1f);
+        root.pivot = new Vector2(0f, 1f);
+        root.anchoredPosition = new Vector2(300f, -topOffset);
+        root.sizeDelta = new Vector2(-336f, 24f);
 
-        Image background = CreateImage(root, new Color(0.07f, 0.13f, 0.18f, 0.96f));
-        background.raycastTarget = true;
+        Image rootHitImage = root.gameObject.AddComponent<Image>();
+        rootHitImage.color = new Color(1f, 1f, 1f, 0.001f);
+        rootHitImage.raycastTarget = true;
 
         Slider slider = root.gameObject.AddComponent<Slider>();
         slider.direction = Slider.Direction.LeftToRight;
         slider.minValue = 0f;
         slider.maxValue = 1f;
+        slider.wholeNumbers = false;
+
+        RectTransform background = CreateRect("Background", root);
+        Stretch(background, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        Image backgroundImage = CreateImage(background, new Color(0.14f, 0.22f, 0.26f, 1f));
+        backgroundImage.raycastTarget = true;
 
         RectTransform fillArea = CreateRect("FillArea", root);
-        Stretch(fillArea, Vector2.zero, Vector2.one, new Vector2(8f, 8f), new Vector2(-8f, -8f));
+        Stretch(fillArea, Vector2.zero, Vector2.one, new Vector2(8f, 5f), new Vector2(-8f, -5f));
 
         RectTransform fill = CreateRect("Fill", fillArea);
-        fill.anchorMin = new Vector2(0f, 0f);
-        fill.anchorMax = new Vector2(1f, 1f);
-        fill.pivot = new Vector2(0f, 0.5f);
+        Stretch(fill, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         Image fillImage = CreateImage(fill, new Color(0.86f, 0.93f, 0.38f, 1f));
         fillImage.raycastTarget = false;
 
@@ -1139,7 +1141,7 @@ public class PlayerHudRuntime : MonoBehaviour
         Image handleImage = CreateImage(handle, Color.white);
         handleImage.raycastTarget = true;
 
-        slider.targetGraphic = background;
+        slider.targetGraphic = backgroundImage;
         slider.fillRect = fill;
         slider.handleRect = handle;
         slider.onValueChanged.AddListener(onChanged);
@@ -1758,14 +1760,6 @@ public class PlayerHudRuntime : MonoBehaviour
             pauseBgmVolumeLabel.text = LocalizationManager.Get("title.options.bgm_volume", "BGM Volume");
         if (pauseSfxVolumeLabel != null)
             pauseSfxVolumeLabel.text = LocalizationManager.Get("title.options.sfx_volume", "SFX Volume");
-        if (pauseDisplaySectionLabel != null)
-            pauseDisplaySectionLabel.text = LocalizationManager.Get("title.options.display", "Display");
-        if (pauseFullscreenValueLabel != null)
-        {
-            pauseFullscreenValueLabel.text = GameOptions.Fullscreen
-                ? LocalizationManager.Get("title.options.fullscreen_on", "Fullscreen: ON")
-                : LocalizationManager.Get("title.options.fullscreen_off", "Fullscreen: OFF");
-        }
 
         if (pauseMasterSlider != null)
             pauseMasterSlider.SetValueWithoutNotify(GameOptions.MasterVolume);
@@ -1799,12 +1793,6 @@ public class PlayerHudRuntime : MonoBehaviour
     void SetPauseLanguage(GameLanguage language)
     {
         LocalizationManager.SetLanguage(language);
-    }
-
-    void TogglePauseFullscreen()
-    {
-        GameOptions.Fullscreen = !GameOptions.Fullscreen;
-        RefreshPauseOptionsUi();
     }
 
     void UpdateNavigatorArrow(TMP_Text arrow, Vector3 originWorld, Vector3 originScreen, Component target)

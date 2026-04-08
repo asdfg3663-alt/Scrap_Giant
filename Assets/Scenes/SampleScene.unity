@@ -174,6 +174,11 @@ MonoBehaviour:
   minModuleMassForCOM: 0.001
   engineDirectionThreshold: 0.75
   maxRPM: 30
+  enablePlayerBalanceSas: 1
+  balanceAssistTolerance: 0.1
+  balanceAssistTurnDeadZone: 0.08
+  balanceAssistMaxTorque: 18
+  balanceAssistAngularDamping: 3.5
 --- !u!50 &10065786
 Rigidbody2D:
   serializedVersion: 5
@@ -252,6 +257,11 @@ MonoBehaviour:
   totalHeatDissipationPerSec: 0
   totalRepairPerSecond: 0
   repairScrapCostPerHp: 0.1
+  assemblyPriorityMode: 0
+  ammoSynthesisPerSec: 8
+  ammoPerScrap: 12
+  baseAmmoReserveTarget: 120
+  ammoReservePerWeapon: 40
   totalDps: 0
   weaponPowerPerSecPotential: 0
   weaponHeatPerSecPotential: 0
@@ -6001,9 +6011,9 @@ MonoBehaviour:
   baseThreat: 0.16
   threatGraceScore: 50
   earlyThreatMultiplier: 0.3
-  threatAccelerationScore: 500
+  threatAccelerationScore: 1000
   threatAccelerationScale: 0.012
-  threatAccelerationExponent: 1.3
+  threatAccelerationExponent: 1.2
   weakEnemyChance: 0.3
   weakEnemyThreatMultiplier: 0.4
   extraEngineThreatStep: 1.35
