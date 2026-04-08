@@ -823,7 +823,11 @@ public sealed partial class TitleScreenRuntime : MonoBehaviour
         for (int i = 0; i < languageButtonLabels.Count; i++)
         {
             if (i < LocalizationManager.GetSupportedLanguages().Count)
-                languageButtonLabels[i].text = LocalizationManager.GetLanguageLabel(LocalizationManager.GetSupportedLanguages()[i]);
+            {
+                GameLanguage language = LocalizationManager.GetSupportedLanguages()[i];
+                languageButtonLabels[i].text = LocalizationManager.GetNativeLanguageLabel(language);
+                LocalizationFontManager.ApplyFont(languageButtonLabels[i], language);
+            }
         }
 
         for (int i = 0; i < howToTabLabels.Count; i++)

@@ -8,7 +8,8 @@ public enum GameLanguage
     Korean,
     Japanese,
     Spanish,
-    Russian
+    Russian,
+    SimplifiedChinese
 }
 
 [Serializable]
@@ -20,6 +21,7 @@ public sealed class LocalizationEntryData
     public string ja;
     public string es;
     public string ru;
+    public string zhHans;
 }
 
 [Serializable]
@@ -94,7 +96,8 @@ public class LocalizationManager : MonoBehaviour
             GameLanguage.Korean,
             GameLanguage.Japanese,
             GameLanguage.Spanish,
-            GameLanguage.Russian
+            GameLanguage.Russian,
+            GameLanguage.SimplifiedChinese
         };
     }
 
@@ -102,11 +105,25 @@ public class LocalizationManager : MonoBehaviour
     {
         return language switch
         {
-            GameLanguage.Korean => Get("language.korean", "\uD55C\uAD6D\uC5B4"),
-            GameLanguage.Japanese => Get("language.japanese", "\u65E5\u672C\u8A9E"),
-            GameLanguage.Spanish => Get("language.spanish", "Espa\u00F1ol"),
-            GameLanguage.Russian => Get("language.russian", "\u0420\u0443\u0441\u0441\u043A\u0438\u0439"),
+            GameLanguage.Korean => Get("language.korean", "Korean"),
+            GameLanguage.Japanese => Get("language.japanese", "Japanese"),
+            GameLanguage.Spanish => Get("language.spanish", "Spanish"),
+            GameLanguage.Russian => Get("language.russian", "Russian"),
+            GameLanguage.SimplifiedChinese => Get("language.simplified_chinese", "Simplified Chinese"),
             _ => Get("language.english", "English")
+        };
+    }
+
+    public static string GetNativeLanguageLabel(GameLanguage language)
+    {
+        return language switch
+        {
+            GameLanguage.Korean => "\uD55C\uAD6D\uC5B4",
+            GameLanguage.Japanese => "\u65E5\u672C\u8A9E",
+            GameLanguage.Spanish => "Espa\u00F1ol",
+            GameLanguage.Russian => "\u0420\u0443\u0441\u0441\u043A\u0438\u0439",
+            GameLanguage.SimplifiedChinese => "\u7B80\u4F53\u4E2D\u6587",
+            _ => "English"
         };
     }
 
@@ -193,6 +210,14 @@ public class LocalizationManager : MonoBehaviour
                 return saved;
         }
 
+        string systemLanguageName = Application.systemLanguage.ToString();
+        if (string.Equals(systemLanguageName, "ChineseSimplified", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(systemLanguageName, "ChineseTraditional", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(systemLanguageName, "Chinese", StringComparison.OrdinalIgnoreCase))
+        {
+            return GameLanguage.SimplifiedChinese;
+        }
+
         return Application.systemLanguage switch
         {
             SystemLanguage.Korean => GameLanguage.Korean,
@@ -226,6 +251,7 @@ public class LocalizationManager : MonoBehaviour
             GameLanguage.Japanese => entry.ja,
             GameLanguage.Spanish => entry.es,
             GameLanguage.Russian => entry.ru,
+            GameLanguage.SimplifiedChinese => entry.zhHans,
             _ => entry.en
         };
     }

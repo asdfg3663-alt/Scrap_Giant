@@ -8,6 +8,7 @@ public static class LocalizationFontManager
     static TMP_FontAsset koreanFontAsset;
     static TMP_FontAsset japaneseFontAsset;
     static TMP_FontAsset cyrillicFontAsset;
+    static TMP_FontAsset simplifiedChineseFontAsset;
     static TMP_FontAsset resourceFallbackFontAsset;
     static readonly List<TMP_FontAsset> fallbackAssets = new();
     static bool initialized;
@@ -19,6 +20,7 @@ public static class LocalizationFontManager
         koreanFontAsset = null;
         japaneseFontAsset = null;
         cyrillicFontAsset = null;
+        simplifiedChineseFontAsset = null;
         resourceFallbackFontAsset = null;
         fallbackAssets.Clear();
         initialized = false;
@@ -34,7 +36,7 @@ public static class LocalizationFontManager
     {
         EnsureInitialized();
 
-        TMP_FontAsset localized = GetPrimaryFontForLanguage(LocalizationManager.CurrentLanguage);
+        TMP_FontAsset localized = GetFontAssetForLanguage(LocalizationManager.CurrentLanguage);
         if (localized != null)
             return localized;
 
@@ -44,27 +46,38 @@ public static class LocalizationFontManager
         return TMP_Settings.defaultFontAsset;
     }
 
+    public static TMP_FontAsset GetFontAssetForLanguage(GameLanguage language)
+    {
+        EnsureInitialized();
+
+        TMP_FontAsset localized = GetPrimaryFontForLanguage(language);
+        if (IsFontAssetUsable(localized))
+            return localized;
+
+        return IsFontAssetUsable(resourceFallbackFontAsset) ? resourceFallbackFontAsset : TMP_Settings.defaultFontAsset;
+    }
+
     public static void ApplyFont(TMP_Text text)
     {
         if (text == null)
             return;
 
         EnsureInitialized();
+        ApplyResolvedFont(text, GetUiFontAsset());
+    }
 
-        TMP_FontAsset font = GetUiFontAsset();
-        if (font == null)
+    public static void ApplyFont(TMP_Text text, GameLanguage language)
+    {
+        if (text == null)
             return;
 
-        AttachFallbackChain(font);
-        text.font = font;
-        text.havePropertiesChanged = true;
-        text.SetAllDirty();
+        EnsureInitialized();
+        ApplyResolvedFont(text, GetFontAssetForLanguage(language));
     }
 
     public static void RefreshActiveTexts()
     {
         EnsureInitialized();
-        ApplyGlobalFallbacks();
 
         TMP_Text[] texts = Resources.FindObjectsOfTypeAll<TMP_Text>();
         TMP_FontAsset activeFont = GetUiFontAsset();
@@ -76,16 +89,13 @@ public static class LocalizationFontManager
                 continue;
 
             TMP_FontAsset font = activeFont != null ? activeFont : text.font;
-            if (font == null)
+            if (!IsFontAssetUsable(font))
                 font = TMP_Settings.defaultFontAsset;
 
             if (font == null)
                 continue;
 
-            AttachFallbackChain(font);
-            text.font = font;
-            text.havePropertiesChanged = true;
-            text.SetAllDirty();
+            ApplyResolvedFont(text, font);
         }
     }
 
@@ -102,19 +112,22 @@ public static class LocalizationFontManager
         koreanFontAsset = CreateDynamicFontAsset(GetKoreanFontNames(), "Localized_Korean_Primary");
         japaneseFontAsset = CreateDynamicFontAsset(GetJapaneseFontNames(), "Localized_Japanese_Primary");
         cyrillicFontAsset = CreateDynamicFontAsset(GetCyrillicFontNames(), "Localized_Cyrillic_Primary");
+        simplifiedChineseFontAsset = CreateDynamicFontAsset(GetSimplifiedChineseFontNames(), "Localized_Chinese_Primary");
 
         AddFallback(resourceFallbackFontAsset);
         AddFallback(koreanFontAsset);
         AddFallback(japaneseFontAsset);
         AddFallback(cyrillicFontAsset);
+        AddFallback(simplifiedChineseFontAsset);
 
         AttachFallbackChain(resourceFallbackFontAsset);
         AttachFallbackChain(latinFontAsset);
         AttachFallbackChain(koreanFontAsset);
         AttachFallbackChain(japaneseFontAsset);
         AttachFallbackChain(cyrillicFontAsset);
+        AttachFallbackChain(simplifiedChineseFontAsset);
 
-        ApplyGlobalFallbacks();
+        CleanupTmpSettingsReferences();
     }
 
     static TMP_FontAsset GetPrimaryFontForLanguage(GameLanguage language)
@@ -124,6 +137,7 @@ public static class LocalizationFontManager
             GameLanguage.Korean => koreanFontAsset ?? latinFontAsset ?? resourceFallbackFontAsset,
             GameLanguage.Japanese => japaneseFontAsset ?? latinFontAsset ?? resourceFallbackFontAsset,
             GameLanguage.Russian => cyrillicFontAsset ?? latinFontAsset ?? resourceFallbackFontAsset,
+            GameLanguage.SimplifiedChinese => simplifiedChineseFontAsset ?? latinFontAsset ?? resourceFallbackFontAsset,
             _ => latinFontAsset ?? resourceFallbackFontAsset
         };
     }
@@ -146,6 +160,7 @@ public static class LocalizationFontManager
 
         asset.name = assetName;
         asset.hideFlags = HideFlags.HideAndDontSave;
+        PreserveFontSubAssets(asset);
         return asset;
     }
 
@@ -184,18 +199,6 @@ public static class LocalizationFontManager
         return null;
     }
 
-    static void AddFallbackToSettings(TMP_FontAsset fallback)
-    {
-        if (fallback == null)
-            return;
-
-        if (TMP_Settings.fallbackFontAssets == null)
-            TMP_Settings.fallbackFontAssets = new List<TMP_FontAsset>();
-
-        if (!TMP_Settings.fallbackFontAssets.Contains(fallback))
-            TMP_Settings.fallbackFontAssets.Add(fallback);
-    }
-
     static void AddFallbackToFont(TMP_FontAsset primary, TMP_FontAsset fallback)
     {
         if (primary == null || fallback == null)
@@ -210,33 +213,100 @@ public static class LocalizationFontManager
 
     static void AttachFallbackChain(TMP_FontAsset font)
     {
-        if (font == null)
+        if (!IsFontAssetUsable(font))
             return;
 
         for (int i = 0; i < fallbackAssets.Count; i++)
         {
             TMP_FontAsset fallback = fallbackAssets[i];
-            if (fallback == null || fallback == font)
+            if (!IsFontAssetUsable(fallback) || fallback == font)
                 continue;
 
             AddFallbackToFont(font, fallback);
         }
     }
 
-    static void ApplyGlobalFallbacks()
+    static void ApplyResolvedFont(TMP_Text text, TMP_FontAsset font)
     {
-        TMP_FontAsset defaultFont = GetPrimaryFontForLanguage(LocalizationManager.CurrentLanguage);
-        if (defaultFont == null)
-            defaultFont = resourceFallbackFontAsset ?? TMP_Settings.defaultFontAsset;
+        if (text == null)
+            return;
 
-        if (defaultFont != null)
+        if (!IsFontAssetUsable(font))
+            font = IsFontAssetUsable(resourceFallbackFontAsset) ? resourceFallbackFontAsset : TMP_Settings.defaultFontAsset;
+
+        if (!IsFontAssetUsable(font))
+            return;
+
+        AttachFallbackChain(font);
+        text.font = font;
+        if (font.material != null)
+            text.fontSharedMaterial = font.material;
+        text.havePropertiesChanged = true;
+        text.SetAllDirty();
+    }
+
+    static void PreserveFontSubAssets(TMP_FontAsset font)
+    {
+        if (font == null)
+            return;
+
+        try
         {
-            TMP_Settings.defaultFontAsset = defaultFont;
-            AttachFallbackChain(defaultFont);
+            if (font.material != null)
+                font.material.hideFlags = HideFlags.HideAndDontSave;
+
+            Texture[] atlasTextures = font.atlasTextures;
+            if (atlasTextures == null)
+                return;
+
+            for (int i = 0; i < atlasTextures.Length; i++)
+            {
+                if (atlasTextures[i] != null)
+                    atlasTextures[i].hideFlags = HideFlags.HideAndDontSave;
+            }
+        }
+        catch (MissingReferenceException)
+        {
+        }
+    }
+
+    static bool IsFontAssetUsable(TMP_FontAsset font)
+    {
+        if (font == null)
+            return false;
+
+        try
+        {
+            _ = font.material;
+            _ = font.atlasTextures;
+            return true;
+        }
+        catch (MissingReferenceException)
+        {
+            return false;
+        }
+    }
+
+    static void CleanupTmpSettingsReferences()
+    {
+        if (TMP_Settings.instance == null)
+            return;
+
+        if (!IsFontAssetUsable(TMP_Settings.defaultFontAsset))
+        {
+            TMP_FontAsset safeDefault = resourceFallbackFontAsset ?? latinFontAsset;
+            if (IsFontAssetUsable(safeDefault))
+                TMP_Settings.defaultFontAsset = safeDefault;
         }
 
-        for (int i = 0; i < fallbackAssets.Count; i++)
-            AddFallbackToSettings(fallbackAssets[i]);
+        if (TMP_Settings.fallbackFontAssets == null)
+            return;
+
+        for (int i = TMP_Settings.fallbackFontAssets.Count - 1; i >= 0; i--)
+        {
+            if (!IsFontAssetUsable(TMP_Settings.fallbackFontAssets[i]))
+                TMP_Settings.fallbackFontAssets.RemoveAt(i);
+        }
     }
 
     static string[] GetPrimaryUiFontNames()
@@ -280,6 +350,17 @@ public static class LocalizationFontManager
         return new[] { "Arial Unicode MS", "Helvetica Neue" };
 #else
         return new[] { "Segoe UI", "Arial", "Tahoma" };
+#endif
+    }
+
+    static string[] GetSimplifiedChineseFontNames()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        return new[] { "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "MiSans", "sans-serif" };
+#elif UNITY_IOS && !UNITY_EDITOR
+        return new[] { "PingFang SC", "Heiti SC", "Arial Unicode MS" };
+#else
+        return new[] { "Microsoft YaHei UI", "Microsoft YaHei", "DengXian", "SimHei", "Arial Unicode MS" };
 #endif
     }
 }

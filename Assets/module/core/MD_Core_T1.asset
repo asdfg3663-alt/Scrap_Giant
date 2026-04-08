@@ -40,8 +40,8 @@ MonoBehaviour:
   powerGenPerSec: 1
   powerUsePerSec: 0
   maxEnergy: 10
-  maxFuel: 50
-  fuelSynthesisPerSec: 5
+  maxFuel: 100
+  fuelSynthesisPerSec: 15
   thrust: 1
   mass: 5
   scoreMultiplier: 1

@@ -84,7 +84,6 @@ public class PlayerHudRuntime : MonoBehaviour
     }
 
     ShipStats trackedShip;
-    TMP_FontAsset fontAsset;
 
     RectTransform hudRoot;
     RectTransform resourceListRoot;
@@ -586,7 +585,6 @@ public class PlayerHudRuntime : MonoBehaviour
         if (GetComponent<GraphicRaycaster>() == null)
             gameObject.AddComponent<GraphicRaycaster>();
 
-        fontAsset = ResolveFontAsset();
     }
 
     void InitializeDefaults()
@@ -1772,7 +1770,10 @@ public class PlayerHudRuntime : MonoBehaviour
         for (int i = 0; i < pauseLanguageButtonLabels.Count; i++)
         {
             if (i < languages.Count)
-                pauseLanguageButtonLabels[i].text = LocalizationManager.GetLanguageLabel(languages[i]);
+            {
+                pauseLanguageButtonLabels[i].text = LocalizationManager.GetNativeLanguageLabel(languages[i]);
+                LocalizationFontManager.ApplyFont(pauseLanguageButtonLabels[i], languages[i]);
+            }
         }
 
         for (int i = 0; i < pauseLanguageButtons.Count; i++)
@@ -2061,18 +2062,6 @@ public class PlayerHudRuntime : MonoBehaviour
         return WorldSpawnDirector.GetModulePrefabByType(module.data.type);
     }
 
-    TMP_FontAsset ResolveFontAsset()
-    {
-        TMP_FontAsset localizedFont = LocalizationFontManager.GetUiFontAsset();
-        if (localizedFont != null)
-            return localizedFont;
-
-        if (TMP_Settings.instance != null && TMP_Settings.defaultFontAsset != null)
-            return TMP_Settings.defaultFontAsset;
-
-        return Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
-    }
-
     RectTransform CreateRect(string name, Transform parent)
     {
         var go = new GameObject(name, typeof(RectTransform));
@@ -2137,7 +2126,7 @@ public class PlayerHudRuntime : MonoBehaviour
         SetAnchored(rect, pivot, pivot, pivot, anchoredPosition, new Vector2(200f, 28f));
 
         var label = rect.gameObject.AddComponent<TextMeshProUGUI>();
-        label.font = fontAsset;
+        LocalizationFontManager.ApplyFont(label);
         label.fontSize = fontSize;
         label.color = color;
         label.text = text;
@@ -2151,7 +2140,7 @@ public class PlayerHudRuntime : MonoBehaviour
     {
         var rect = CreateRect(name, parent);
         var label = rect.gameObject.AddComponent<TextMeshProUGUI>();
-        label.font = fontAsset;
+        LocalizationFontManager.ApplyFont(label);
         label.fontSize = fontSize;
         label.color = color;
         label.fontStyle = style;
@@ -2166,7 +2155,7 @@ public class PlayerHudRuntime : MonoBehaviour
         rect.sizeDelta = new Vector2(30f, 30f);
 
         var label = rect.gameObject.AddComponent<TextMeshProUGUI>();
-        label.font = fontAsset;
+        LocalizationFontManager.ApplyFont(label);
         label.fontSize = 34f;
         label.color = color;
         label.text = "▲";
